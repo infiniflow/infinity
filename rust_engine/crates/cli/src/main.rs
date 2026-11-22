@@ -222,15 +222,20 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     // entry and lets the OS flush; the checkpoint is the durability boundary.
     let wal_flush = toml_value(&text, "wal_flush").unwrap_or_default();
     engine.set_wal_flush(txn::WalFlush::parse(&wal_flush));
-    // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
-    // chunk once it reaches this size. The reference defaults to 4 GiB.
-    let quota = toml_value(&text, "memindex_memory_quota").unwrap_or_default();
+    // `[buffer] unsealed_memory_quota` — everything not yet on disk (the append
+    // buffer plus every index tail) is drained once it passes this. The byte
+    // figure the loop compares against is `budget_bytes()`; the reference's
+    // nearest knob is `index_memory_limit` (default 4 GiB). The older spelling
+    // `memindex_memory_quota` is still accepted.
+    let quota = toml_value(&text, "unsealed_memory_quota")
+        .or_else(|| toml_value(&text, "memindex_memory_quota"))
+        .unwrap_or_default();
     let quota = if quota.trim().is_empty() {
         4 * 1024 * 1024 * 1024
     } else {
         parse_size_bytes(&quota)
     };
-    engine.set_memindex_quota(quota);
+    engine.set_unsealed_memory_quota(quota);
     // `[storage] mem_index_capacity` — rows an in-memory index holds before it
     // is dumped into a sealed chunk (the reference defaults to 65536 rows).
     let capacity = toml_value(&text, "mem_index_capacity")

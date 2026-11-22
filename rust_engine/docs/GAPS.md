@@ -46,13 +46,15 @@
 
 ### 1.2 未落盘内存的周期回收（有意的设计偏离）
 
-**重写版有一条参考没有的周期回收路径**：每 `unsealed_reclaim_interval` 检查一次，以**表**为单位把 append buffer
-与索引 tail 落盘，直到引擎总量回到 `memindex_memory_quota` 的一半（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的
-配额与按批容量触发，所以一张写完就没人动的表会一直占着内存。
+**重写版有一条参考没有的回收路径**：写路径越过 `unsealed_memory_quota` 时只置一个标志，真正排水与周期扫描都发生在
+trigger loop 的 tick 上，以**表**为单位把 append buffer 与索引 tail 落盘，直到引擎总量回到配额的一半
+（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的配额触发且**立即**排水，所以：一张写完就没人动的表在参考里会一直
+占着内存（重写版会回收它），而一次突发写入在参考里按批次各排一次、在重写版里合并成一次 tick 的扫描（chunk 划分因此
+可能不同）。
 
 | | 参考 | 重写版 |
 |---|---|---|
-| 触发 | 写路径的 `MemIndexTracer` 配额、`MemIndexCapacity` 行数 | 同左，**外加**按 `unsealed_reclaim_interval` 的周期扫描（目标：配额的一半） |
+| 触发 | 写路径的 `MemIndexTracer` 配额，**立即**排水 | 同左判断，但只置标志；排水在 trigger loop 的 tick 上（定时或标志），目标为配额的一半 |
 | 单位 | 单个 `MemIndex`（`SegmentIndexMeta`） | **整表**：一次选中就排空该表所有索引 tail 与 append buffer |
 | 选表排序 | 无跨表排序（每次 breach 只处理写入表） | 尺寸与年龄两路名次做 RRF（`K = 3`，年龄优先），平局按年龄、字节、表名 |
 | 单轮上限 | 无（一次 breach 一个索引） | `unsealed_max_tables_per_round`（默认 100，`0` = 不限） |
@@ -62,7 +64,7 @@
 就会看到差异。行数据本身不受影响（内存里的行本就在块文件和 WAL 里）。
 
 配置：`[buffer] unsealed_reclaim_interval`（`0` 停止调度）、`unsealed_max_tables_per_round`（`0` = 不限）；
-`memindex_memory_quota = 0` 关掉整个机制，因为目标由它派生。
+`unsealed_memory_quota = 0` 关掉整个机制，因为目标由它派生。
 
 ## 2 未实现 / 未接线
 

@@ -270,6 +270,12 @@ impl Config {
             }
             ("buffer", "lru_num") => self.lru_num = integer()? as usize,
             ("buffer", "temp_dir") => self.temp_dir = string(),
+            ("buffer", "unsealed_memory_quota") => {
+                self.mem_index_memory_quota = parse_byte_size(&string())?
+            }
+            // The old spelling. Kept so an existing config keeps working; the
+            // name is misleading now - the quota bounds everything not yet on
+            // disk (the append buffer plus every index tail), not one index.
             ("buffer", "memindex_memory_quota") => {
                 self.mem_index_memory_quota = parse_byte_size(&string())?
             }

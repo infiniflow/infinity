@@ -4630,32 +4630,6 @@ impl DropScope<'_> {
     }
 }
 
-/// The quota's proposed dumps: one per table, `drain_all` when the proposal
-/// asked for every tail.
-///
-/// A second breach for a table already listed merges into the pending entry
-/// instead of queueing a second task (`MemIndexTracer::proposed_dump_`'s
-/// coalescing); a breach for a different table still gets its own task.
-#[derive(Default)]
-pub(crate) struct MemIndexPending {
-    /// How many breaches each table has reported since its dump was proposed,
-    /// with [`ALL_TABLES`] standing for "every tail". A dump serves one, so a
-    /// count above 1 means another one is owed.
-    ///
-    /// The reference's `proposed_dump_` skips an **index** that already has a
-    /// dump in flight, but the breach it would have served is not lost: the
-    /// next `IncreaseMemoryUsage` sees the freed memory and only re-proposes if
-    /// it is still over. Counting here is the port's equivalent - a proposal
-    /// that arrives while a dump is queued is served by the dump that follows
-    /// it, not dropped.
-    pub(crate) pending: std::collections::HashMap<String, usize>,
-    /// The `drain_all` a queued task was asked for, per key.
-    pub(crate) drain_all: std::collections::HashSet<String>,
-}
-
-/// The marker [`MemIndexPending::tables`] uses for an "every tail" proposal.
-pub(crate) const ALL_TABLES: &str = "*";
-
 /// Secondary-index registry of one table (the reference's index metas under
 /// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by
 /// **index id**.
@@ -4720,8 +4694,7 @@ impl Default for TableEntry {
             pending_bytes: 0,
             memindex_bytes: 0,
             unsealed_marks: Default::default(),
-            last_write_ms: crate::memory::now_millis(),
-            last_attempt_ms: 0,
+            last_attempt_ts: 0,
             dump_failures: 0,
             row_counter: None,
             append_totals: None,
@@ -4929,18 +4902,17 @@ impl TableEntry {
         self.pending_bytes + self.pending_rows.column_count() * std::mem::size_of::<Vec<Value>>()
     }
 
-    /// Records that this table's rows changed, stamping the reclaim loop's
-    /// clock at the same time.
+    /// Records that this table's rows changed.
     ///
-    /// Every site that advanced [`Self::mirror_epoch`] also has to advance
-    /// [`Self::last_write_ms`]: they answer the same question ("the files are
-    /// behind the rows"), so splitting them would let a table look idle to the
-    /// sweeper while it was written a second ago. One method keeps that
-    /// impossible to get wrong.
+    /// Every site that advanced [`Self::mirror_epoch`] goes through here: they
+    /// answer the same question ("the files are behind the rows"), so splitting
+    /// them would let the two disagree. The age the reclaim loop ranks on is
+    /// **not** stamped here - it is the table's newest append commit ts, which
+    /// the append log already records (`append_ts`) and which therefore survives
+    /// a restart.
     pub(crate) fn note_write(&mut self) {
         self.mirror_dirty = true;
         self.mirror_epoch += 1;
-        self.last_write_ms = crate::memory::now_millis();
         // A write means the table has something new to dump, so a backoff from
         // an earlier failure no longer applies.
         self.dump_failures = 0;
@@ -5084,17 +5056,11 @@ pub(crate) struct TableEntry {
     /// attempt, which the failure backoff absorbs - but under-reporting would
     /// leave a table in memory forever.
     pub(crate) unsealed_marks: HashMap<u64, Arc<std::sync::atomic::AtomicU64>>,
-    /// Monotonic milliseconds of the last write to this table, or the process
-    /// start when it has not been written in this process.
-    ///
-    /// The age the periodic loop sorts on. It advances exactly where
-    /// [`Self::mirror_epoch`] does (an append, a delete, a schema or row-id
-    /// rewrite), because those are the same events that make the table dirty.
-    pub(crate) last_write_ms: u64,
     /// When the reclaim loop last *tried* this table and the attempt released
-    /// nothing. Used only by the pressure path to push a failing table to the
-    /// queue's tail.
-    pub(crate) last_attempt_ms: u64,
+    /// nothing, in **commit ts**. The ranking's age is measured from
+    /// `max(last append ts, this)`, so a failing table recedes to the tail
+    /// instead of camping at the head of the order.
+    pub(crate) last_attempt_ts: u64,
     /// Consecutive failed attempts, reset by a success or a write.
     ///
     /// The backoff is exponential in this count. Refreshing `last_attempt_ms`
@@ -6051,27 +6017,20 @@ pub(crate) struct Context {
     /// `PhysicalFlush` only runs a checkpoint and the cross-engine byte gates
     /// compare directories after `flush_data()`.
     pub(crate) flush_dumps_mem_index: std::sync::atomic::AtomicBool,
-    /// The tables with a quota-proposed `DumpMemIndexTask` queued or running,
-    /// and the engine-wide count that gates the fast path.
-    ///
-    /// The reference's `MemIndexTracer::proposed_dump_` records the indexes a
-    /// dump already covers and skips **those**; it does not refuse to propose
-    /// anything else. A single global flag did: while one table's dump was in
-    /// flight, another table's breach was dropped outright, so that table
-    /// never drained (two databases, one HNSW index each, in
-    /// `test_optimize_from_different_database`).
-    pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
-    /// The three-level waterlines over the one byte ledger (`SPANN_DESIGN.md`
-    /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
-    /// table. Derived from `memindex_quota`, never set directly.
-    pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
-    /// Monotonic milliseconds before which the periodic reclaim loop must not
-    /// start another round, because the last one released nothing.
-    ///
-    /// One timer shared by both targets: "no progress" means the same thing to
-    /// each (candidates were picked and every `dump_table` returned `false`), so
-    /// two timers would only let the pair take turns spinning every tick.
+    /// Commit ts before which no reclaim round may start, because the last one
+    /// released nothing.
     pub(crate) unsealed_backoff_until: std::sync::atomic::AtomicU64,
+    /// Set by the write path when a batch pushed the byte ledger over
+    /// `unsealed_memory_quota`.
+    ///
+    /// The write path **does not drain**. Draining there would have to take
+    /// other tables' bottom gates from inside its own table's bottom half - the
+    /// cross-table cycle the block drain documents - and it would put a block
+    /// write plus an index dump on the statement's latency. It only raises this
+    /// flag; the trigger loop's next tick runs the same `reclaim_unsealed` the
+    /// periodic sweep runs, so there is one drain and one place that performs
+    /// it.
+    pub(crate) unsealed_reclaim_requested: std::sync::atomic::AtomicBool,
     /// `[buffer] unsealed_reclaim_interval` in milliseconds: how often the
     /// staleness sweep runs. `0` disables that path.
     pub(crate) unsealed_reclaim_interval: std::sync::atomic::AtomicU64,
@@ -10390,61 +10349,6 @@ pub(crate) fn files_under(dir: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
-}
-
-impl BgTask for DumpMemIndexTask {
-    fn name(&self) -> &str {
-        "DumpMemIndexTask"
-    }
-
-    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
-        Box::pin(async move {
-            if let Some(engine) = self.engine.upgrade() {
-                // A dump sees a whole write batch: the dump transaction
-                // conflicts with an append or update that already took its
-                // commit ts on the same segment and is retried, as the
-                // reference's `DoDump` is. Every step inside is an `.await`;
-                // the segment files it seals are written on the blocking pool,
-                // leaf by leaf.
-                if self.drain_all {
-                    engine.dump_all_memory_indexes().await;
-                    engine.dump_all_sealed_blocks(None).await;
-                } else {
-                    engine.dump_under_pressure(self.table.as_deref()).await;
-                }
-            }
-            // This task served one breach for its table. A breach that
-            // arrived while it was queued is still counted, and the dump that
-            // follows it is what turns that insert into its own chunk.
-            let key = self.table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
-            let more = {
-                let mut pending = self.pending.lock().unwrap();
-                let left = pending.pending.get_mut(&key).map(|count| {
-                    *count = count.saturating_sub(1);
-                    *count
-                });
-                match left {
-                    Some(0) | None => {
-                        pending.pending.remove(&key);
-                        pending.drain_all.remove(&key);
-                        false
-                    }
-                    Some(_) => true,
-                }
-            };
-            if more {
-                // Submit the continuation **without** recording another breach:
-                // the count already holds the one this task serves.
-                if let Some(engine) = self.engine.upgrade() {
-                    let processor = engine.bg_processor.lock().unwrap().clone();
-                    if let Some(processor) = processor {
-                        let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
-                        engine.submit_dump_task(processor, drain_all, self.table.clone());
-                    }
-                }
-            }
-        })
-    }
 }
 
 impl BgTask for CleanupTask {

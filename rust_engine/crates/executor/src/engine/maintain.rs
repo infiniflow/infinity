@@ -12,128 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Index maintenance accounting and scheduling (`SPANN_DESIGN.md` §9.5, §9.6).
+//! Ordering policy for the reclaim loop (`docs/MEMORY_RECLAIM.md` §4.1).
 //!
-//! Two pieces live here, both of them **pure policy**: they read numbers the
-//! engine already keeps and decide *when* to seal and *which* tail to seal.
-//! The sealing itself (a dump transaction) stays where it was, so this module
-//! adds no locks around file work.
-//!
-//! * [`Watermarks`] turns the one byte ledger (`memindex_quota` against
-//!   `memindex_total` plus the unsealed rows) into the three-level pressure of
-//!   §9.5: below `soft` nothing happens, above `soft` a background seal is
-//!   proposed, above `hard` the writing thread seals inline. That is the "one
-//!   ledger" of §12.1 - rows (`mem_index_capacity`) no longer decide *when* to
-//!   dump, they only bound how much a single index keeps.
-//! * [`rrf_order`] merges the two ranks the periodic reclaim loop needs - size
-//!   and age - into one order. The write path does not use it: a breach names
-//!   one table, so it only has to choose among that table's indexes, which is
-//!   `pick_largest_index`.
-
-/// Which waterline the pending bytes are above (§9.5).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Pressure {
-    Normal,
-    /// `tail_bytes > soft`: queue a seal behind the writers.
-    Soft,
-    /// `tail_bytes > hard`: the writing thread seals before returning.
-    Hard,
-}
-
-/// `soft = min(64 MiB, budget/4)`, `hard = min(256 MiB, budget/2)` (§9.5), with
-/// an AIMD trim on `soft` while the engine sits above 80% of its budget.
-///
-/// The budget is the atomic the quota check already reads (`memindex_quota`);
-/// this type only derives the two lower waterlines from it, instead of every
-/// caller inventing its own threshold.
-#[derive(Debug)]
-pub(crate) struct Watermarks {
-    budget: u64,
-    soft: u64,
-    hard: u64,
-}
-
-const SOFT_CAP: u64 = 64 << 20;
-const HARD_CAP: u64 = 256 << 20;
-
-impl Watermarks {
-    pub(crate) fn new(budget: u64) -> Self {
-        let mut out = Self {
-            budget: 0,
-            soft: 0,
-            hard: 0,
-        };
-        out.set_budget(budget);
-        out
-    }
-
-    /// Recomputes the waterlines for a new budget. `budget == 0` disables the
-    /// mechanism, exactly like `memindex_quota == 0` does.
-    pub(crate) fn set_budget(&mut self, budget: u64) {
-        self.budget = budget;
-        if budget == 0 {
-            self.soft = 0;
-            self.hard = 0;
-            return;
-        }
-        // Both lines are fractions of the budget (§9.5), so a tiny budget gets
-        // tiny lines instead of collapsing onto the budget itself - a floor here
-        // would make `soft == budget` and disable the soft level entirely.
-        let base = (budget / 4).clamp(1, SOFT_CAP);
-        self.hard = (budget / 2).clamp(1, HARD_CAP).max(base);
-        self.soft = base;
-    }
-
-    pub(crate) fn budget(&self) -> u64 {
-        self.budget
-    }
-
-    /// The lower waterline. Production reads it through [`Self::level`]; the
-    /// tests pin it directly.
-    #[cfg(test)]
-    pub(crate) fn soft(&self) -> u64 {
-        self.soft
-    }
-
-    /// The hard line, only the tests pin it: production reads it through
-    /// [`Self::level`], which is what the waterlines exist to feed.
-    #[cfg(test)]
-    pub(crate) fn hard(&self) -> u64 {
-        self.hard
-    }
-
-    /// The level `pending` bytes sit at.
-    pub(crate) fn level(&self, pending: u64) -> Pressure {
-        if self.budget == 0 {
-            return Pressure::Normal;
-        }
-        if pending > self.hard {
-            Pressure::Hard
-        } else if pending > self.soft {
-            Pressure::Soft
-        } else {
-            Pressure::Normal
-        }
-    }
-
-    /// AIMD on `soft` (§9.5 row 3): above 80% of the budget, halve it (down to
-    /// one mebibyte); below half the budget, restore it. `hard` follows the
-    /// budget only - it is the memory-safety line, not a tuning knob.
-    pub(crate) fn retune(&mut self, pending: u64) {
-        if self.budget == 0 {
-            return;
-        }
-        let base = (self.budget / 4).clamp(1, SOFT_CAP);
-        let over = pending as f64 > self.budget as f64 * 0.8;
-        let under = (pending as f64) < self.budget as f64 / 2.0;
-        if over {
-            self.soft = (self.soft / 2).max(1);
-        } else if under || self.soft == 0 {
-            self.soft = base;
-        }
-        self.soft = self.soft.clamp(1, self.hard.max(1));
-    }
-}
+//! [`rrf_order`] merges the two ranks the drain needs - size and age - into one
+//! order. It is pure: it reads numbers the caller already collected and decides
+//! nothing else, so the ranking is testable without an engine.
 
 /// One table the periodic reclaim loop may dump, as the fusion sees it.
 #[derive(Clone, Debug)]
@@ -222,86 +105,9 @@ pub(crate) fn rrf_order(candidates: &[ReclaimCandidate]) -> Vec<usize> {
     order
 }
 
-/// The index a write-path breach should dump: the one holding the most bytes,
-/// with ties going to whichever was dumped longest ago.
-///
-/// The write path names one table, so the candidate set is that table's indexes
-/// and there is nothing to be fair *between* - the earlier per-tenant scheduler
-/// degenerated to pure rotation here, because a breach is always raised by one
-/// table and its candidate set therefore has one tenant. Bytes descending is
-/// what actually releases the most per dump; the `last_dump` tie-break is what
-/// keeps two equally sized indexes from starving each other (without it a
-/// strict `bytes > seen` picks the first of the pair on every breach, and the
-/// other one's chunk never appears).
-pub(crate) fn pick_largest_index(held: &[(u64, u64, u64)]) -> Option<usize> {
-    let mut best: Option<(usize, u64, u64)> = None;
-    for (at, (bytes, last_dump, _id)) in held.iter().enumerate() {
-        let better = match best {
-            None => true,
-            Some((_, seen_bytes, seen_dump)) => {
-                *bytes > seen_bytes || (*bytes == seen_bytes && *last_dump < seen_dump)
-            }
-        };
-        if better {
-            best = Some((at, *bytes, *last_dump));
-        }
-    }
-    best.map(|(at, _, _)| at)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn watermarks_split_the_budget_like_the_design() {
-        // The 8 GiB default: soft caps at 64 MiB, hard at 256 MiB.
-        let w = Watermarks::new(8 << 30);
-        assert_eq!(w.soft(), SOFT_CAP);
-        assert_eq!(w.hard(), HARD_CAP);
-        assert_eq!(w.level(0), Pressure::Normal);
-        assert_eq!(w.level(SOFT_CAP), Pressure::Normal);
-        assert_eq!(w.level(SOFT_CAP + 1), Pressure::Soft);
-        assert_eq!(w.level(HARD_CAP), Pressure::Soft);
-        assert_eq!(w.level(HARD_CAP + 1), Pressure::Hard);
-
-        // A tight budget keeps them proportional.
-        let w = Watermarks::new(16 << 20);
-        assert_eq!(w.soft(), 4 << 20);
-        assert_eq!(w.hard(), 8 << 20);
-
-        // A budget below the floor still yields usable (identical) lines, so a
-        // tiny test quota never turns every write into an inline seal.
-        let w = Watermarks::new(1024);
-        assert!(w.soft() >= 1 && w.soft() <= w.hard());
-    }
-
-    #[test]
-    fn zero_budget_disables_the_mechanism() {
-        let mut w = Watermarks::new(0);
-        assert_eq!(w.level(u64::MAX), Pressure::Normal);
-        w.set_budget(1 << 30);
-        assert_eq!(w.level(1 << 29), Pressure::Hard);
-        w.set_budget(0);
-        assert_eq!(w.level(1 << 29), Pressure::Normal);
-    }
-
-    #[test]
-    fn soft_waterline_halves_under_pressure_and_recovers() {
-        let mut w = Watermarks::new(1 << 30); // base soft = 64 MiB
-        let base = w.soft();
-        assert_eq!(base, SOFT_CAP);
-        w.retune(900 << 20); // above 80% of the budget
-        assert_eq!(w.soft(), base / 2);
-        w.retune(950 << 20);
-        assert_eq!(w.soft(), base / 4);
-        for _ in 0..40 {
-            w.retune(1023 << 20); // never zero, however long the pressure lasts
-        }
-        assert!(w.soft() >= 1);
-        w.retune(100 << 20); // back under half the budget
-        assert_eq!(w.soft(), base);
-    }
 
     fn cand(key: &str, bytes: u64, age_ms: u64) -> ReclaimCandidate {
         ReclaimCandidate {
@@ -391,21 +197,5 @@ mod tests {
     #[test]
     fn rrf_of_an_empty_set_is_empty() {
         assert!(rrf_order(&[]).is_empty());
-    }
-
-    #[test]
-    fn the_largest_index_wins_and_ties_go_to_the_older_dump() {
-        // (bytes, last_dump, id)
-        let held = [(10, 5, 1), (900, 7, 2), (900, 3, 3)];
-        assert_eq!(
-            pick_largest_index(&held),
-            Some(2),
-            "equal bytes, older dump"
-        );
-        let held = [(900, 3, 3), (900, 7, 2)];
-        assert_eq!(pick_largest_index(&held), Some(0));
-        let held = [(5, 0, 1), (7, 0, 2)];
-        assert_eq!(pick_largest_index(&held), Some(1), "bytes decide first");
-        assert_eq!(pick_largest_index(&[]), None);
     }
 }

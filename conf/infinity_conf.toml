@@ -51,13 +51,13 @@ buffer_manager_size      = "4GB"
 lru_num                  = 7
 temp_dir                 = "/var/infinity/tmp"
 result_cache             = "off"
-memindex_memory_quota    = "1GB"
+unsealed_memory_quota    = "1GB"
 # Periodic reclaim of memory that is not on disk yet (buffer + index tails):
 # tables nobody writes any more would otherwise hold it until the process ends.
 # A round sorts every such table by fused size/age ranks and dumps until the
-# ledger is back under HALF of memindex_memory_quota. `memindex_memory_quota = 0`
+# ledger is back under HALF of unsealed_memory_quota. `unsealed_memory_quota = 0`
 # turns the whole mechanism off; it is the real switch, since the target is
-# derived from it.
+# derived from it. (The older name `memindex_memory_quota` is still accepted.)
 # unsealed_reclaim_interval:      the loop's period; "0s" stops the scheduler
 #                                 (a direct call still drains).
 # unsealed_max_tables_per_round:  how many tables one round may dump; 0 = no limit.

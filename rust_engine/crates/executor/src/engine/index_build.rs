@@ -1106,9 +1106,8 @@ impl Engine {
         // table with no `spann_mem` tail at all still has to dump (that is how
         // the index is materialised at creation - `query.rs` calls
         // `dump_index_transaction` as soon as the catalog entry exists). `true`
-        // is therefore the honest answer, and the two callers that must skip a
-        // no-op keep that from costing anything: `pick_seal_candidate` and
-        // `dump_every_table_index` both drop an index whose
+        // is therefore the honest answer, and `dump_every_table_index` keeps
+        // that from costing anything: it drops an index whose
         // `index_memory_bytes` is 0, and `index_memory_bytes` has a SPANN branch
         // that counts the tail and a `Memory`-form handle.
         true
@@ -4399,179 +4398,6 @@ impl Engine {
         Ok(out)
     }
 
-    /// Releases memory in the order that gives the most back per unit of work.
-    ///
-    /// Two things hold rows in memory here, and the reference bounds both with
-    /// one budget: the append buffer (its `BufferObject`s) and the in-memory
-    /// index tails. The port's quota covered the second only, and the append
-    /// buffer had no other limiter at all, so the rows a write-heavy table
-    /// appended stayed resident until a checkpoint - a day by default.
-    ///
-    /// A breach therefore does both:
-    ///
-    /// 1. **Unsealed rows go to their block files.** That is the per-table step
-    ///    of a checkpoint (`write_blocks_bounded`), not a checkpoint: no
-    ///    timestamp moves, no WAL entry is written, and the rows stay readable
-    ///    because those files *are* the mirror. It is what the reference's
-    ///    buffer manager does when it evicts a block.
-    /// 2. **The largest memory index is dumped** - the unit the reference's
-    ///    `DumpIndexProcessor` works in when one step cannot free the whole
-    ///    budget. Dumping all of them would spend a transaction per index on
-    ///    every breach; the next check picks the next largest if it is still
-    ///    over.
-    ///
-    /// `only` restricts the block drain to one table, for the caller that runs
-    /// inside that table's commit bottom half - see
-    /// [`Self::dump_all_sealed_blocks`] for why walking the others there can
-    /// deadlock. The index steps are engine-wide either way: they take no
-    /// bottom gate.
-    pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
-        self.dump_all_sealed_blocks(only).await;
-        // §9.5: `hard` pressure seals **every** tail of the table - the point of
-        // the escalate level is that one seal is not enough. `soft` seals the
-        // one that gives the most memory back.
-        if self.seal_pressure() == Pressure::Hard {
-            self.dump_every_table_index(only).await;
-        } else {
-            self.dump_largest_memory_index(only).await;
-        }
-        // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
-        // are **not** sealed here. `seal_sparse_index` is only half a dump: it
-        // calls `SealedTail::take`, which removes the entries and hands them
-        // back, and the chunk writer that persists them is the dump transaction
-        // (`seal_index_tail` -> `publish_index_chunks`). Calling it from here
-        // discarded the returned tail and lost those rows - `test_mem_bmp` in
-        // the restart suite caught it. What the quota can release here is
-        // therefore the rows in the append buffer and the named indexes; the
-        // rest waits for the next checkpoint, which is what makes their files.
-        //
-        // The dump released tails: fold that into the engine-wide total so the
-        // next quota check sees it without a second scan of every table.
-        self.recompute_memindex_total();
-    }
-
-    /// Writes unsealed rows into their block files.
-    ///
-    /// `only` narrows it to one table. The caller inside a commit's bottom half
-    /// **must** pass it: that caller holds its own table's gate, and walking
-    /// other tables would wait on *their* gates while those commits wait on
-    /// this one - A holding A and waiting for B while B waits for A is a
-    /// deadlock, and `run_commit_bottom` only special-cases the same table.
-    ///
-    /// Each write takes the table's bottom gate, so this cannot simply await
-    /// one: the quota is proposed from **inside** a commit's bottom half
-    /// (`update_text_indexes_batch`, which the bottom calls while holding the
-    /// gate), and re-entering it there self-locks. `run_commit_bottom` is the
-    /// entry that knows this - it runs the work inline when the gate is already
-    /// held on this thread, and on the table's bottom worker otherwise.
-    ///
-    /// `only == None` is for the background dump task, which holds no gate and
-    /// may therefore walk every table.
-    pub(crate) async fn dump_all_sealed_blocks(&self, only: Option<&str>) {
-        let wanted = only.map(|table| self.table_key(table));
-        let tables: Vec<String> = self
-            .tables
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(key, entry)| {
-                !entry.pending_rows.is_empty() && wanted.as_ref().is_none_or(|want| *key == want)
-            })
-            .map(|(key, _)| key.clone())
-            .collect();
-        let checkpoint_ts = self.checkpoint_ts();
-        for table in tables {
-            let key = self.table_key(&table);
-            // `ivf_mem` is deliberately left alone: a checkpoint clears it after
-            // its own block write because its bound covers every row it wrote,
-            // but the rows a transaction still in flight holds are not in these
-            // files and their vectors must stay searchable. The IVF tail is
-            // released by the index dump that follows.
-            let work_table = table.clone();
-            let _ = self
-                .run_commit_bottom(&key, move |engine: &Engine| {
-                    Box::pin(async move {
-                        engine
-                            .write_blocks_bounded_locked(&work_table, checkpoint_ts)
-                            .map(|_| ())
-                    })
-                })
-                .await;
-        }
-    }
-
-    /// Dumps the in-memory index that holds the most bytes.
-    ///
-    /// **One** index, not all of them: this runs on every quota breach, and a
-    /// table with several indexes would spend a transaction per index on each
-    /// one. The largest gives the most memory back for that single unit of
-    /// work, which is the choice the reference's `DumpIndexProcessor` makes.
-    ///
-    /// Ties go to the index dumped **longest ago** (`dump_ts`, 0 when never).
-    /// Two tails can hold the same number of bytes - the same table shape in
-    /// two databases, or two indexes over one column - and with a strict
-    /// `bytes > seen` the first of the pair was picked on every breach, so the
-    /// other one was never drained and its chunk never appeared.
-    ///
-    /// The rows are the part that has to go now: they are what grows without
-    /// any other bound, and [`Self::dump_all_sealed_blocks`] has just released
-    /// them.
-    ///
-    /// `only` restricts the choice to one table. The write path passes the
-    /// table whose batch raised the charge: picking the largest tail in the
-    /// *engine* would let a table that merely happens to hold more bytes
-    /// absorb every breach, and the table that just grew would never drain
-    /// (`test_optimize_from_different_database` in the restart suite).
-    async fn dump_largest_memory_index(&self, only: Option<&str>) {
-        let Some(im) = self.pick_seal_candidate(only) else {
-            return;
-        };
-        let _ = self.dump_index_transaction(&im.table, &im.name).await;
-    }
-
-    /// The largest tail that still holds bytes, ties to the oldest dump.
-    ///
-    /// The write path names **one** table, so its candidate set is that table's
-    /// indexes and there is nothing to be fair between. An earlier per-tenant
-    /// weighted scheduler degenerated here to plain rotation for exactly that
-    /// reason: a breach is always raised by one table, so the candidate set had
-    /// one tenant and every candidate carried the same weight. Byte size is what
-    /// actually releases memory per transaction, and the `last_dump` tie-break
-    /// keeps two equally sized indexes from starving each other.
-    ///
-    /// Cross-table fairness is the periodic loop's job (`Engine::reclaim_unsealed`
-    /// with [`rrf_order`]), which does see every table at once.
-    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<IndexMeta> {
-        let wanted = only.map(|table| self.table_key(table));
-        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        let mut held: Vec<(u64, u64, IndexMeta)> = Vec::new();
-        for im in indexes {
-            if let Some(wanted) = &wanted {
-                if &self.table_key(&im.table) != wanted {
-                    continue;
-                }
-            }
-            if !self.index_has_memory_tail(&im.table, &im) {
-                continue;
-            }
-            let bytes = self.index_memory_bytes(&im.table, im.id, &im.index_type);
-            if bytes == 0 {
-                continue;
-            }
-            let last_dump = self.last_dump_ts(&im.table, &im.name);
-            held.push((bytes as u64, last_dump, im));
-        }
-        if held.is_empty() {
-            return None;
-        }
-        let listing: Vec<(u64, u64, u64)> = held
-            .iter()
-            .map(|(bytes, last_dump, im)| (*bytes, *last_dump, im.id))
-            .collect();
-        let at = crate::engine::pick_largest_index(&listing)?;
-        Some(held.swap_remove(at).2)
-    }
-
     /// Seals every tail of `only` (or of every table when `None`).
     ///
     /// Only reached under `hard` pressure: the normal path seals one index per
@@ -4597,27 +4423,6 @@ impl Engine {
         }
     }
 
-    /// The §9.5 waterline the byte ledger sits at, after the AIMD retune.
-    ///
-    /// One function computes it, so the write path and the explicit check cannot
-    /// disagree about which level they are at.
-    pub(crate) fn seal_pressure(&self) -> Pressure {
-        let budget = self
-            .context
-            .memindex_quota
-            .load(std::sync::atomic::Ordering::Relaxed);
-        if budget == 0 {
-            return Pressure::Normal;
-        }
-        let pending = self.budget_bytes() as u64;
-        let mut marks = self.context.watermarks.lock().unwrap();
-        if marks.budget() != budget {
-            marks.set_budget(budget);
-        }
-        marks.retune(pending);
-        marks.level(pending)
-    }
-
     /// The indexes whose recall stayed below target long enough to suggest a
     /// rebuild (`SPANN_DESIGN.md` §11.3 item 4, §9.4's rebuild is the fix).
     ///
@@ -4641,20 +4446,6 @@ impl Engine {
             .unwrap_or_default();
         out.sort_unstable();
         out
-    }
-
-    /// The commit ts of the last dump this index published, or 0 when it has
-    /// never been dumped (so an undumped index wins a tie).
-    fn last_dump_ts(&self, table: &str, index: &str) -> u64 {
-        self.storage
-            .catalog
-            .store()
-            .get(&crate::dump_ts_key(&self.qualified_table(table), index))
-            .ok()
-            .flatten()
-            .filter(|v| v.len() >= 8)
-            .map(|v| u64::from_le_bytes(v[..8].try_into().unwrap()))
-            .unwrap_or(0)
     }
 
     /// One index's in-memory footprint, for picking the largest to dump.
@@ -4729,9 +4520,9 @@ impl Engine {
             // (`spann_mem`) and a published tree that is still `Memory`. A
             // `File` handle reports 0 (its slots are page cache). Without this
             // branch the figure fell through to the multi-vector reader and
-            // returned 0, so `dump_every_table_index` and `pick_seal_candidate`
-            // skipped every SPANN index (`== 0 -> continue`) and its tail could
-            // never be released by a quota breach.
+            // returned 0, so `dump_every_table_index` skipped every SPANN index
+            // (`== 0 -> continue`) and its tail could never be released by a
+            // quota breach.
             let (tail, published) = {
                 let tables = self.tables.lock().unwrap();
                 let Some(entry) = tables.get(&tkey) else {

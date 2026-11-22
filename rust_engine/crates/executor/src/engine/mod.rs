@@ -80,7 +80,6 @@ pub(crate) mod text_query;
 pub(crate) mod types;
 
 pub(crate) use index_build::{chunk_commit_ts, with_chunk_ts, RecordedChunk};
-pub(crate) use maintain::{pick_largest_index, Pressure, Watermarks};
 pub(crate) use recall::RecallMonitor;
 
 pub use state::*;

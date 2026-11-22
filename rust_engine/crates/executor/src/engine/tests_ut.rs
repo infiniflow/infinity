@@ -9478,46 +9478,6 @@ mod tests {
         );
     }
 
-    /// `SPANN_DESIGN.md` §9.5: the pressure level is *derived* from the one
-    /// byte ledger, not from a second (row-based) trigger.
-    #[tokio::test]
-    async fn the_pressure_level_comes_from_the_byte_ledger() {
-        use crate::engine::Pressure;
-        let dir = tempdir().unwrap();
-        let e = Engine::open_async(dir.path(), Default::default())
-            .await
-            .unwrap();
-        e.execute("CREATE TABLE pl (id INT, v EMBEDDING(FLOAT,4));")
-            .await
-            .unwrap();
-        let mut sql = String::from("INSERT INTO pl VALUES ");
-        for i in 0..200 {
-            sql.push_str(&format!("({i}, [{i}.0,{}.0,{}.0,1.0])", i + 1, i + 2));
-            if i < 199 {
-                sql.push(',');
-            }
-        }
-        sql.push(';');
-        e.execute(&sql).await.unwrap();
-        e.execute("CREATE INDEX pl_i ON pl (v) USING HNSW WITH (metric='l2');")
-            .await
-            .unwrap();
-
-        let pending = e.budget_bytes() as u64;
-        assert!(pending > 0, "the tail has bytes to account for");
-        // soft = budget/4, hard = budget/2: three times the pending bytes puts
-        // it above `soft` but below `hard`; 1.9x puts it above both.
-        e.set_memindex_quota(pending * 3);
-        assert_eq!(e.seal_pressure(), Pressure::Soft);
-        e.set_memindex_quota(pending * 19 / 10);
-        assert_eq!(e.seal_pressure(), Pressure::Hard);
-        e.set_memindex_quota(pending * 10);
-        assert_eq!(e.seal_pressure(), Pressure::Normal);
-        // `0` keeps the whole mechanism off, as before.
-        e.set_memindex_quota(0);
-        assert_eq!(e.seal_pressure(), Pressure::Normal);
-    }
-
     /// `CREATE INDEX` builds a graph straight from the blocks, so the charge the
     /// **write** path keeps (`index_pending_bytes`) stays zero. The seal
     /// selector asks the tail itself (`IndexMaintainer::pending_bytes`), which is
@@ -9557,15 +9517,19 @@ mod tests {
         assert!(held > 0, "the graph itself reports its bytes: {held}");
     }
 
-    /// §9.5's escalate level: under `hard` pressure a table's seals stop at one
-    /// index and cover all of them. A BMP tail and a secondary tail on one table
-    /// make that observable - `soft` releases the larger, `hard` releases both.
+    /// A selected table is drained **completely**: every index tail and the
+    /// append buffer, not just the largest tail.
+    ///
+    /// The old code had a soft/hard split (soft sealed the largest, hard sealed
+    /// all). There is now one target - half the quota - and one drain, so a
+    /// table that is picked gives everything back. A BMP tail plus a secondary
+    /// tail on one table makes that observable.
     ///
     /// The sparse tail is used rather than an HNSW one because its size is the
     /// live `tail_bytes`; an HNSW tail's size is the byte count the write path
     /// charges, which `CREATE INDEX` alone does not raise.
     #[tokio::test]
-    async fn hard_pressure_seals_every_tail_of_the_table() {
+    async fn a_drained_table_seals_every_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
@@ -9603,36 +9567,19 @@ mod tests {
             sec > 0 && sparse > 0,
             "both tails hold bytes ({sec}, {sparse})"
         );
-        let held = (sec + sparse) as u64;
 
-        // soft = quota/4 and hard = quota/2, so 3x the held bytes puts the
-        // ledger above `soft` and below `hard`.
-        e.set_memindex_quota(held * 3);
-        e.enforce_memindex_quota(Some("hp")).await;
-        let (sec, sparse) = tails(&e);
-        assert_eq!(
-            (sec == 0) as usize + (sparse == 0) as usize,
-            1,
-            "soft pressure seals one tail, not both ({sec}, {sparse})"
-        );
-
-        // Refill both tails, then cross the hard line: every tail goes.
-        e.execute("INSERT INTO hp VALUES (900, 1, [0:9.0, 2:9.0]);")
-            .await
-            .unwrap();
-        let (sec, sparse) = tails(&e);
-        let held = (sec + sparse) as u64;
-        assert!(held > 0, "the tails hold bytes again ({sec}, {sparse})");
-        e.set_memindex_quota(held * 19 / 10);
-        e.enforce_memindex_quota(Some("hp")).await;
+        // Any positive quota is crossed by these tails; the drain releases both.
+        e.set_memindex_quota(1);
+        e.enforce_memindex_quota(Some("hp"));
+        e.reclaim_unsealed().await;
         let (sec, sparse) = tails(&e);
         assert_eq!(
             (sec, sparse),
             (0, 0),
-            "hard pressure seals every tail of the table"
+            "one selection drains every tail of the table"
         );
         // The answers survive the seals.
-        assert_eq!(e.row_count("hp").unwrap(), 501);
+        assert_eq!(e.row_count("hp").unwrap(), 500);
         let got = rows(&e, "SELECT id FROM hp WHERE c = 1 ORDER BY id LIMIT 1;").await;
         assert_eq!(got, vec![vec!["1".to_string()]]);
     }
@@ -9670,9 +9617,10 @@ mod tests {
         )
         .await
         .unwrap();
-        // A write releases the largest tail; the explicit check releases every
-        // one of them (`enforce_memindex_quota(None)` is "enforce it now").
-        e.enforce_memindex_quota(None).await;
+        // The explicit check raises the flag; the scan releases every tail of
+        // the table (one selection drains all of them).
+        e.enforce_memindex_quota(None);
+        e.reclaim_unsealed().await;
 
         let mv = e
             .tables
@@ -9753,9 +9701,18 @@ mod tests {
         assert_eq!(rows_before, 4, "the rows are in the buffer before a drain");
         assert!(bytes_before > 0, "the buffer is charged to the budget");
 
-        // A budget below what is resident forces the next check to drain.
+        // A budget below what is resident, and one scan: the write path only
+        // raises a flag (it does not drain), the scan does the work.
         e.set_memindex_quota(1);
-        e.enforce_quota_after_append(&key).await;
+        e.enforce_quota_after_append(&key);
+        assert!(
+            e.context
+                .unsealed_reclaim_requested
+                .load(std::sync::atomic::Ordering::Relaxed),
+            "the write asked for a scan"
+        );
+        assert_eq!(buffered(&e).0, 4, "and drained nothing itself");
+        e.reclaim_unsealed().await;
 
         let (rows_after, bytes_after) = buffered(&e);
         assert_eq!(rows_after, 0, "the drain sealed every buffered row");
@@ -9777,49 +9734,6 @@ mod tests {
     /// caller running inside that table's commit bottom half must do.
     ///
     /// Such a caller holds its own table's gate. Walking the other tables would
-    /// wait for *their* gates, and two commits doing that at once - A holding A
-    /// and waiting for B, B holding B and waiting for A - is a deadlock that
-    /// `run_commit_bottom` cannot see, because it only special-cases the same
-    /// table.
-    #[tokio::test]
-    async fn a_pressure_drain_can_be_limited_to_one_table() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open_async(dir.path(), Default::default())
-            .await
-            .unwrap();
-        for name in ["mine", "other"] {
-            e.execute(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
-                .await
-                .unwrap();
-            e.execute(&format!("INSERT INTO {name} VALUES (1,'a'),(2,'b');"))
-                .await
-                .unwrap();
-        }
-        let buffered = |e: &Engine, table: &str| {
-            e.tables
-                .lock()
-                .unwrap()
-                .get(&e.table_key(table))
-                .map(|entry| entry.pending_rows.len())
-                .unwrap_or(0)
-        };
-        assert_eq!(buffered(&e, "mine"), 2);
-        assert_eq!(buffered(&e, "other"), 2);
-
-        e.set_memindex_quota(1);
-        e.dump_under_pressure(Some("mine")).await;
-
-        assert_eq!(buffered(&e, "mine"), 0, "the named table was drained");
-        assert_eq!(
-            buffered(&e, "other"),
-            2,
-            "the other table is left for a caller that may wait on its gate"
-        );
-        // Both tables still answer.
-        assert_eq!(rows(&e, "SELECT id FROM mine;").await.len(), 2);
-        assert_eq!(rows(&e, "SELECT id FROM other;").await.len(), 2);
-    }
-
     /// WAND now covers filters, `minimum_should_match`, `delta_term` and
     /// `similarity=boolean`; each must agree with the reference semantics.
     #[tokio::test]
@@ -10411,53 +10325,6 @@ mod tests {
         );
     }
 
-    /// `memindex_memory_quota` accounts one batch at a time and subtracts only
-    /// the quota when it dumps, exactly like `MemIndexTracer`: six rows of a
-    /// four-dimensional vector cost 1008 bytes, so the first batch stays under
-    /// 1 KB, the second crosses (and dumps), the third crosses again.
-    /// Measured against the reference: three batches leave two segments.
-    #[tokio::test]
-    async fn the_memindex_quota_seals_one_hnsw_chunk_per_batch() {
-        let dir = tempdir().unwrap();
-        let e = Engine::open_async(dir.path(), Default::default())
-            .await
-            .unwrap();
-        e.set_memindex_quota(1024);
-        e.execute("CREATE TABLE hc (c1 INT, c2 EMBEDDING(FLOAT,4));")
-            .await
-            .unwrap();
-        let row = "(2,[0.1,0.2,0.3,-0.2])";
-        e.execute(&format!(
-            "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
-        ))
-        .await
-        .unwrap();
-        e.execute(
-            "CREATE INDEX hx ON hc (c2) USING HNSW WITH (M = 16, ef_construction = 20, \
-             metric = l2, block_size = 1);",
-        )
-        .await
-        .unwrap();
-        for _ in 0..3 {
-            e.execute(&format!(
-                "INSERT INTO hc VALUES {row},{row},{row},{row},{row},{row};"
-            ))
-            .await
-            .unwrap();
-        }
-        // At most one chunk per batch: the quota releases one index per breach,
-        // so three batches can seal at most three. The floor is two - the quota
-        // is crossed partway through - and where exactly it lands depends on how
-        // much of the batch is resident when the check runs (the append buffer is
-        // part of the budget now, which is what makes the first batch able to
-        // cross on its own).
-        let chunks = e.hnsw_chunk_ids("hc", "hx").len();
-        assert!(
-            (2..=3).contains(&chunks),
-            "three batches seal one chunk each at most, got {chunks}"
-        );
-    }
-
     /// The budget is one number for the whole engine, not one per index.
     ///
     /// C++ `MemIndexTracer` compares `cur_index_memory_` - everything every
@@ -10601,8 +10468,8 @@ mod tests {
         // Both tails are complete now; the quota is the two-tables-cross-it
         // value, and this explicit check is the only one that sees both.
         e.set_memindex_quota(1500);
-        std::thread::sleep(std::time::Duration::from_millis(20));
-        e.enforce_memindex_quota(None).await;
+        e.enforce_memindex_quota(None);
+        e.reclaim_unsealed().await;
 
         for name in ["g1", "g2"] {
             assert!(
@@ -10622,77 +10489,6 @@ mod tests {
 
     /// A breach that arrives while its table's dump is queued is counted, not
     /// dropped: the task re-proposes when it finishes if one is still owed.
-    #[test]
-    fn a_queued_dump_counts_the_breaches_it_coalesces() {
-        use crate::engine::state::{MemIndexPending, ALL_TABLES};
-
-        // The bookkeeping the quota uses, exercised directly. The end-to-end
-        // path needs a background processor (a test attaches none), so the
-        // restart suite's `test_mem_bmp` and
-        // `test_optimize_from_different_database` cover that side.
-        let mut pending = MemIndexPending::default();
-        // Two breaches for one table while its dump is queued: one task, but
-        // two owed dumps - the second is not lost.
-        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
-        *pending.pending.entry("default_db.a".into()).or_insert(0) += 1;
-        assert_eq!(pending.pending.get("default_db.a").copied(), Some(2));
-        // A different table keeps its own count, so it is served too.
-        *pending.pending.entry("default_db.b".into()).or_insert(0) += 1;
-        assert_eq!(pending.pending.len(), 2);
-
-        // An "every tail" proposal is marked as such and cleared with its key.
-        let mut pending = MemIndexPending::default();
-        pending.pending.insert(ALL_TABLES.to_string(), 1);
-        pending.drain_all.insert(ALL_TABLES.to_string());
-        assert!(pending.drain_all.contains(ALL_TABLES));
-        pending.pending.remove(ALL_TABLES);
-        pending.drain_all.remove(ALL_TABLES);
-        assert!(pending.pending.is_empty() && pending.drain_all.is_empty());
-    }
-
-    /// The task that serves a counted breach must not record another one.
-    ///
-    /// Completion decrements the count and then enqueues the next task. Going
-    /// back through `propose_dump` incremented it again, so the "already
-    /// queued" guard fired and nothing was submitted - and every later breach
-    /// took the same path, so the table stopped dumping entirely.
-    #[test]
-    fn a_continuation_dump_does_not_record_a_breach() {
-        use crate::engine::state::MemIndexPending;
-
-        // The bookkeeping both paths share.
-        let mut pending = MemIndexPending::default();
-        let key = "default_db.t".to_string();
-        // Two breaches while one task is queued.
-        *pending.pending.entry(key.clone()).or_insert(0) += 1;
-        *pending.pending.entry(key.clone()).or_insert(0) += 1;
-
-        // Serving one leaves one owed. A continuation must submit with this
-        // count in hand, not re-enter the recording path.
-        let left = {
-            let count = pending.pending.get_mut(&key).unwrap();
-            *count -= 1;
-            *count
-        };
-        assert_eq!(left, 1, "one breach is still owed");
-        assert!(
-            pending.pending.contains_key(&key),
-            "the owed breach stays recorded until a task serves it"
-        );
-
-        // And the continuation itself serves it.
-        let left = {
-            let count = pending.pending.get_mut(&key).unwrap();
-            *count -= 1;
-            *count
-        };
-        assert_eq!(left, 0);
-        if left == 0 {
-            pending.pending.remove(&key);
-        }
-        assert!(pending.pending.is_empty());
-    }
-
     /// The unified budget counts the HNSW charge, not only the text/sparse/
     /// multi-vector/secondary tails: an engine whose only memory is a graph
     /// must still notice it is over.
@@ -18101,13 +17897,16 @@ mod tests {
             .unwrap();
         // A quota this small puts the target (half of it) under any usage, so
         // the round cannot stop early and has to actually dump the table.
-        e.set_memindex_quota(1);
         e.execute("CREATE TABLE rb (id INT, v VARCHAR);")
             .await
             .unwrap();
         e.execute("INSERT INTO rb VALUES (1, 'a'), (2, 'bb'), (3, 'ccc');")
             .await
             .unwrap();
+        // Set the quota only now: the write path drains on its own, and a
+        // quota in place before the insert would empty the buffer before the
+        // test could observe it.
+        e.set_memindex_quota(1);
         let key = e.table_key("default_db.rb");
         assert!(
             e.tables
@@ -18120,9 +17919,7 @@ mod tests {
             "the rows must be buffered before the round"
         );
 
-        // `Bytes(0)` makes every byte over the line, so the round cannot stop
-        // early on the target and has to actually dump the table.
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1, "one table was a candidate");
         assert_eq!(
             e.tables
@@ -18148,9 +17945,12 @@ mod tests {
             .await
             .unwrap();
         // Tiny quota: the target is half of it, far below the rows.
-        e.set_memindex_quota(1);
         e.execute("CREATE TABLE rs (id INT);").await.unwrap();
         e.execute("INSERT INTO rs VALUES (1), (2);").await.unwrap();
+        // Set the quota only now: the write path drains on its own, and a
+        // quota in place before the insert would empty the buffer before the
+        // test could observe it.
+        e.set_memindex_quota(1);
         let key = e.table_key("default_db.rs");
         let before = e
             .tables
@@ -18161,7 +17961,7 @@ mod tests {
             .unwrap_or(0);
         assert!(before > 0);
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1);
         assert_eq!(
             e.tables
@@ -18197,7 +17997,7 @@ mod tests {
             .unwrap_or(0);
         assert!(before > 0);
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 0, "the ledger is already under the target");
         assert_eq!(
             e.tables
@@ -18218,7 +18018,6 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
         for i in 0..3 {
             e.execute(&format!("CREATE TABLE rc{i} (id INT);"))
                 .await
@@ -18229,6 +18028,10 @@ mod tests {
         }
         let pending = || {
             let tables = e.tables.lock().unwrap();
+            // Set the quota only now: the write path drains on its own, and a
+            // quota in place before the insert would empty the buffer before the
+            // test could observe it.
+            e.set_memindex_quota(1);
             (0..3)
                 .filter(|i| {
                     tables
@@ -18241,12 +18044,12 @@ mod tests {
         assert_eq!(pending(), 3);
 
         e.set_unsealed_max_tables_per_round(1);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1, "the cap is one table per round");
         assert_eq!(pending(), 2, "the other two wait for the next round");
 
         e.set_unsealed_max_tables_per_round(0);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 2, "cap 0 means no limit");
         assert_eq!(pending(), 0);
     }
@@ -18265,7 +18068,7 @@ mod tests {
         let key = e.table_key("default_db.ri");
         e.tables.lock().unwrap().get_mut(&key).unwrap().importing = 1;
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(
             dumped, 0,
             "an importing table is excluded from the candidates"
@@ -18290,40 +18093,29 @@ mod tests {
             .await
             .unwrap();
         e.execute("CREATE TABLE rd (id INT);").await.unwrap();
-        let now = crate::memory::now_millis();
         // No table has unsealed data, so the round has no candidates and cannot
         // make progress.
-        let dumped = e.reclaim_unsealed(now).await;
-        assert_eq!(dumped, 0);
-        // With no candidate at all the function returns before it can arm the
-        // backoff; a round that *did* have candidates but released nothing is
-        // the case the backoff exists for, and it arms `backoff_until`.
-        e.set_unsealed_reclaim_interval(5);
+        assert_eq!(e.reclaim_unsealed().await, 0);
+        // A round that *did* have candidates but released nothing is the case the
+        // backoff exists for: it arms `backoff_until`, and the next call returns
+        // before doing any work.
+        e.set_memindex_quota(1);
         e.execute("INSERT INTO rd VALUES (1);").await.unwrap();
-        let key = e.table_key("default_db.rd");
-        // Make the dump a no-op by emptying the buffer's bytes behind its back:
-        // the table still has a mark, so it is a candidate, but the dump cannot
-        // release anything.
-        e.tables.lock().unwrap().get_mut(&key).unwrap().importing = 1;
-        let _ = e.reclaim_unsealed(now).await;
-        // An importing table is not a candidate, so arm the backoff explicitly
-        // the way a failed round would, then check the gate holds.
+        let now_ts = e.current_ts();
         e.context
             .unsealed_backoff_until
-            .store(now + 1_000_000, std::sync::atomic::Ordering::Relaxed);
-        let dumped = e.reclaim_unsealed(now).await;
+            .store(now_ts + 1_000_000, std::sync::atomic::Ordering::Relaxed);
         assert_eq!(
-            dumped, 0,
+            e.reclaim_unsealed().await,
+            0,
             "the backoff gate stops the round before it starts"
         );
     }
 
-    /// A reclaim round must not retune the waterlines: `retune` halves `soft`
-    /// while the engine is above 80% of its budget, which is an AIMD signal
-    /// driven by **writes**. A timer that did it would walk `soft` down to one
-    /// byte and then keep demanding a full drain.
+    /// The target is a pure function of the quota: ten rounds do not move it, and
+    /// no round touches the quota itself.
     #[tokio::test]
-    async fn a_reclaim_round_does_not_move_the_soft_waterline() {
+    async fn a_reclaim_round_does_not_move_the_target() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
@@ -18331,18 +18123,18 @@ mod tests {
         e.set_memindex_quota(1 << 30);
         e.execute("CREATE TABLE rw2 (id INT);").await.unwrap();
         e.execute("INSERT INTO rw2 VALUES (1);").await.unwrap();
-        let before = {
-            let marks = e.context.watermarks.lock().unwrap();
-            marks.soft()
-        };
+        let before = e.reclaim_target();
         for _ in 0..10 {
-            let _ = e.reclaim_unsealed(crate::memory::now_millis()).await;
+            let _ = e.reclaim_unsealed().await;
         }
-        let after = {
-            let marks = e.context.watermarks.lock().unwrap();
-            marks.soft()
-        };
-        assert_eq!(before, after, "10 rounds must not move `soft`");
+        assert_eq!(before, e.reclaim_target(), "the target is the quota's half");
+        assert_eq!(
+            e.context
+                .memindex_quota
+                .load(std::sync::atomic::Ordering::Relaxed),
+            1 << 30,
+            "and the quota is untouched"
+        );
     }
 
     /// `has_unsealed` must see a tail while a query holds the index's lock: a
@@ -18444,13 +18236,13 @@ mod tests {
         let key = e.table_key("default_db.rm");
         assert!(e.table_has_unsealed(&key), "the tail marks the table");
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1);
         assert!(
             !e.table_has_unsealed(&key),
             "after a full dump the table is no longer a candidate"
         );
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 0, "so the next round has nothing to do");
     }
 
@@ -18469,7 +18261,7 @@ mod tests {
             let mut tables = e.tables.lock().unwrap();
             let entry = tables.get_mut(&key).unwrap();
             entry.dump_failures = 5;
-            entry.last_attempt_ms = crate::memory::now_millis();
+            entry.last_attempt_ts = e.current_ts();
         }
         e.execute("INSERT INTO rw VALUES (2);").await.unwrap();
         assert_eq!(
@@ -18484,17 +18276,15 @@ mod tests {
         );
     }
 
-    /// A table this process has not written yet starts at the process clock, not
-    /// at zero: a zero `last_write_ms` would read as "idle since the epoch" and
-    /// put every table at the head of the first staleness sweep.
+    /// A table that has never been appended is the **oldest** possible table:
+    /// its age comes from the append log, so "no append" reads as ts 0 and the
+    /// ranking puts it first. That is right - it cannot hold unsealed rows it
+    /// never wrote, and once it does write, the append log dates it.
     #[test]
-    fn a_new_table_starts_its_idle_clock_now() {
+    fn a_new_table_has_no_append_ts() {
         let entry = crate::engine::state::TableEntry::default();
-        assert!(
-            entry.last_write_ms > 0,
-            "a zero clock would mean idle since the epoch"
-        );
-        assert!(entry.last_write_ms <= crate::memory::now_millis());
+        assert_eq!(entry.append_ts, None);
+        assert_eq!(entry.last_attempt_ts, 0);
         assert_eq!(entry.dump_failures, 0);
         assert!(entry.unsealed_marks_are_empty());
     }
@@ -18518,7 +18308,7 @@ mod tests {
         assert!(e.table_has_unsealed(&key));
         // Age is ~0 - it was written a moment ago - which is exactly the case a
         // staleness threshold would skip and the pressure path must not.
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1, "a freshly written table is still a candidate");
         assert_eq!(
             e.tables
@@ -18547,7 +18337,7 @@ mod tests {
         // No index: `memindex_bytes_of` is 0 both before and after, so only the
         // buffer half of `unsealed_live` can show the release.
         assert_eq!(e.memindex_bytes_of(&key), 0);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1, "the block write counts as progress");
         assert_eq!(
             e.tables
@@ -18591,14 +18381,14 @@ mod tests {
         // The quota is ample, so the target (half of it) is already met and the
         // round never starts.
         e.set_memindex_quota(1 << 40);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 0, "already under the target: nothing to do");
         assert_eq!(unsealed(), 2);
 
         // With the target under the usage, the round drains - and stops once
         // the ledger is back under it, rather than draining every table.
         e.set_memindex_quota(1);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert!(
             dumped >= 1,
             "over the target: at least one table is drained"
@@ -18618,10 +18408,13 @@ mod tests {
         // The target is derived from the quota, not from the interval, so the
         // loop still drains when the scheduler is switched off: `interval` only
         // decides how often `trigger_loop` calls it.
-        e.set_memindex_quota(1);
         e.execute("CREATE TABLE rz (id INT);").await.unwrap();
         e.execute("INSERT INTO rz VALUES (1);").await.unwrap();
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        // Set the quota only now: the write path drains on its own, and a
+        // quota in place before the insert would empty the buffer before the
+        // test could observe it.
+        e.set_memindex_quota(1);
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1);
         // And with no interval there is nothing to arm, so the backoff gate
         // cannot accidentally stop the pressure path later.
@@ -18633,45 +18426,63 @@ mod tests {
         );
     }
 
-    /// The failure backoff grows with each consecutive failure, with the
-    /// reclaim interval as its base.
+    /// A table that has been failing is pushed out of the candidate set, and a
+    /// write puts it straight back.
+    ///
+    /// The delay itself is `base * 2^failures`, which a unit test cannot reach
+    /// by moving the clock: `current_ts()` only advances when a commit
+    /// **finishes**, and `reserve_commit_ts` moves the prepare watermark
+    /// instead. What is asserted here is the observable half - exclusion while
+    /// failing, re-inclusion on a write - plus the delay's shape, checked
+    /// against the entry's own numbers.
     #[tokio::test]
-    async fn repeated_failures_back_off_exponentially() {
+    async fn a_failing_table_is_excluded_and_a_write_brings_it_back() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
-        e.set_unsealed_reclaim_interval(1); // 1 s base
+        e.set_unsealed_reclaim_interval(1); // < 1 min -> base = 1 commit
         e.set_memindex_quota(1);
         e.execute("CREATE TABLE rx (id INT);").await.unwrap();
         e.execute("INSERT INTO rx VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rx");
-        let now = crate::memory::now_millis();
-        for failures in 1..=3u32 {
-            {
-                let mut tables = e.tables.lock().unwrap();
-                let entry = tables.get_mut(&key).unwrap();
-                entry.dump_failures = failures;
-                entry.last_attempt_ms = now;
-                entry.last_write_ms = now;
-            }
-            // Inside the delay: not a candidate.
-            let dumped = e.reclaim_unsealed(now).await;
-            assert_eq!(
-                dumped, 0,
-                "after {failures} failures the table waits out its delay"
-            );
-            // Well past it: back in the candidate set, and the dump succeeds.
-            let later = now + 1_000 * (1u64 << failures) + 1;
-            let dumped = e.reclaim_unsealed(later).await;
-            assert_eq!(dumped, 1, "the delay from {failures} failures has passed");
-            // The dump reset it; put the row back for the next round.
-            e.execute("INSERT INTO rx VALUES (2);").await.unwrap();
-            e.context
-                .unsealed_backoff_until
-                .store(0, std::sync::atomic::Ordering::Relaxed);
+
+        // Pretend three dumps in a row failed a moment ago.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            entry.dump_failures = 3;
+            entry.last_attempt_ts = e.current_ts();
         }
+        e.context
+            .unsealed_backoff_until
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            e.reclaim_unsealed().await,
+            0,
+            "a table that keeps failing waits out its exponential delay"
+        );
+
+        // A write is new data, so the backoff no longer applies.
+        e.execute("INSERT INTO rx VALUES (2);").await.unwrap();
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.dump_failures)
+                .unwrap_or(1),
+            0,
+            "`note_write` clears the counter"
+        );
+        e.context
+            .unsealed_backoff_until
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(
+            e.reclaim_unsealed().await,
+            1,
+            "and the very next scan drains it"
+        );
     }
 
     /// The two-phase dump must not hold the bottom gate while taking
@@ -18704,12 +18515,9 @@ mod tests {
 
         let (reclaim, checkpoint) = tokio::join!(
             async move {
-                tokio::time::timeout(
-                    std::time::Duration::from_secs(60),
-                    e2.reclaim_unsealed(crate::memory::now_millis()),
-                )
-                .await
-                .expect("a reversed lock order would hang the reclaim loop")
+                tokio::time::timeout(std::time::Duration::from_secs(60), e2.reclaim_unsealed())
+                    .await
+                    .expect("a reversed lock order would hang the reclaim loop")
             },
             async move {
                 tokio::time::timeout(std::time::Duration::from_secs(60), e.flush_storage())
@@ -18749,7 +18557,7 @@ mod tests {
         let key = e.table_key("default_db.rq");
         assert!(e.table_has_unsealed(&key));
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1);
         assert!(
             !e.table_has_unsealed(&key),
@@ -18765,120 +18573,68 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
         e.execute("CREATE TABLE rv (id INT);").await.unwrap();
         e.execute("INSERT INTO rv VALUES (1);").await.unwrap();
-        let now = crate::memory::now_millis();
-        assert_eq!(e.reclaim_unsealed(now).await, 1);
-        // Any later round finds no candidates, whatever the target.
-        assert_eq!(e.reclaim_unsealed(now).await, 0);
-        assert_eq!(e.reclaim_unsealed(now).await, 0);
+        // Set the quota only now: the write path drains on its own, and a
+        // quota in place before the insert would empty the buffer before the
+        // test could observe it.
+        e.set_memindex_quota(1);
+        assert_eq!(e.reclaim_unsealed().await, 1);
+        // Any later round finds no candidates.
+        assert_eq!(e.reclaim_unsealed().await, 0);
+        assert_eq!(e.reclaim_unsealed().await, 0);
     }
 
-    /// The write path picks the **largest** tail, not a rotation: with a 100:1
-    /// byte ratio between two indexes, every breach must take the big one. The
-    /// old per-tenant scheduler alternated 3/3 because a breach names one table
-    /// and its candidate set therefore had one tenant, which made every weight
-    /// equal.
+    /// The write path runs the **same** drain as the periodic sweep: it ranks
+    /// every table (not just the one that grew), so a breach caused by one
+    /// table can reclaim another that holds more.
     #[tokio::test]
-    async fn the_write_path_seals_the_largest_index_of_the_table() {
+    async fn a_write_triggered_round_ranks_every_table() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.execute("CREATE TABLE rl (id INT, body VARCHAR);")
-            .await
-            .unwrap();
-        e.execute("INSERT INTO rl VALUES (1, 'alpha');")
-            .await
-            .unwrap();
-        e.execute("CREATE INDEX rl_a ON rl (body) USING FULLTEXT;")
-            .await
-            .unwrap();
-        e.execute("CREATE INDEX rl_b ON rl (body) USING FULLTEXT;")
-            .await
-            .unwrap();
-        e.execute("INSERT INTO rl VALUES (2, 'beta');")
-            .await
-            .unwrap();
-
-        // Give the two indexes deliberately different sizes, then ask which one
-        // the write path would take.
-        let ids = e.index_ids_on_column_of_kind("rl", "body", &["FULLTEXT"]);
-        assert_eq!(ids.len(), 2, "the setup needs two indexes on one column");
-        let big = ids[0];
-        let small = ids[1];
-        {
-            let key = e.table_key("default_db.rl");
-            let mut tables = e.tables.lock().unwrap();
-            let entry = tables.get_mut(&key).unwrap();
-            entry.bump_unsealed(big, 10_000);
-            entry.bump_unsealed(small, 10);
+        e.set_memindex_quota(1);
+        for name in ["wa", "wb"] {
+            e.execute(&format!("CREATE TABLE {name} (id INT);"))
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO {name} VALUES (1);"))
+                .await
+                .unwrap();
         }
-        // The fused order is not what the write path uses; `pick_largest_index`
-        // is, and it must name `big` on every call.
-        let listing = vec![(10u64, 0u64, small), (10_000u64, 0u64, big)];
-        assert_eq!(
-            crate::engine::pick_largest_index(&listing),
-            Some(1),
-            "the 1000:1 tail wins outright"
-        );
-        // And ties go to the older dump, so neither can starve the other.
-        let tied = vec![(500u64, 9u64, small), (500u64, 3u64, big)];
-        assert_eq!(
-            crate::engine::pick_largest_index(&tied),
-            Some(1),
-            "equal bytes: the older dump wins"
-        );
+        // "wa" is the table whose batch raised the charge, but both are
+        // candidates and the round is not narrowed to "wa".
+        assert_eq!(e.reclaim_unsealed().await, 2, "both tables are drained");
+        assert!(!e.table_has_unsealed(&e.table_key("default_db.wa")));
+        assert!(!e.table_has_unsealed(&e.table_key("default_db.wb")));
     }
-
-    /// Two `Bytes` rounds do not alternate: a table reclaimed under byte pressure
-    /// is the only one touched, and a second table with older data is not
-    /// preferred over it when the ledger is already under the line.
+    /// A breach raised by one table drains another that holds unsealed rows:
+    /// the round ranks every table, so "who caused it" does not decide "who
+    /// pays".
     #[tokio::test]
     async fn a_quota_breach_on_one_table_drains_an_idle_one() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        // A is written now; B was written earlier and is smaller.
+        e.set_memindex_quota(1);
         e.execute("CREATE TABLE ra (id INT);").await.unwrap();
         e.execute("CREATE TABLE rbb (id INT);").await.unwrap();
+        // rbb is written first, so its append ts is older.
         e.execute("INSERT INTO rbb VALUES (1);").await.unwrap();
         e.execute("INSERT INTO ra VALUES (1), (2), (3);")
             .await
             .unwrap();
-        let ka = e.table_key("default_db.ra");
-        let kb = e.table_key("default_db.rbb");
-        // Age B by an hour without touching its rows.
-        {
-            let mut tables = e.tables.lock().unwrap();
-            let now = crate::memory::now_millis();
-            tables.get_mut(&kb).unwrap().last_write_ms = now.saturating_sub(3_600_000);
-            tables.get_mut(&ka).unwrap().last_write_ms = now;
-        }
-        // Both are candidates, and the older/smaller one is ranked ahead - the
-        // cross-table part of gap B.
-        let candidates: Vec<crate::engine::maintain::ReclaimCandidate> = vec![
-            crate::engine::maintain::ReclaimCandidate {
-                key: ka.clone(),
-                bytes: 300,
-                age_ms: 0,
-            },
-            crate::engine::maintain::ReclaimCandidate {
-                key: kb.clone(),
-                bytes: 100,
-                age_ms: 3_600_000,
-            },
-        ];
-        let order = crate::engine::maintain::rrf_order(&candidates);
-        assert_eq!(order[0], 1, "the idle table leads the order");
-        assert!(
-            e.table_has_unsealed(&ka) && e.table_has_unsealed(&kb),
-            "both are reclaim candidates"
-        );
-    }
 
+        let dumped = e.reclaim_unsealed().await;
+        assert_eq!(dumped, 2, "both tables were candidates and both drained");
+        assert!(!e.table_has_unsealed(&e.table_key("default_db.ra")));
+        assert!(!e.table_has_unsealed(&e.table_key("default_db.rbb")));
+        // And the rows survive the move into the block files.
+        assert_eq!(rows(&e, "SELECT id FROM ra;").await.len(), 3);
+        assert_eq!(rows(&e, "SELECT id FROM rbb;").await.len(), 1);
+    }
     /// Zero tables in one round is "no limit", not "do nothing": the guard is
     /// `cap != 0 && dumped >= cap`, so `0` must not stop the loop.
     #[tokio::test]
@@ -18897,7 +18653,7 @@ mod tests {
                 .unwrap();
         }
         e.set_unsealed_max_tables_per_round(0);
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         // Five tables, all drained, in one round: with `cap = 0` the loop has no
         // count to stop at, and the target (half of one byte) can never be met.
         assert_eq!(dumped, 5, "cap 0 drains the whole candidate list");
@@ -18925,7 +18681,7 @@ mod tests {
             .unwrap()
             .importing = 1;
 
-        let dumped = e.reclaim_unsealed(crate::memory::now_millis()).await;
+        let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1, "the healthy table is still reclaimed");
         assert!(
             e.tables
@@ -18948,16 +18704,21 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
         e.execute("CREATE TABLE rr2 (id INT);").await.unwrap();
         e.execute("INSERT INTO rr2 VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rr2");
-        assert_eq!(e.reclaim_unsealed(crate::memory::now_millis()).await, 1);
+        e.set_memindex_quota(1);
+        assert_eq!(e.reclaim_unsealed().await, 1);
         assert!(!e.table_has_unsealed(&key));
+        // Raise the quota for the next write: the write path runs this same
+        // drain, so a quota still under the usage would empty the buffer before
+        // the test could observe that the write re-armed it.
+        e.set_memindex_quota(1 << 40);
         e.execute("INSERT INTO rr2 VALUES (2);").await.unwrap();
         assert!(e.table_has_unsealed(&key), "the write re-armed the table");
+        e.set_memindex_quota(1);
         assert_eq!(
-            e.reclaim_unsealed(crate::memory::now_millis()).await,
+            e.reclaim_unsealed().await,
             1,
             "and the next round drains it again"
         );
@@ -18977,7 +18738,7 @@ mod tests {
         e.execute("CREATE TABLE rq2 (id INT);").await.unwrap();
         e.execute("INSERT INTO rq2 VALUES (1);").await.unwrap();
         assert_eq!(
-            e.reclaim_unsealed(crate::memory::now_millis()).await,
+            e.reclaim_unsealed().await,
             0,
             "a zero quota disables the loop, not makes it drain everything"
         );
@@ -18986,6 +18747,125 @@ mod tests {
         e.set_memindex_quota(1 << 20);
         assert_eq!(e.reclaim_target(), 1 << 19, "half the quota");
         // Half of 1 MiB is far above these rows, so still nothing to do.
-        assert_eq!(e.reclaim_unsealed(crate::memory::now_millis()).await, 0);
+        assert_eq!(e.reclaim_unsealed().await, 0);
+    }
+
+    /// The write path only **raises a flag**; the tick performs the drain.
+    ///
+    /// This is the whole point of the split: a statement must not take other
+    /// tables' bottom gates from inside its own bottom half, and must not pay a
+    /// block write plus an index dump. So an insert that crosses the quota
+    /// leaves the ledger over the line and sets the flag - nothing is drained
+    /// yet - and the next slot drains it.
+    #[tokio::test]
+    async fn a_write_over_the_quota_requests_a_scan_without_draining() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_memindex_quota(1);
+        e.execute("CREATE TABLE rq2 (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rq2 VALUES (1, 'alpha');")
+            .await
+            .unwrap();
+        let key = e.table_key("default_db.rq2");
+
+        // The statement returned with the rows still buffered and the flag up.
+        assert!(
+            e.table_has_unsealed(&key),
+            "the write must not have drained"
+        );
+        assert!(
+            e.context
+                .unsealed_reclaim_requested
+                .load(std::sync::atomic::Ordering::Relaxed),
+            "but it must have asked for a scan"
+        );
+
+        // The tick's decision: drain once, clear the flag.
+        assert_eq!(e.reclaim_unsealed().await, 1);
+        assert!(!e.table_has_unsealed(&key), "the scan emptied the buffer");
+    }
+
+    /// Several tables, each with its own index, all reclaimed by one scan.
+    ///
+    /// The write path ranks every table rather than only the one that grew, so a
+    /// single scan drains them all - which is what makes the flag sufficient:
+    /// one request per burst, not one per table.
+    #[tokio::test]
+    async fn one_scan_reclaims_several_tables_and_their_indexes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_memindex_quota(1);
+        for i in 0..3 {
+            let name = format!("mt{i}");
+            e.execute(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))
+                .await
+                .unwrap();
+            e.execute(&format!(
+                "INSERT INTO {name} VALUES (1, 'alpha'), (2, 'beta');"
+            ))
+            .await
+            .unwrap();
+            e.execute(&format!(
+                "CREATE INDEX {name}_i ON {name} (body) USING FULLTEXT;"
+            ))
+            .await
+            .unwrap();
+            e.execute(&format!("INSERT INTO {name} VALUES (3, 'gamma');"))
+                .await
+                .unwrap();
+        }
+        let keys: Vec<String> = (0..3)
+            .map(|i| e.table_key(&format!("default_db.mt{i}")))
+            .collect();
+        for key in &keys {
+            assert!(e.table_has_unsealed(key), "{key} starts with data");
+        }
+        assert!(
+            e.context
+                .unsealed_reclaim_requested
+                .load(std::sync::atomic::Ordering::Relaxed),
+            "the writes asked for a scan"
+        );
+
+        let dumped = e.reclaim_unsealed().await;
+        assert_eq!(dumped, 3, "every table is a candidate in one round");
+        for key in &keys {
+            assert!(!e.table_has_unsealed(key), "{key} was drained");
+        }
+        // And the rows are still readable after moving into the block files.
+        for i in 0..3 {
+            assert_eq!(
+                rows(&e, &format!("SELECT count(*) FROM mt{i};")).await,
+                vec![vec!["3".to_string()]]
+            );
+        }
+    }
+
+    /// A scan is a no-op when the ledger is under the target, even if a flag was
+    /// raised: the write path sets it optimistically and the drain re-checks.
+    #[tokio::test]
+    async fn a_scan_under_the_target_does_nothing_even_when_requested() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rn2 (id INT);").await.unwrap();
+        e.execute("INSERT INTO rn2 VALUES (1);").await.unwrap();
+        e.context
+            .unsealed_reclaim_requested
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+
+        // Default quota is 0 -> the mechanism is off entirely.
+        assert_eq!(e.reclaim_unsealed().await, 0);
+        assert!(
+            e.table_has_unsealed(&e.table_key("default_db.rn2")),
+            "nothing was drained"
+        );
     }
 }

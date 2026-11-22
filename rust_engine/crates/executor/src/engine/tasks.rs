@@ -14,26 +14,6 @@
 
 use super::*;
 
-/// Background `DumpMemIndexTask` (`src/storage/bg_task/bg_task.cppm`).
-///
-/// Submitted by [`Engine`] when the in-memory quota is exceeded while a
-/// `BGTaskProcessor` is attached. It upgrades the weak engine handle when it
-/// runs, so the dump sees every row buffered by the time the worker starts —
-/// the reference's proposed-dump coalescing.
-pub struct DumpMemIndexTask {
-    pub(crate) engine: std::sync::Weak<Engine>,
-    pub(crate) pending: Arc<std::sync::Mutex<MemIndexPending>>,
-    /// Whether every tail must go, or only the largest one: an explicit quota
-    /// check asks for everything, a write-triggered one takes the largest.
-    pub(crate) drain_all: bool,
-    /// The table whose batch raised the charge. A write-triggered dump picks
-    /// its victim among **that** table's indexes: choosing across the engine
-    /// let a table that merely held more bytes absorb every breach, and the
-    /// table that had just grown never drained. `None` for an explicit check,
-    /// which drains everything anyway.
-    pub(crate) table: Option<String>,
-}
-
 /// Background `CleanupTask` (`src/storage/bg_task/bg_task.cppm:107-114`).
 ///
 /// The trigger submits it once a transaction has committed since the last
@@ -144,15 +124,29 @@ pub(crate) async fn trigger_loop(
                 last_cleanup = std::time::Instant::now();
                 engine.submit_cleanup();
             }
-            // Periodic reclaim of unsealed memory (`docs/MEMORY_RECLAIM.md`
-            // §4.7). The write path already checks the byte quota on every
-            // statement, so this slot only has to catch what writes cannot see:
-            // a table that stopped being written while still holding memory. A
-            // round is a no-op unless the ledger is over half the quota, so an
-            // idle engine pays one atomic load here.
-            if !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval {
+            // Reclaim of unsealed memory (`docs/MEMORY_RECLAIM.md` §4.7). The
+            // **only** place a drain runs.
+            //
+            // Two things ask for it and they share one gate here:
+            // * the interval, for a table that stopped being written while
+            //   still holding memory (writes cannot see that case);
+            // * the write path's flag, raised when a batch pushed the ledger
+            //   over the quota.
+            //
+            // Short-circuiting both through this one slot is what keeps the
+            // spacing between two drains at least one tick, whichever of the
+            // two asked. `reclaim_unsealed` re-checks the target itself, so a
+            // flag raised and then satisfied by another path costs one atomic
+            // read.
+            let due_interval =
+                !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval;
+            let requested = engine
+                .context
+                .unsealed_reclaim_requested
+                .swap(false, std::sync::atomic::Ordering::Relaxed);
+            if due_interval || requested {
                 last_reclaim = std::time::Instant::now();
-                let _ = engine.reclaim_unsealed(crate::memory::now_millis()).await;
+                let _ = engine.reclaim_unsealed().await;
             }
             // The insert path takes a couple of queued splits per row and
             // leaves the rest of a bulk load's backlog behind it; this is the

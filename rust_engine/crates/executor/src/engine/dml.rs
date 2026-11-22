@@ -1151,7 +1151,7 @@ impl Engine {
         // the append buffer is bounded, and the next write to the table closes
         // it.
         if !self.has_index_declaration(table) {
-            self.enforce_quota_after_append(table).await;
+            self.enforce_quota_after_append(table);
         }
         // §9.2's row bound, not §9.5's byte watermarks: a spann mem index is the
         // query's candidate list, so one import can put a million rows into
@@ -2317,7 +2317,7 @@ impl Engine {
     ) {
         self.update_text_indexes_batch_inner(table, rows, schema, prepared)
             .await;
-        self.enforce_memindex_quota(Some(table)).await;
+        self.enforce_memindex_quota(Some(table));
     }
 
     /// The batch's work, without the quota check.
@@ -3110,18 +3110,25 @@ impl Engine {
             .store(dirty_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
-    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
-    /// keeps every row in memory until a checkpoint.
+    /// Sets `[buffer] unsealed_memory_quota` (bytes).
+    ///
+    /// This is the budget for **everything not yet on disk**: the append buffer
+    /// plus every in-memory index tail. Crossing it drives two things that run
+    /// the same drain - the write path's quota check and the periodic loop - so
+    /// the two can never disagree about what "over" means. `0` turns the whole
+    /// mechanism off.
+    pub fn set_unsealed_memory_quota(&self, bytes: u64) {
+        self.set_memindex_quota(bytes)
+    }
+
+    /// The old name for [`Self::set_unsealed_memory_quota`].
+    ///
+    /// Kept because the field it writes (`Context::memindex_quota`) is still the
+    /// engine's one byte ledger; callers that predate the rename keep working.
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
-        // The waterlines are derived (`SPANN_DESIGN.md` §9.5), so a new budget
-        // has to reach them before the next check reads it.
-        if let Ok(mut marks) = self.context.watermarks.lock() {
-            marks.set_budget(bytes);
-        }
     }
 
     /// Sets `[storage] mem_index_capacity` (rows). The reference dumps an

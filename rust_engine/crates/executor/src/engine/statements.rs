@@ -516,9 +516,8 @@ impl Engine {
                 memindex_total: std::sync::atomic::AtomicUsize::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
-                memindex_pending: Arc::new(std::sync::Mutex::new(MemIndexPending::default())),
-                watermarks: std::sync::Mutex::new(Watermarks::new(0)),
                 unsealed_backoff_until: std::sync::atomic::AtomicU64::new(0),
+                unsealed_reclaim_requested: std::sync::atomic::AtomicBool::new(false),
                 unsealed_reclaim_interval: std::sync::atomic::AtomicU64::new(30_000),
                 unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize::new(100),
                 recall: std::sync::Mutex::new(std::collections::HashMap::new()),
@@ -782,24 +781,20 @@ impl Engine {
             .unwrap_or(1)
     }
 
-    /// Dumps every memory index when the unified budget is exceeded, mirroring
-    /// the reference's memindex dump. The budget is one number for the whole
-    /// engine (`memindex_bytes`: every dumpable family, including the HNSW
-    /// charge and the IVF rows), not one per index.
-    /// `memindex_memory_quota = 0` disables it.
+    /// The write path's quota check: note that a batch pushed the ledger over
+    /// `[buffer] unsealed_memory_quota`, and let the trigger loop drain.
     ///
-    /// With a `BGTaskProcessor` attached this proposes one background
-    /// `DumpMemIndexTask` (C++ `BGMemIndexTracer::IncreaseMemoryUsage`): the
-    /// pending flag coalesces the per-row checks, and the task dumps whatever
-    /// was buffered when the worker runs. Without a processor the dump stays
-    /// synchronous, which is the engine's historical in-process behaviour.
-    /// `table` is the one whose tails just changed (the per-row call); `None`
+    /// **This does not drain.** Draining here would take other tables' bottom
+    /// gates from inside its own table's bottom half (the cross-table cycle the
+    /// block drain documents) and would put a block write plus an index dump on
+    /// the statement's latency. It raises
+    /// [`Context::unsealed_reclaim_requested`] instead; the trigger loop's next
+    /// tick runs the same [`Engine::reclaim_unsealed`] the periodic sweep runs.
+    /// One drain, one place that performs it.
+    ///
+    /// `table` names the table whose charge changed (the per-row call); `None`
     /// asks for a full recompute first (an explicit check).
-    /// The quota check, in its **async** form: every caller
-    /// (`run_bottom`, `insert_literals_inner`, `copy_from_inner`,
-    /// `execute_stmt_inner`) is already a task, so the fallback dump is an
-    /// `.await` instead of a nested `block_on` on a runtime worker.
-    pub(crate) async fn enforce_memindex_quota(&self, table: Option<&str>) {
+    pub(crate) fn enforce_memindex_quota(&self, table: Option<&str>) {
         let quota = self
             .context
             .memindex_quota
@@ -815,90 +810,31 @@ impl Engine {
         if table.is_some_and(|table| self.import_in_flight(table)) {
             return;
         }
-        // No time gate. The reference's `MemIndexTracer::IncreaseMemoryUsage`
-        // compares on **every** increase (`cur_index_memory_ >
-        // index_memory_limit_ + proposed_dump_size_`, `memindex_tracer.cppm:103`)
-        // and relies on `proposed_dump_` to avoid queueing a second task for an
-        // index that already has one in flight - never on a clock.
-        //
-        // This used to skip a check whose predecessor was younger than 10 ms,
-        // which made the outcome of a write depend on how fast the previous
-        // statement had been: two `INSERT`s issued back to back landed as one
-        // breach, so only one dump happened where the reference makes two.
-        // The callers are **per statement** (`update_text_indexes_batch`), not
-        // per row, so the clock bought nothing anyway.
-        //
-        // Fold in what changed before comparing: one table when the caller
-        // names it (O(that table's indexes)), everything for an explicit check.
+        // Fold in what changed: one table when the caller names it (O(that
+        // table's indexes)), everything for an explicit check. The ledger has to
+        // be current before the next tick decides, and only this call site knows
+        // which table moved.
         match table {
             Some(table) => self.refresh_memindex_charge(table),
             None => {
                 self.recompute_memindex_total();
             }
         }
-        // §9.5: one ledger, three waterlines. `soft` asks for a background
-        // seal, `hard` escalates it to every tail of the table; there is no
-        // second (row-based) trigger deciding *when* to dump - rows bound what
-        // one index keeps, bytes decide the pressure.
-        let pressure = self.seal_pressure();
-        if pressure == Pressure::Normal {
-            return;
-        }
-        if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(table.is_none(), table.map(str::to_string));
-            return;
-        }
-        // No background processor (a test, or shutdown): do the same work
-        // inline. An explicit check (`table == None`) is a caller asking for
-        // everything to be released, so it drains every tail; the per-write
-        // path takes the largest one.
-        if table.is_none() {
-            self.dump_all_memory_indexes().await;
-            // An explicit check may run outside any bottom half (a test, a
-            // shutdown), so the block drain can walk every table.
-            self.dump_all_sealed_blocks(None).await;
-            // The block drain released rows after the index dump had already
-            // folded its own result in, so the total is restated once more.
-            self.recompute_memindex_total();
-        } else {
-            // Inside this table's bottom half: its own gate is held, so the
-            // block drain must not reach for another table's.
-            self.dump_under_pressure(table).await;
+        if (self.budget_bytes() as u64) > self.reclaim_target() {
+            self.context
+                .unsealed_reclaim_requested
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
-    /// The quota check for a table whose rows just grew, without the per-row
-    /// gate.
+    /// The quota check for a table whose rows just grew.
     ///
     /// [`Self::enforce_memindex_quota`] is driven by the **index** write path,
-    /// so a table with no index never reached it - and that is exactly the
-    /// table whose append buffer grows unbounded. This runs at the end of a
-    /// commit instead: it folds in this table's new charge and, if the engine
-    /// is over budget, proposes the same background drain. Cheap enough for the
-    /// commit path because it reads one table's running totals and one atomic.
-    pub(crate) async fn enforce_quota_after_append(&self, table: &str) {
-        let quota = self
-            .context
-            .memindex_quota
-            .load(std::sync::atomic::Ordering::Relaxed) as usize;
-        if quota == 0 {
-            return;
-        }
-        if self.import_in_flight(table) {
-            return;
-        }
-        self.refresh_memindex_charge(table);
-        if self.seal_pressure() == Pressure::Normal {
-            return;
-        }
-        if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(false, Some(table.to_string()));
-            return;
-        }
-        // This runs after the commit returned, so no bottom gate is held. It
-        // still names the table: the breach is that table's charge, and picking
-        // the victim across the engine would leave it undrained.
-        self.dump_under_pressure(Some(table)).await;
+    /// so a table with no index never reached it - and that is exactly the table
+    /// whose append buffer grows unbounded. This runs at the end of a commit
+    /// instead and raises the same flag.
+    pub(crate) fn enforce_quota_after_append(&self, table: &str) {
+        self.enforce_memindex_quota(Some(table));
     }
 
     /// Whether an `IMPORT` is currently staging rows into `table`.
@@ -914,73 +850,6 @@ impl Engine {
             .unwrap()
             .get(&self.table_key(table))
             .is_some_and(|entry| entry.import_in_flight())
-    }
-
-    /// Queues the background drain. The caller has already established that a
-    /// processor is attached; one proposal is in flight at a time
-    /// (`proposed_dump_`).
-    pub(crate) fn propose_dump(&self, drain_all: bool, table: Option<String>) {
-        // Both callers check the processor first, so reaching here without one
-        // is a shutdown in progress: there is no worker to run the task.
-        let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
-            return;
-        };
-        // One task per table at a time, but a breach that arrives while that
-        // task is still queued is **counted**, not dropped: the task's
-        // completion re-proposes when the count is still above zero. Dropping
-        // it lost a chunk the write was supposed to produce
-        // (`test_mem_bmp`, `test_optimize_from_different_database`).
-        let key = table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
-        {
-            let mut pending = self.context.memindex_pending.lock().unwrap();
-            let count = {
-                let count = pending.pending.entry(key.clone()).or_insert(0);
-                *count += 1;
-                *count
-            };
-            if drain_all {
-                pending.drain_all.insert(key.clone());
-            }
-            // A task is already queued for this key; it serves this breach too.
-            if count > 1 {
-                return;
-            }
-        }
-        self.submit_dump_task(processor, drain_all, table);
-    }
-
-    /// Enqueues one dump task, without recording a breach.
-    ///
-    /// Separate from [`Self::propose_dump`] because the task's completion uses
-    /// it: going back through `propose_dump` incremented the count it had just
-    /// decremented, so the guard saw "already queued" and returned without
-    /// submitting anything - and every later breach returned the same way, so
-    /// that table never dumped again.
-    pub(crate) fn submit_dump_task(
-        &self,
-        processor: Arc<crate::bg_task::BGTaskProcessor>,
-        drain_all: bool,
-        table: Option<String>,
-    ) {
-        let engine = self.self_weak.lock().unwrap().clone();
-        let queued = processor.submit(Box::new(DumpMemIndexTask {
-            engine,
-            pending: Arc::clone(&self.context.memindex_pending),
-            drain_all,
-            table: table.clone(),
-        }));
-        if !queued {
-            // The processor is shutting down and dropped the task, so no worker
-            // will clear its proposal: drop it here or that table is never
-            // proposed again.
-            let key = table.unwrap_or_else(|| ALL_TABLES.to_string());
-            self.context
-                .memindex_pending
-                .lock()
-                .unwrap()
-                .pending
-                .remove(&key);
-        }
     }
 
     /// Records one sampled query's recall (`SPANN_DESIGN.md` §11.3 item 4).

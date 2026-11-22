@@ -28,7 +28,7 @@
 
 **A. 闲置表不再被检查。** 表写完就没人写它，此后没有任何路径调用配额检查，它的索引 tail 与 `pending_rows` 一直留在内存里。
 
-**B. 压力被发现后，排水到不了闲置表。** `enforce_memindex_quota(Some(other))` 里 `seal_pressure()` 是**引擎级**的（`index_build.rs:4568`），但 `dump_under_pressure(Some(other))` 把受害者限定在 `other`：
+**B. 超配额被发现后，排水到不了闲置表。** `enforce_memindex_quota(Some(other))` 的判定是**引擎级**的，但当时的 `dump_under_pressure(Some(other))` 把受害者限定在 `other`：
 
 ```rust
 // index_build.rs:4383
@@ -74,25 +74,30 @@ tick 是**正确的位置**，只是缺少一个步骤。
 一条循环：每张表算一个 unsealed 足迹，按**尺寸**与**年龄**两路排名后融合成一个顺序，逐张 dump 直到引擎总量回到**配额的一半**。
 
 ```
-reclaim_unsealed(now_ms) -> usize:
-    if quota == 0: return 0                          // 配额关掉 = 本机制关掉
-    if now_ms < backoff_until: return 0               // §4.2
-    target    = quota / 2                             // 唯一的目标
-    if budget_bytes() <= target: return 0             // 已经达标
-    stats      = 每张表的 (key, footprint, sort_base)  // §4.0
-    candidates = stats.filter(eligible)               // §4.0/§4.2：有数据、非 import、退避已过
-    order      = rrf_order(candidates)                // §4.1
+reclaim_unsealed() -> usize:                          // 没有 now 参数：时钟是 commit ts
+    if quota == 0: return 0                           // 配额关掉 = 本机制关掉
+    now_ts = current_ts()
+    if now_ts < backoff_until: return 0                // §4.2
+    target    = quota / 2                              // 唯一的目标
+    if budget_bytes() <= target: return 0              // 已经达标
+    stats      = 每张表的 (key, footprint, last_ts)     // §4.0
+    candidates = stats.filter(eligible)                // §4.0/§4.2：有数据、非 import、退避已过
+    order      = rrf_order(candidates)                 // §4.1
     dumped = 0
     for key in order:
-        if budget_bytes() <= target { break }         // 达标：本轮结束
-        if dump_table(key).await { dumped += 1 }      // §4.3
+        if budget_bytes() <= target { break }          // 达标：本轮结束
+        if dump_table(key).await { dumped += 1 }       // §4.3
         if cap != 0 && dumped >= cap { break }
-    // 出口：有进展 → 清除退避；一张都没成功 → 置 now + interval（§4.2）
+    // 出口：有进展 → 清除退避；一张都没成功 → 置 now_ts + base（§4.2）
 ```
 
 **只有一个目标：配额的一半。** 早先的版本有两条路径（"超水位"与"超过某个年龄"），但它们问的是同一个问题（"该让哪张表先还内存"）、用的是同一套排序，只有退出条件不同。合并之后少一个要调的阈值，也少一种两者互相矛盾的可能。
 
-选"一半"而不是"刚好低于水位"：`memindex_quota` 本身就是写路径的软线，排到 `quota/2` 才留出余量，否则下一批写入立刻又把它顶过线，回收与写入互相追尾。
+选"一半"而不是"刚好低于配额"：配额本身就是写路径的上限，排到 `quota/2` 才留出余量，否则下一批写入立刻又把它顶过线，回收与写入互相追尾。
+
+**同一个函数，两个调用者。** 周期扫描与**写路径**调用的是同一段代码（`enforce_memindex_quota` / `enforce_quota_after_append` 都直接调它），区别只有"谁触发"。因此两者对"是否超标""该排谁""何时停"永远一致——第二份实现只会随着调参而漂移。写路径**不**把候选集缩到刚写入的那张表：按 RRF 排名全部表，一张表把总量顶过线时，被回收的可以是另一张更该还内存的表。
+
+**年龄用 commit ts，不用墙上时钟。** `current_ts()` 是引擎给 append / dump 分配提交时间戳的同一条序列，单调、跨重启有意义。墙上时钟会在进程重启那一刻让每张表都显得"闲置了很久"，把全部表推到首轮扫描的队头。
 
 ### 4.0 表级足迹：数据从哪来
 
@@ -101,7 +106,7 @@ reclaim_unsealed(now_ms) -> usize:
 | 量 | 来源 | 含义 |
 |---|---|---|
 | `bytes` | `entry.unsealed_bytes() + entry.memindex_bytes` | 排序用的近似足迹；**不是**"有没有数据"的判据（见下） |
-| `age` | `now_ms - entry.last_write_ms` | 距最后一次 append（或最后一次回收）多久 |
+| `age` | `current_ts() - max(entry.append_ts.last(), entry.last_attempt_ts)` | 距最后一次 commit 多少个 ts |
 
 - `unsealed_bytes()` 是运行总量：行数据（`pending_bytes`）加每列的 `Vec<Value>` 头开销（`state.rs:4857-4866`）；空表返回 0，因此从没写过的表不占候选名额。`memindex_bytes` 是每张表的索引 tail 计费，由 `refresh_memindex_charge`（`index_build.rs:2459`）维护、`recompute_memindex_total`（`index_build.rs:2485`）全量重算。
 - **不把索引字节并进 `unsealed_bytes()`。** `budget_bytes()`（`index_build.rs:2448`）是 `全局 memindex_total + Σ unsealed_bytes`，并进去会重复计数。新增独立读法：
@@ -179,7 +184,7 @@ pub(crate) fn unsealed_footprint(&self) -> usize {
 
   排序用的 `bytes` 仍可以是 `footprint`（缓存值只影响先后，不影响是否回收）。但**判"是否该排"必须用 `has_unsealed`**，否则 `CREATE INDEX` 刚建好的索引永远进不了候选集，而它恰好是内存占用最大、又完全没有写路径会触发 `enforce_memindex_quota` 的情形——`CREATE INDEX` 本身不经过 append 的配额检查。
 
-- `last_write_ms` 需要新增，见 §4.5。
+- `last_attempt_ts`（失败重试的时间戳）需要新增，见 §4.5；"最后一次写入"直接用 `append_ts` 的最后一项，不另存一份。
 
 ### 4.1 两路排序与融合
 
@@ -188,12 +193,14 @@ pub(crate) fn unsealed_footprint(&self) -> usize {
 ```
 size_rank: 按 bytes 降序，rank 从 1 开始
 age_rank:  按 age 降序，rank 从 1 开始，其中
-           age = now - max(last_write_ms, last_attempt_ms)
+           age = now_ts - max(last_ts, last_attempt_ts)      // 都是 commit ts
 score(t) = 1/(K + size_rank(t)) + 1/(K + age_rank(t))     K = 3
 order    = score 降序
 ```
 
-`age` 取 `last_write_ms` 与 `last_attempt_ms` 中**更晚**的那个：失败表不以"上次尝试"为起点重算年龄（否则它会被永久钉在队头，§4.5），但失败本身也不该让它的年龄倒退。
+`age` 取 `last_ts`（最后一次 append 的 commit ts）与 `last_attempt_ts` 中**更晚**的那个：失败表不以"上次尝试"为起点重算年龄（否则它会被永久钉在队头，§4.5），但失败本身也不该让它的年龄倒退。
+
+**平局必须先看年龄。** 融合分是对称的（`1/(K+a)+1/(K+b)` 不区分名次来自哪个维度），所以"最大且最新"与"最小且最老"**恒等**——上表第 2/3 行同分正是这个原因。若平局按 `bytes` 降序破，这一对就交给大表，`K = 3` 想表达的"年龄优先"被自己的平局规则完全抵消。所以顺序是 **age 降序 → bytes 降序 → 表名升序**，用整数交叉相乘比较（`u128`，不做浮点）。
 
 这是 RRF（Reciprocal Rank Fusion，Cormack 等 2009）的两路形式。
 
@@ -225,7 +232,7 @@ order    = score 降序
 
 ### 4.2 排水循环的约束：退出、封顶、退避
 
-- **`Bytes(soft)` 的判据在每个候选之前重读一次 `budget_bytes()`。** dump 会因 import in flight、或另一条路径已排空而释放不了，也会因并发写入让总量反弹；增量记账不可靠。所以 `target_met()` 在 `for key in order` 循环里、每次 `dump_table` 之前调用一次。
+- **目标的判据在每个候选之前重读一次 `budget_bytes()`。** dump 会因 import in flight、或另一条路径已排空而释放不了，也会因并发写入让总量反弹；增量记账不可靠。所以 `target_met()` 在 `for key in order` 循环里、每次 `dump_table` 之前调用一次。
 
   次数是 **`1 + dumped`**（`dumped` 是本轮实际 dump 的张数），**上界是 `1 + unsealed_max_tables_per_round`**。一旦达标立即返回，所以常见的"压力解除"场景只有 1～2 次。按上界估算：10000 表 × `cap = 100` 是每轮 101 次求和与 101 次短锁。这是有意的（总量必须新鲜），但成本要按上界算，不能按"一次求和"。
 
@@ -236,7 +243,7 @@ order    = score 降序
 
   `unsealed_footprint()` 只用于**排序**，不用于判断是否已达标。两者故意分开：排序容忍近似，退出条件不能。
 
-- **目标只由 `memindex_quota` 派生，全程不碰水线。** `reclaim_target()` = `memindex_quota / 2`，一次读取，循环内只重读 `budget_bytes()`。这同时消掉了一个陷阱：`seal_pressure()` 在算 `level` 之前调 `retune`（`index_build.rs:4577-4581`），而 `retune` 在超过 80% 预算时把 `soft` 减半（`maintainer.rs:121-134`）。回收循环一旦也走 `retune`，引擎持续超 80% 却没有写入时 `soft` 会每轮减半、直到底——而它现在根本不读 `soft`，这条路不存在。
+- **目标只由 `unsealed_memory_quota` 派生。** `reclaim_target()` = `quota / 2`，一次读取，循环内只重读 `budget_bytes()`。没有第二层水线：`soft`/`hard` 那套 AIMD 只服务"两档该做多少"的区分，而本方案只有一个目标、一套排序。
 - **`memindex_quota == 0` 直接关掉本机制**，不是"目标为 0 于是排空一切"。目标从配额派生，`0/2` 会让每一轮都判"未达标"，必须显式早退。
 
 `dump_table` 返回 `false` 时 `continue` 而不是 `break`：某张表因 import 暂不可排、或某索引在 dump 前已被别处排空，都不该阻塞排在它后面的表。但整轮都没有进展时必须 `break`，否则死循环。
@@ -247,25 +254,25 @@ order    = score 降序
 
 补完之后仍可能有释放不掉的项（`e.spann` 那一类），所以还要一条退避规则。
 
-**状态：`Context::unsealed_backoff_until: AtomicU64`，per-engine（不是 per-target）。** 它记录"在此之前不要进入 `reclaim_unsealed`"的单调毫秒。三条状态转移：
+**状态：`Context::unsealed_backoff_until: AtomicU64`，per-engine，单位是 commit ts。** 三条状态转移：
 
 | 事件 | 动作 |
 |---|---|
-| 一轮结束、`progressed == false` | `store(now + unsealed_reclaim_interval)` |
+| 一轮结束、`progressed == false` | `store(now_ts + base)`，`base = max(1, interval 分钟数)` |
 | 一轮结束、`progressed == true` | `store(0)`（立即清除） |
-| 退避期间 | tick 上的 `Watermarks::pressure()` 照常判定（纯读），但**不进入** `reclaim_unsealed` |
+| 退避期间 | 直接返回 0，不做候选扫描 |
 
-**两条路径共用一个原子。** 它们的"无进展"含义相同：候选非空、但每张 `dump_table` 都返回 `false`（I/O 失败，或只含释放不掉的 `Memory` 形态 spann 句柄）。"全部超龄表都在 import"不会造成无进展——那些表已被排除在候选集外，`candidates.is_empty()` 先 `break`。所以是 `Context::unsealed_backoff_until` 一个原子。
+**退避基数是 commit 数。** `unsealed_reclaim_interval` 是时长、年龄是 ts，两者不能直接比；转换用的是"每个 interval 分钟算一个 commit"。`interval = 0`（调度关掉）时基数取 1，写路径触发的失败轮仍然会退避而不是原地打转。
 
 不这么做的话：每个间隔都会跑满一整轮，每轮最多 `max_tables_per_round` 次 `dump_every_table_index`（每次扫一遍 `catalog.list_indexes()`），且失败表会一直占着队头。
 
 **循环必然终止，靠三条合起来：**
 
-1. `dump_table` 排空了该表的 unsealed 数据（§4.3 的 `unsealed_live` 变小且已无 tail）时，把 `last_write_ms` 设为 `now` 且 `dump_failures = 0`，于是它下一轮不进候选集。
-2. `dump_table` 返回 `false` 时 `last_write_ms` 不前进，但 `progressed` 保持假——整轮全是这种表就 `break`。
-3. `unsealed_max_tables_per_round` 封顶，即使有源源不断的新超龄表也在一轮后返回。
+1. `dump_table` 排空了该表的 unsealed 数据（§4.3 的 `unsealed_live` 变小）时 `dump_failures = 0`，它不再满足 `has_unsealed`，下一轮不进候选集。
+2. `dump_table` 返回 `false` 时 `last_attempt_ts` 前进、`dump_failures` 递增，整轮全是这种表就 `break`。
+3. `unsealed_max_tables_per_round` 封顶，即使有源源不断的新候选也在一轮后返回。
 
-**并发写入是唯一的例外**：一张表 dump 完、`last_write_ms` 设为 `now`，另一个事务立刻写入——它又把 `last_write_ms` 往前推了（§4.5 约束 1），于是这张表带着新数据重新进入候选，下一轮再排一次。这是正确的：新数据确实还在内存里。
+**并发写入是唯一的例外**：一张表 dump 完，另一个事务立刻写入——`append_ts` 多一条，于是这张表带着新数据重新进入候选，下一轮再排一次。这是正确的：新数据确实还在内存里。
 
 注意判据是**全局**总量，不看逐表年龄。一张表有可能因为**别的**表写入而被顶过线，于是被选中——这正是"以表为单位"想要的行为：谁的内存最容易还就还谁（§4.1 的融合排序），而不是只惩罚刚写入的那张。
 
@@ -313,7 +320,7 @@ unsealed_live(key) -> usize:
 
    正确做法是 §4.3 伪代码里的 `unsealed_live(&key)` = `unsealed_bytes() + memindex_bytes_of(&key)`，前后各取一次，两者都是当场值、都不经缓存。**不要用 `has_unsealed` 的前后在假做信号**：它的第三项是 §4.0 的原子标记，那个标记按设计允许"宁多勿少"，所以"标记仍非 0 但实际已清空"是允许的中间态——拿它判进度会把一次成功记成失败。
 
-   两份判据因此各有分工：`has_unsealed` 决定**进不进候选集**（允许保守），`unsealed_live` 前后差决定**这次是否算进展**（必须精确）。`last_write_ms` 只在后者显示变小、且该表已无 tail 时才写 `now`；否则只写 `last_attempt_ms`。
+   两份判据因此各有分工：`has_unsealed` 决定**进不进候选集**（允许保守），`unsealed_live` 前后差决定**这次是否算进展**（必须精确）。只有后者为真才清 `dump_failures`；为假则前进 `last_attempt_ts` 并递增计数。
 
 `write_blocks_bounded_locked` 要求调用者已持有该表的 bottom gate，所以走 `run_commit_bottom`（与 `dump_all_sealed_blocks` 同一条路，`index_build.rs:4446`）。
 
@@ -359,7 +366,7 @@ unsealed_live(key) -> usize:
 
 小索引的饥饿由周期路径覆盖：一旦某张表被选中，`dump_every_table_index` 会排空它的**所有**索引 tail（§4.3），不看大小。
 
-`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 只有单个索引，它断言 `2..=3` 个 chunk（`tests_ut.rs:10455-10458`，注释说明下限是 2、落点取决于检查运行时驻留多少）。单索引下候选集只有一个元素，改为"选最大"不改变候选集，因此这个区间不变。
+该测试已随写路径改为"置标志"而删除：它断言三个批次产生 `2..=3` 个 chunk，依赖"每次 breach 立刻排一次"；节流到 tick 之后批次会合并，那个区间不再成立。取而代之的是 `a_write_over_the_quota_requests_a_scan_without_draining` 与 `one_scan_reclaims_several_tables_and_their_indexes`，断言的是"请求"与"扫描"，而不是"每次 breach 一个 chunk"。
 
 #### 小索引不会被饿死：每一类索引都有自己的行数上限
 
@@ -379,85 +386,42 @@ HNSW / 二级 / SPANN / 全文这四类不会无限增长：攒够上限就自�
 
 **IVF、BMP、PLAID 三类没有行数上限**，只能靠配额压力或周期路径排空。它们必须依赖周期路径；`unsealed_max_tables_per_round = 100` 的默认值保证一轮能覆盖相当多的表。§9 里列为未决的是"是否要给它们补行数触发"，判据见 §9。
 
-### 4.5 `last_write_ms` 与并发安全
+### 4.5 年龄的来源：`append_ts` 与 `last_attempt_ts`
 
-`TableEntry` 目前没有"最后一次写入"的时间，需要新增：
-
-```rust
-pub(crate) struct TableEntry {
-    /// 最后一次 append 的单调毫秒（`elapsed_millis()`）；0 = 本进程内从未写过。
-    /// 最后一次改变 unsealed 内容的操作（append / delete / compaction），用时基见下，
-    /// **与 `mirror_epoch += 1` 在同一处更新**（现有 7 处，见 §4.5）。
-    /// 排水成功后设为 `now`，不清零。读路径不碰。
-    pub(crate) last_write_ms: u64,
-}
-```
-
-三条实现约束：
-
-1. **与 `mirror_epoch += 1` 在同一位置更新。** 全部 7 处（行号是 `mirror_epoch += 1` 那一行，`mirror_dirty = true` 在其上一行）：
-
-   | 位置 | 所在函数 | 语义 |
-   |---|---|---|
-   | `statements.rs:1461` | `invalidate_block_mirror` | compaction / schema 变更让块必须重写 |
-   | `statements.rs:2187` | `reserve_rows_inline` | 分配行号并进入 append 日志 |
-   | `statements.rs:2264` | `reserve_import_rows_inline` | IMPORT 的行号分配 |
-   | `dml.rs:330` | `note_append` | append 日志的 ts 落定 |
-   | `dml.rs:454` | `note_deleted_ids` | **删除**，不是 append |
-   | `blocks/engine.rs:1804` | `refresh_block_mirror_rows` | 行真正进入 append buffer |
-   | `blocks/engine.rs:3528` | `apply_replayed_rows` | WAL 重放把行放回 buffer |
-
-   两者并排写就从结构上排除了"只更新一个"的漏写——`last_write_ms` 不是新造的信号，而是既有写入信号的另一个投影。
-
-   **因此 `last_write_ms` 的定义不是"最后一次 append"，而是"最后一次改变 unsealed 内容的操作"**，包含删除（`dml.rs:454`）与 compaction（`statements.rs:1461`）。理由是这三类都会让 `version` 或块文件需要重写，与 append 一样让"这份 unsealed 数据是否还新"发生变化。定义若是"最后一次 append"，一张刚被删掉一半的表就会被判成"很久没写"。
-
-   `blocks/engine.rs:1804` 与 `:3528` 这两处是最容易漏的：前者是 `buffer_rows` 真正填充 buffer 的地方（`engine.rs:1797-1804`），后者是 WAL 重放。漏了它们，重放之后的表 `age` 会算成"从未写过"。
-2. **排水成功后设为 `now`，不是清零。** `0` 的语义是"本进程内从未写过"，清零会让刚被回收的表在下一轮立刻又满足超龄。
-3. **重启后置为启动时刻。** 恢复出来的 tail 没有可用的写入时间；若沿用持久化的 `dump_ts`，重启后第一次扫描会把所有 tail 都视为陈旧，造成启动即集中 dump。`recover_mem_index` 完成时把 `last_write_ms` 设为进程启动的单调毫秒，"闲置"从**能观察到的时间**算起。
-
-**时基：`elapsed_millis()` 现在是 `memory.rs` 的私有函数**（`memory.rs:121`，无 `pub`），而 `TableEntry` 在 `engine/state.rs`、自增点跨 `statements.rs` / `dml.rs` / `blocks/engine.rs`。实现第一步要把它提升为 `pub(crate)`（或加一个 `Engine::elapsed_ms()`）。它本身以首次调用为 0 点并 `+1`，所以"进程启动的单调毫秒"就是它的 0 点，不需要额外的基准。
-
-**失败不更新 `last_write_ms`，下一轮重试。** `dump_table` 因 import in flight 或写盘失败而释放 0 字节时，`last_write_ms` 保持不动——那张表仍然是"最老的"，下一轮还会第一个被选中。这是有意的：陈旧路径的判据是"该表有数据且很久没动"，一次失败不改变这个事实。
-
-代价是一张持续失败的表会每轮都被重试。**但"永远排第一"会让它把后面的表挤出轮次上限**：持续失败的表 `age` 最大、恒居第一，若这类表 ≥ `unsealed_max_tables_per_round`，每轮都只轮到它们，健康表永远排不进去（§4.4 的 SPANN 空洞就是必然持续失败的一类）。
-
-所以失败的表不只要"不前进"，还要**排到队尾**。但**不能**把"上次尝试"的时间戳简单地刷成 `now`：
-
-- 排序键若是 `now - max(last_write_ms, last_attempt_ms)`，而每次失败都把它刷成 `now`，那么对一张闲置表（`last_write_ms` 永不动），`max` 恒等于 `last_attempt_ms` 恒等于"刚刚"，`age ≈ 0` **永远**成立。失败表于是被永久钉在队尾——这正是它要防止的饥饿，只是换了个方向。
-
-改成**连续失败计数 + 指数退避**：
+排序用的年龄**不新造字段**，而是复用已有的 append 日志：
 
 ```rust
 pub(crate) struct TableEntry {
-    /// 连续失败次数；成功一次或表被写入则清零。
+    /// 每次 append 的 commit ts，按提交顺序（`append_ts:{table}`），
+    /// 最后一项就是这张表"最后一次写"的时刻。
+    pub(crate) append_ts: Option<Vec<u64>>,
+    /// 回收循环最后一次尝试失败的时刻，单位同为 commit ts。
+    /// 只为把失败表推到队尾，不参与"是否有数据"的判断。
+    pub(crate) last_attempt_ts: u64,
+    /// 连续失败次数；成功一次或被写入则清零。
     pub(crate) dump_failures: u32,
 }
-
-// 排序基（§4.1 的 age_rank）
-sort_base(t) = t.last_write_ms.max(t.last_attempt_ms)
-// 只有当 now - sort_base(t) > 退避基数 × 2^failures 时才允许再试
 ```
 
-| 规则 | 值 |
-|---|---|
-| 失败时 | `dump_failures += 1`；`last_attempt_ms = now` |
-| 成功时（`unsealed_live` 变小且已无 tail，§4.3） | `dump_failures = 0`；`last_write_ms = now` |
-| 写入时 | `dump_failures = 0`（表又有新数据，值得重试） |
-| 候选门槛 | `dump_failures == 0` → 进；否则 `now - sort_base >= unsealed_reclaim_interval * 2^min(dump_failures, 6)` |
+`age = current_ts() - max(append_ts.last(), last_attempt_ts)`。
 
-**门槛只在有失败时生效。** `dump_failures == 0` 时任何 `has_unsealed` 为真的表都进候选集——这正是缺口 B 要修的：一张刚写完、把总量顶过目标的大表必须能被选中（回归用例 `the_table_that_crossed_soft_is_itself_a_candidate`）。
+**为什么用 commit ts 而不是墙上时钟。** 三个好处，缺一不可：
 
-**基数就是 `unsealed_reclaim_interval`。** 别再引入第二个量：`idle_age` 已经在本方案里删掉了（§5 只剩两个配置键），而 `interval` 天然是"多久看一次"的尺度，`0` 时循环本身就不启动（§4.7），不存在"基数为 0 让退避失效"这一支。
+1. **跨重启有意义。** 墙上时钟在进程重启那一刻跳变（新进程的单调时钟从 0 开始），每张恢复出来的表都会显得"闲置了很久"，把全部表推到首轮队头。`current_ts()` 分配在 WAL 里，重启后继续递增。
+2. **与 `dump_index_transaction` 用的是同一条序列**，所以"多久没写过"和"多久没 dump 过"可以互相比较，不需要两套单位。
+3. **单调、不倒退**（NTP 调整、时区都不影响）。
 
-指数退避让第 n 次失败要等 `基数 × 2^n`（上限 `2^6 = 64` 倍；默认基数 30s 即约 32 分钟）才再试一次。失败表即使永远失败也只占每十几小时一次的机会，不会挤掉健康表；任何一次成功写入都会把计数清零、立刻回到正常队列。
+**`append_ts` 覆盖全部写入形式。** 它是每次 append 事务的 ts 列表，`INSERT` / `COPY` / `IMPORT` 都追加一条（`dml.rs:328` 的 `note_append`、`statements.rs:1644` 的 import 路径），compaction 重写后由 `rebase_appends` 重建（`admin.rs:846`）。所以"最近一次写入"对本方案真正关心的三类事件都成立。
 
-**三条必须一起满足：**
+**删除不算"写过"。** `DELETE` 不动 `append_ts`，所以一张刚被删掉一半的表会显得比实际更老。这是**有意的**：删除让 `unsealed` 的内容变少而不是变多，把它当成"刚写过"只会让这张表更晚被回收，而它恰恰是应该优先回收的。回收之后 `dump_table` 会把 tombstone 一起写进 `version`，下一轮的 `has_unsealed` 自然为假。
+
+**`last_attempt_ts` 只在失败时前进，成功时为 0。** 三条约束：
 
 | 约束 | 原因 |
 |---|---|
-| `last_attempt_ms` 只在 `dump_table` 返回 `false` 时写 | 部分成功（`unsealed_live` 已变小）不该被降级 |
-| 用 `max(...)` 而不是覆盖 | `last_attempt_ms` 可能早于 `last_write_ms`（失败后又被写入），`max` 保证 `age` 不倒退 |
-| `Stale` 时代的两套 `sort_base` 已合并 | 只剩一个目标，`age_rank` 一律用 `max(last_write_ms, last_attempt_ms)`；不再需要"陈旧路径只用 `last_write_ms`"的分叉 |
+| 只在 `dump_table` 返回 `false` 时写 | 部分成功（`unsealed_live` 已变小）不该被降级 |
+| 用 `max(...)` 而不是覆盖 | `last_attempt_ts` 可能早于 `append_ts.last()`（失败后又被写入），`max` 保证 `age` 不倒退 |
+| 成功时置 0 | 一张清空的表下次写入时重新从 `append_ts` 计时 |
 
 **不加"已 dump"标记。** 判据（`has_unsealed` ∧ 年龄排序）已充分；加第三态只会在两个字段间引入不一致的可能——它们表达的是同一件事。
 
@@ -490,12 +454,12 @@ t4  比对 epoch(N) != N+1 → mirror_dirty = true
 **T2 — 排水之后又 APPEND**
 
 ```
-t0  flush 完成，last_write_ms := now
-t1        ← 新 INSERT，last_write_ms := now
-t2  下一轮扫描：now - last_write_ms < idle_age → 不选它
+t0  flush 完成，pending_rows 与索引 tail 都空，has_unsealed == false
+t1        ← 新 INSERT，append_ts 多一条，has_unsealed == true
+t2  下一轮：它重新进候选集（目标只看字节，不看年龄，§4）
 ```
 
-新写入推迟回收，正是想要的（刚写过不算闲置）。
+新写入让它重新成为候选，正是想要的：新数据确实还在内存里。
 
 **T4 — 第一段（块写）之后、第二段（索引 dump）之前落地的 APPEND**
 
@@ -513,8 +477,8 @@ t3  这些行的块文件还不存在（mirror_dirty == true）
 **T3 — 排水完成后一直没人写**
 
 ```
-t0  flush 完成，last_write_ms := now，pending_rows 与索引 tail 都空
-t1  下一轮扫描：footprint == 0 → 不进候选集
+t0  flush 完成，pending_rows 与索引 tail 都空，has_unsealed == false
+t1  下一轮：不进候选集
 ```
 
 不会重复 flush。判据第一项必须是"有 unsealed 数据"，年龄只是排序维度；顺序反了会让每张空表都进候选集。
@@ -563,16 +527,28 @@ dump 3  version = [(10, 100), (14, 200), (20, 300)]
 
 ### 4.7 单一节拍
 
-**只有一条定时器：`unsealed_reclaim_interval`（默认 30 秒）。** 到点就调一次 `reclaim_unsealed(now)`，没有别的判定：
+**排水只在一个地方发生：trigger loop 的 tick。** 两种请求共用这一个闸门：
 
 ```rust
-if !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval {
+let due_interval = !reclaim_interval.is_zero()
+    && last_reclaim.elapsed() >= reclaim_interval;
+let requested = engine.context.unsealed_reclaim_requested.swap(false, Relaxed);
+if due_interval || requested {
     last_reclaim = Instant::now();
-    let _ = engine.reclaim_unsealed(now_millis()).await;
+    let _ = engine.reclaim_unsealed().await;
 }
 ```
 
-**为什么不在 tick（1 秒）上跑。** 写路径**每条语句**都会查配额（`enforce_memindex_quota` / `enforce_quota_after_append` / `seal_pending_over_budget`），所以定时器只负责写路径看不见的那一件事：**没人再写、内存却还占着**。每秒跑一次只把"超配额"的发现从 30 秒缩到 1 秒，代价是每秒一次 `budget_bytes()` 的全表求和；而超配额的直接原因是写入，写入自己已经查过了。
+- **定时**：`unsealed_reclaim_interval` 到点。它负责写路径看不见的那件事——没人再写、内存却还占着。
+- **提前触发**：写路径把 `unsealed_reclaim_requested` 置真。`enforce_memindex_quota` / `enforce_quota_after_append` **只记账 + 置标志**，不排水。
+
+**为什么写路径不排水。** 三条，任一条都足够：
+
+1. **跨表死锁。** 那个调用点在**本表 bottom half 内**（持有该表的 gate），而排水要给每张表取 gate——A 持 A 等 B、B 持 B 等 A。
+2. **延迟。** 一次块写加一次索引 dump 挂在 INSERT 的返回路径上。
+3. **两处实现会分叉。** 排水只有一份代码、一个执行位置，才谈得上"同一语义"。
+
+**两次扫描的最小间隔就是一个 tick（1 秒）。** `requested` 用 `swap(false)` 取走，同一 tick 内多条语句只产生一次排水；下一次最早在下一个 tick。不需要额外的节流配置：tick 本身就是闸门。
 
 **为什么不需要"先判水位再决定目标"。** 目标从配额派生（§4.2），判定就在 `reclaim_unsealed` 的第一行：`budget_bytes() <= quota/2` 时直接返回 0。所以空闲引擎在这个节拍上只付一次原子读 + 一次求和，不做候选扫描。
 
@@ -580,7 +556,7 @@ if !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval {
 
 **注册到 `trigger_loop` 的方式**：`reclaim_interval` 作为参数传入而**不是**从 `Context` 读，是为了让传 `Duration::ZERO` 的单测（`bg_task_ut.rs:148`）保持惰性。但注意 `0` 只关掉**调度**：直接调用 `reclaim_unsealed` 仍会排水（单测就靠这一点）。要关掉机制本身是 `memindex_quota = 0`。
 
-**同一张表在一轮里被重复处理是可接受的。** 一轮只做一种目标，所以同一轮内不会重复；跨轮重复由 `write_blocks_mode_with` 的 `!dirty && block_index 非空` 短路（`blocks/engine.rs:737-745`）与 `dump_index_transaction` 的"无 tail 就跳过"（`index_build.rs:1254`）吸收，两次调用第二次空转。不为此加锁或去重。
+**同一张表在一轮里被重复处理是可接受的。** 跨轮重复由 `write_blocks_mode_with` 的 `!dirty && block_index 非空` 短路（`blocks/engine.rs:737-745`）与 `dump_index_transaction` 的"无 tail 就跳过"（`index_build.rs:1254`）吸收，两次调用第二次空转。不为此加锁或去重。
 
 **两个 `reclaim_unsealed` 并发调用会串行，不会重入。** `run_commit_bottom` 的 `HeldBottom` 标记是 **task-local**（`statements.rs:1304`），只对"同一条 task 上的嵌套调用"短路。若真有第二个触发源（另一个进程、将来新增的路径），同一张表的 gate 仍会串行：无 bottom pool 时走 `gate.lock().await`（`statements.rs:1310-1312`），有 pool 时由 `BottomWork::gates` 在 worker 上加锁（`state.rs:6584`、`:6634-6635`）。于是两次 `dump_table` 串行、第二次空转。这也是为什么本方案不需要一把引擎级的回收锁。
 
@@ -610,11 +586,11 @@ unsealed_max_tables_per_round = 100
 
 | 项 | 默认 | `0` 的含义 |
 |---|---|---|
-| `memindex_memory_quota` | 1GB（`conf/infinity_conf.toml:54`；代码默认 4 GiB，`config.rs:157`） | **关闭整个回收机制**（目标由它派生：`quota / 2`） |
+| `unsealed_memory_quota` | 1GB（`conf/infinity_conf.toml:54`；代码默认 4 GiB，`config.rs:157`）。旧名 `memindex_memory_quota` 仍接受 | **关闭整个回收机制**（目标由它派生：`quota / 2`） |
 | `unsealed_reclaim_interval` | `30s`（新增） | 关闭调度；`reclaim_unsealed` 被直接调用时仍会排水 |
 | `unsealed_max_tables_per_round` | `100`（新增） | 不限，一轮排到目标为止 |
 
-**`memindex_memory_quota = 0` 是真正的总开关**，因为目标从它派生：`0 / 2 == 0` 会让每一轮都判"未达标"并试图排空一切，所以 `reclaim_unsealed` 的第一行显式早退。`unsealed_reclaim_interval = 0` 只停掉 `trigger_loop` 的调用，写路径的配额检查不受影响。
+**`unsealed_memory_quota = 0` 是真正的总开关**，因为目标从它派生：`0 / 2 == 0` 会让每一轮都判"未达标"并试图排空一切，所以 `reclaim_unsealed` 的第一行显式早退。`unsealed_reclaim_interval = 0` 只停掉 `trigger_loop` 的调用，写路径的配额检查不受影响。
 
 **`unsealed_max_tables_per_round` 默认 100。** 它是两道护栏：不长时间占用 `flush` 串行化，以及不阻塞 `trigger_loop` 的其他四步——`trigger_loop` 是**单一顺序任务**（`tasks.rs:88-158`），checkpoint / `memory_tick` / optimize / compact / cleanup 都在同一条 `.await` 链上。`cap = 0` 表示单轮没有时间上界，10000 张有 tail 的表可能跑数分钟，期间 checkpoint 与 cleanup 都不会触发。**只用于测试或明确知道表数很少的部署；生产环境不要设 0。**
 
@@ -624,9 +600,9 @@ unsealed_max_tables_per_round = 100
 
 | 约束 | 原因 |
 |---|---|
-| **写路径的触发间隔一个都不动** | `the_memindex_quota_seals_one_hnsw_chunk_per_batch` 断言 `2..=3` 个 chunk（`tests_ut.rs:10455-10458`），依赖"一次 breach 排一个索引"；§4.4 只改"排哪一个"，候选集不变，区间不变 |
-| **`budget_bytes()` 的记账不变** | 新增的 `unsealed_footprint()` 只用于选表排序，不并入 `budget_bytes`，否则与 `memindex_total` 重复计数 |
-| **`soft` / `hard` 的推导与更新频率都不变** | 公式仍是 `max(1, min(64MiB, budget/4))` / `max(soft, max(1, min(256MiB, budget/2)))`，`budget == 0` 时都置 0（`maintain.rs:74-87`）；`retune` 仍只由写路径的 `seal_pressure()` 驱动。回收循环**不读也不改**水线，它只读 `memindex_quota` 与 `budget_bytes()`（§4.2） |
+| **写路径的检查频率不变** | `enforce_memindex_quota` / `enforce_quota_after_append` 仍在原位置每条语句调用一次；变的只是它们不做排水（§4.7），排水频率由 tick 决定 |
+| **`budget_bytes()` 的记账不变** | 它仍是 `memindex_total + Σ unsealed_bytes`；选表排序用的 `footprint` 不并入，否则重复计数 |
+| **写路径的既有触发点一个都不动** | `enforce_memindex_quota` / `enforce_quota_after_append` / `seal_pending_over_budget` 的调用位置不变；前两者内部改为"记账 + 置标志"，排水交给 tick（§4.7） |
 | **`FLUSH DATA` 语义不变** | `flush_dumps_mem_index` 仍只控制 `Engine::flush`；周期路径不读这个标志 |
 | **IMPORT 中的表单表不排水** | 逐表判断（`statements.rs:886-892` 的 `import_in_flight(table)`），只把那张表移出候选集；其他表照常回收。`dump_index_transaction` 自身的检查（`index_build.rs:1244`）仍保留作二次防护 |
 | **单元测试不受影响** | 唯一调用 `start_background_tasks` 的单测（`bg_task_ut.rs:148-154`）传的是四个 `Duration::ZERO`，因此新增步骤也不会触发 |
@@ -637,15 +613,15 @@ unsealed_max_tables_per_round = 100
 
 | # | 产出物 | 验收 |
 |---|---|---|
-| 1 | `TableEntry::last_write_ms`（表级 `unsealed_footprint` 见 §4.0）+ 前者与 `mirror_epoch += 1` 同处更新（7 处），重启时置为启动时刻 | 一次 INSERT 后前进；7 个点都更新（含 `blocks/engine.rs:1804`、`:3528`）；重启后不是 0 |
+| 1 | 年龄改从 `TableEntry::append_ts.last()` 取（不新增字段），单位是 commit ts（§4.5） | 一次 INSERT 后 `append_ts` 多一条、`age` 变小；重启后仍递增 |
 | 2 | `rrf_order(candidates)`：两路名次 + `K = 3` + 确定的平局规则 | 单测：构造"大而新"与"小而老"两组，断言年龄维度不被尺寸抹平；平局时按字节再按表名 |
-| 3 | `Engine::reclaim_unsealed(now_ms)`：目标 `quota/2`（`quota == 0` 早退）、候选集（逐表排除 import）、`has_unsealed` 判据、融合排序、逐个 dump（**两段式**：块写在 `run_commit_bottom` 内、索引 dump 在其外）、`unsealed_max_tables_per_round`（0 = 不限）、退避原子 | 单测：目标等于配额一半；按 `budget_bytes()` 退出；`cap = 0` 不限；无进展时退避 |
-| 4 | 定时器接入：`unsealed_reclaim_interval` 到点 → `reclaim_unsealed(now)` | 单测：只写 A 表把总量顶过目标，B 表（更老、更小）被一起回收；**A 表自己也必须在候选集里** |
+| 3 | `Engine::reclaim_unsealed()`（无 `now` 参数，时钟是 `current_ts()`）：目标 `quota/2`（`quota == 0` 早退）、候选集（逐表排除 import）、`has_unsealed` 判据、融合排序、逐个 dump（**两段式**：块写 `bound_ts = max(checkpoint_ts, append_ts.last())`、索引 dump 在 gate 外）、`unsealed_max_tables_per_round`（0 = 不限）、退避原子 | 单测：目标等于配额一半；按 `budget_bytes()` 退出；`cap = 0` 不限；无进展时退避 |
+| 4 | tick 接入：`unsealed_reclaim_interval` 到点**或** `unsealed_reclaim_requested` 置真 → `reclaim_unsealed()`；写路径只记账 + 置标志 | 单测：`a_write_over_the_quota_requests_a_scan_without_draining`；`one_scan_reclaims_several_tables_and_their_indexes`；`a_scan_under_the_target_does_nothing_even_when_requested` |
 | 5 | 调度关闭时的语义：`interval = 0` 不再由 `trigger_loop` 调用，但直接调用仍排水（`quota = 0` 才是总开关） | 单测：`a_zero_reclaim_interval_does_not_disable_the_loop`；`the_reclaim_target_is_half_the_quota` |
 | 6 | 配置接线（`main.rs` / `conf/infinity_conf.toml`），两项 | 配置文件里能读到；`interval = 0` 关调度、`max_tables_per_round = 0` 表示不限 |
-| 7 | `index_memory_bytes` 补 SPANN 分支（`index_has_memory_tail` 的 SPANN 兜底 `true` **保留**，见 §4.0）；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`Watermarks::soft()` / `hard()` 去掉 `#[cfg(test)]` + 新增纯读 `pressure()`；`elapsed_millis` 提升为 `pub(crate)` | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
-| 8 | `TableEntry::last_attempt_ms` + `dump_failures`；排序的 `age` 用 `max(last_write, last_attempt)`，候选门槛 `interval * 2^min(failures,6)`（`failures == 0` 时不设门槛）；`Context` 退避原子 | 单测：连续失败 3 次的表本轮不进候选集、但它被写入后立刻回到队列；成功一次清零 |
-| 9 | 删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `index_seal_starvation`，写路径改为按 `bytes` 降序、平局取更早的 `last_dump` | 三个多库单测一并移除；`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 的 `2..=3` 区间不变 |
+| 7 | `index_memory_bytes` 补 SPANN 分支（`index_has_memory_tail` 的 SPANN 兜底 `true` **保留**，见 §4.0）；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`elapsed_millis` 保持私有（不再需要毫秒时钟） | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
+| 8 | `TableEntry::last_attempt_ts` + `dump_failures`；排序的 `age` 用 `max(append_ts.last(), last_attempt_ts)`，候选门槛 `base * 2^min(failures,6)`（`failures == 0` 时不设门槛），`base = max(1, interval 分钟数)`；`Context::unsealed_backoff_until` | 单测：连续失败 3 次的表本轮不进候选集、但它被写入后立刻回到队列；成功一次清零 |
+| 9 | 删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `index_seal_starvation`、三层水线（`Watermarks`/`Pressure`/`seal_pressure`）、后台 `DumpMemIndexTask` 与 `propose_dump`；写路径改为记账 + 置标志 | 相关多库与排队单测一并移除；`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 删除（批次合并后 `2..=3` 不成立） |
 | 10 | `GAPS.md` §1 登记「周期回收 + 融合排序是与参考的有意偏离」 | 文档有对照表 |
 
 每一项的验收只跑相关单测（见 §8）；全量测试留到全部完成之后。第 9 项删代码，验收是把 `cargo test -p executor --lib` 跑一遍确认没有别的用例依赖轮转顺序。
@@ -670,12 +646,12 @@ unsealed_max_tables_per_round = 100
 | `an_append_between_the_two_phases_keeps_its_payload` **[待实现]** | 两段之间插入一行，查询仍返回它；`pending_rows` 未被清 |
 | `a_table_is_a_candidate_while_its_index_is_being_read` | 一张被并发查询的 HNSW/全文表仍被判为有 tail（`try_lock` 探测会漏，此测试会失败） |
 | `a_concurrent_dump_of_another_table_does_not_mark_this_one_done` **[待实现]** | 回收循环试一张必然失败的表，同时另一张表被 dump：失败表计数仍递增（引擎级信号会误判，此测试会失败） |
-| `repeated_failures_back_off_exponentially` | 连续失败 1/2/3 次后，候选门槛分别是 `interval × 2/4/8` |
+| `a_failing_table_is_excluded_and_a_write_brings_it_back` | 连续失败 3 次的表被排除；一次写入清零计数，下一轮立刻排水 |
 | `reclaim_stops_once_the_ledger_is_under_the_target` | 配额充足时一轮什么也不做；目标低于用量时至少排一张 |
 | `reclaim_honours_the_round_cap` | `unsealed_max_tables_per_round = 1`，3 张表都有数据，一轮只动 1 张；下一轮继续 |
 | `a_zero_round_cap_means_no_limit` | `unsealed_max_tables_per_round = 0`，5 张表在一轮内全部排空 |
 | `reclaim_skips_a_table_an_import_is_staging_into` | 表 A 在 IMPORT 中间，候选集不含 A，排在 A 后面的表照常被回收 |
-| `reclaim_retries_a_table_whose_dump_released_nothing` **[待实现]** | 第一次 `dump_table` 返回 0（模拟 I/O 失败），`last_write_ms` 未前进，下一轮仍选中它 |
+| `reclaim_retries_a_table_whose_dump_released_nothing` **[待实现]** | 第一次 `dump_table` 返回 0（模拟 I/O 失败），`last_attempt_ts` 前进、`dump_failures` 递增，退避过后仍选中它 |
 | `an_indexless_table_reports_progress_when_its_buffer_drains` | 一张**没有索引**、只有 append buffer 的表被排水：`dump_table` 返回 `true`（只用 `memindex_bytes_of` 会返回 `false`，此测试会失败），下一轮不进候选集 |
 | `reclaim_drains_a_table_written_a_moment_ago` | 目标只看字节、不看年龄：刚写完的表照样被回收 |
 | `a_table_with_an_index_dumps_every_tail_not_just_the_largest` | 一张表两个索引 tail，被选中后两个都排空 |
@@ -690,8 +666,11 @@ unsealed_max_tables_per_round = 100
 | `a_drained_table_leaves_the_candidate_set` | SPANN 表被 dump 一次后，下一轮不再进候选集（当前 `index_has_memory_tail` 恒真，此测试会失败） |
 | `reclaim_does_not_hold_the_bottom_gate_while_taking_flush_lock` | 并发跑一次 checkpoint 与一次 `reclaim_unsealed`，两者都在超时内完成（顺序反转会挂死） |
 | `reclaim_drains_a_table_over_the_target` | 目标低于用量时排空，行数不变（数据从 buffer 搬进块文件） |
-| `a_partially_dumped_table_keeps_its_age` **[待实现]** | block 写成功、索引 dump 失败：`unsealed_live` 已变小（`dump_table` 返回 `true`），但该表仍有 tail、`has_unsealed` 仍为真，`last_write_ms` 未前进 |
-| `a_reclaim_round_does_not_move_the_soft_waterline` | 连续 10 轮回收，`Watermarks::soft()` 不变 |
+| `a_partially_dumped_table_keeps_its_age` **[待实现]** | block 写成功、索引 dump 失败：`unsealed_live` 已变小（`dump_table` 返回 `true`），但该表仍有 tail、`has_unsealed` 仍为真，`last_attempt_ts` 不前进 |
+| `a_reclaim_round_does_not_move_the_target` | 连续 10 轮回收，`reclaim_target()` 与 `memindex_quota` 都不变 |
+| `a_write_over_the_quota_requests_a_scan_without_draining` | 越过配额的 INSERT 返回时行仍在 buffer、标志为真 |
+| `one_scan_reclaims_several_tables_and_their_indexes` | 3 张表各带全文索引，一次扫描全部排空，行数不变 |
+| `a_scan_under_the_target_does_nothing_even_when_requested` | 标志为真但未达标时不排水 |
 | `the_reclaim_target_is_half_the_quota` | `quota = 0` 早退（不是排空一切）；`quota = 1 MiB` 时目标是 `512 KiB` |
 | `a_permanently_failing_table_does_not_starve_the_rest` **[待实现]** | 1 张必然失败的表 + 3 张健康表，上限 2：健康表仍被回收 |
 | `a_round_that_releases_nothing_defers_the_next` | 一轮无进展后，下一次压力检查被推迟一个 `unsealed_reclaim_interval` |
@@ -699,7 +678,7 @@ unsealed_max_tables_per_round = 100
 
 **[待实现]** 的 8 条依赖测试钩子（在两段之间注入一次 append、让 `dump_table` 必然失败、逐个走 `seal_index_tail` 分支），属验证补强，不影响本项的验收口径；实现它们时优先做 `an_unsealed_mark_follows_every_dump_branch`（漏一个清零点会让表永远留在候选集）。
 
-单测里如何驱动周期逻辑：**不依赖真实时间，也不起 tick**。`trigger_loop` 是私有函数，测试直接调用 `Engine::reclaim_unsealed(now_ms, target)`，把"现在"作为参数传入——600 秒的阈值在单测里是一次数值比较，不是一次 sleep。
+单测里如何驱动周期逻辑：**不依赖真实时间，也不起 tick**。`trigger_loop` 是私有函数，测试直接调用 `Engine::reclaim_unsealed()`。年龄是 commit ts，所以"让它变老"= 推进提交时间戳，不是 sleep。
 
 ## 9. 未决
 
@@ -707,7 +686,7 @@ unsealed_max_tables_per_round = 100
 - **`unsealed_max_tables_per_round = 100` 的实测标定**：100 是 **[推算]**，依据是"一次后台推进不该长时间占用 `flush` 串行化"。实际取值取决于单表 dump 的典型耗时；100 张表的单轮耗时若超过 `unsealed_reclaim_interval`，就调小。
 - **`K = 3` 的实测复核**：`K` 越小年龄越占优（§4.1）。3 是按"年龄优先于尺寸"定的，具体取值需要在一组真实表分布上看融合后的顺序是否符合预期；若发现尺寸完全不起作用（排序等价于纯按年龄），就把 `K` 调大。
 - **排水与 `checkpoint` 的协调**：两者都取 `flush_lock`。撞在一起时串行跑通，会重复写同一张表——这是可接受的（§4.7），不做合并。
-- **`SealScheduler` 的删除范围（已执行）**：它的 tenant 取库名，而写路径的候选集永远只落在一个库里，权重必然恒等（§4.4）。已删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `Engine::index_seal_starvation` / `Context::seal_scheduler` 与三个多库单测（`the_fair_pick_follows_the_bytes`、`a_tenant_cannot_hold_every_slot`、`a_starved_tail_jumps_the_queue_and_is_counted`）；三个单测构造的都是「多个库各有一个候选」的场景，与本路径的候选集形态不符。写路径改为 `pick_largest_index`（bytes 降序、平局取更早的 `last_dump`），由 `maintain.rs` 的单测覆盖。
+- **`SealScheduler` 的删除范围（已执行）**：它的 tenant 取库名，而写路径的候选集永远只落在一个库里，权重必然恒等（§4.4）。已删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `Engine::index_seal_starvation` / `Context::seal_scheduler` 与三个多库单测（`the_fair_pick_follows_the_bytes`、`a_tenant_cannot_hold_every_slot`、`a_starved_tail_jumps_the_queue_and_is_counted`）；三个单测构造的都是「多个库各有一个候选」的场景，与本路径的候选集形态不符。写路径改为调用同一个 `reclaim_unsealed`（§4），不再有"排哪个索引"的独立选择。
 - **写路径改为"选最大"是否影响既有测量**：`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 只有单索引，不受影响；但任何依赖"两个索引交替被 dump"的测试都会变化。实现时先跑 `cargo test -p executor --lib` 确认没有这类依赖。
-- **IVF / BMP / 多向量是否补行数上限**：这三类没有写路径的行数触发（§4.4 表），只能靠配额压力或周期路径。判据是一个可测的上界：它们的 tail 在"`memindex_memory_quota = 0` 且 `unsealed_reclaim_interval = 0`"下的最大占用。若实测超过 `mem_index_capacity` 行对应的字节量（HNSW 用同一配置作参照），就补一条同样的行数触发；否则保持现状并在文档里写明"关闭两条路径时这三类无界"。
+- **IVF / BMP / 多向量是否补行数上限**：这三类没有写路径的行数触发（§4.4 表），只能靠配额压力或周期路径。判据是一个可测的上界：它们的 tail 在"`unsealed_memory_quota = 0` 且 `unsealed_reclaim_interval = 0`"下的最大占用。若实测超过 `mem_index_capacity` 行对应的字节量（HNSW 用同一配置作参照），就补一条同样的行数触发；否则保持现状并在文档里写明"关闭两条路径时这三类无界"。
 - **tick 本身是否将来还要动**：本方案决定不动（§4.7）。若将来要动，影响的是四个现有 trigger 的触发精度，需要单独评估。

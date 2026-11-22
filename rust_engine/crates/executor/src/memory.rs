@@ -127,17 +127,6 @@ fn elapsed_millis() -> u64 {
         + 1
 }
 
-/// The process's monotonic milliseconds, `+ 1` so `0` means "never set".
-///
-/// Pointer for [`elapsed_millis`], which the periodic reclaim loop also needs:
-/// a table's `last_write_ms` / `last_attempt_ms` and the backoff deadline are
-/// all in this clock, so comparing them is one subtraction. A wall clock would
-/// be wrong for the same reason it is wrong for the cgroup refresh - an NTP
-/// step would make a table look arbitrarily old or new.
-pub(crate) fn now_millis() -> u64 {
-    elapsed_millis()
-}
-
 /// The cgroup's memory ceiling and the cgroup that owns it.
 ///
 /// A limit inherited from an ancestor is still the process's limit, but the
