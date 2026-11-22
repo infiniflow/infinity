@@ -1096,6 +1096,72 @@ impl Engine {
         }
     }
 
+    /// Publishes the PLAID mirror of every multi-vector index this process has
+    /// built, so the chunks on disk cover the rows the checkpoint just wrote.
+    ///
+    /// PLAID is **rebuild-mode**: its chunk is a snapshot of the column, and
+    /// before this only a `DumpMemIndex`-style transaction wrote one. A table
+    /// loaded by an import therefore left chunks covering the rows of the last
+    /// dump, and the first query after the import rebuilt the whole index - a
+    /// full row scan plus centroid training over every token vector, on the read
+    /// path. Measured on a 62 k-unit table: past the 120 s RPC timeout, so the
+    /// query failed, and the client that timed out then desynchronised
+    /// (`Select: out of order sequence response` for every later call).
+    ///
+    /// The checkpoint is where this belongs, for the same reason SPANN uses it
+    /// (§9.4): the blocks are final, the write path is already the expensive
+    /// one, and the query path then only reads. `write_plaid_index` appends one
+    /// chunk per dump and shares the first chunk's centroids, so a checkpoint
+    /// that appended little writes little.
+    ///
+    /// Best effort: a column whose index was never built in this process has
+    /// nothing to publish, and a failure here leaves the previous chunks in
+    /// place - `read_plaid_index` compares their document count with the rows it
+    /// can read and falls back to a rebuild when they disagree.
+    pub(crate) async fn publish_plaid_chunks(&self) {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return;
+        };
+        for im in indexes {
+            if !im.index_type.eq_ignore_ascii_case("PLAID") {
+                continue;
+            }
+            let Ok(index_id) = self.index_position(&im.table, &im.name) else {
+                continue;
+            };
+            let Some(shared) = self.cached_multivector_index(&im.table, index_id as u64) else {
+                continue;
+            };
+            // A tail below the chunk target waits for the dump that creates the
+            // chunk and folds it (`fold_dumped_mirror`): publishing a stub here
+            // would leave a tiny chunk nothing folds, and inflate the chain the
+            // reader has to merge on every load.
+            let target = self.plaid_chunk_target_rows();
+            {
+                let Ok(index) = shared.read() else {
+                    continue;
+                };
+                if index.tail.len() < target {
+                    continue;
+                }
+            }
+            {
+                let Ok(mut index) = shared.write() else {
+                    continue;
+                };
+                // `PlaidIndexInMem::BuildIndex` (or its incremental form): the
+                // buffered rows are encoded against the centroids the index
+                // already holds and the buffer is released. There is nothing to
+                // `seal` - a PLAID column's chunk is the index, written by
+                // `write_plaid_index` from the rows below.
+                index.build_plaid();
+            }
+            if let Err(e) = self.write_plaid_index(&im.table, &im.name).await {
+                eprintln!("plaid publish {}: {e}", im.name);
+            }
+        }
+    }
+
     /// SPANN's optimize pass (§18, P5).
     ///
     /// The index is rebuild-mode, so "merge" is "dump once and keep one chunk":
@@ -1364,7 +1430,10 @@ impl Engine {
         // memory tail to seal, which is why it does not wait for a
         // `DumpMemIndex`.
         self.publish_spann_chunks(bound_ts).await;
-        mark("spann+persist");
+        // PLAID is rebuild-mode as well, and its snapshot was the one nothing
+        // refreshed: the next process paid for it on its first query.
+        self.publish_plaid_chunks().await;
+        mark("spann+plaid");
         // The mirror writes the vector/IVF chunks, so reload after it.
         self.reload_vector_indexes();
         mark("reload_vector_indexes");

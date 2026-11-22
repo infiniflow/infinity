@@ -1182,7 +1182,26 @@ impl PlaidIndex {
             }
         }
         if centroid_score_threshold != 0.0 {
+            // Same rule as the standard path: an all-discarding cut is the
+            // threshold being below the data's scale, so the nearest centroid
+            // of each token stays.
+            let nearest: Vec<u32> = {
+                let mut seen = vec![false; k];
+                let mut out = Vec::new();
+                for heap in &heaps {
+                    if let Some(&(_, cid)) = heap.first() {
+                        if !seen[cid as usize] {
+                            seen[cid as usize] = true;
+                            out.push(cid);
+                        }
+                    }
+                }
+                out
+            };
             probed.retain(|&cid| centroid_max_score[cid as usize] >= centroid_score_threshold);
+            if probed.is_empty() {
+                probed = nearest;
+            }
         }
         // Sparse scores, layout [n_sparse, n_query_tokens].
         let mut sparse = vec![0f32; probed.len() * n_query_tokens];
@@ -1240,6 +1259,9 @@ impl PlaidIndex {
         // Per-token top `n_ivf_probe`, then the union.
         let mut selected = vec![false; k];
         let mut probed = Vec::new();
+        // The nearest centroid of each query token, kept aside: see the comment
+        // on the threshold below.
+        let mut nearest = Vec::new();
         for q in 0..n_query_tokens {
             let mut ranked: Vec<(f32, u32)> =
                 (0..k).map(|c| (scores[q * k + c], c as u32)).collect();
@@ -1252,6 +1274,11 @@ impl PlaidIndex {
                 ranked.truncate(take);
             }
             ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+            if let Some(&(_, cid)) = ranked.first() {
+                if !nearest.contains(&cid) {
+                    nearest.push(cid);
+                }
+            }
             for &(_, cid) in ranked.iter().take(n_ivf_probe) {
                 if !selected[cid as usize] {
                     selected[cid as usize] = true;
@@ -1266,6 +1293,17 @@ impl PlaidIndex {
                     .fold(f32::MIN, f32::max)
                     >= centroid_score_threshold
             });
+            // A cut that discards **every** probed centroid is the threshold
+            // being below the data's scale, not "nothing is relevant": the
+            // score is `q·c - ½‖c‖²`, which for an un-normalized row sits far
+            // under the reference's `-0.1` even at the nearest centroid. The
+            // reference would answer with nothing here; answering from the
+            // nearest centroid at least keeps a complete index from looking
+            // empty, and it never widens the candidate set beyond one list per
+            // query token.
+            if probed.is_empty() {
+                probed = nearest;
+            }
         }
 
         let mut marker = vec![false; self.n_docs as usize];

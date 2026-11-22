@@ -1721,16 +1721,16 @@ impl Engine {
                 rows.clear();
             }
         } else if meta.index_type.eq_ignore_ascii_case("PLAID") {
-            // `DumpSegmentMemIndex`'s `kPLAID` case: the memory index is dumped
-            // into one new chunk under the id the dump transaction's
-            // `GetAndSetNextChunkID` handed out. The checkpoint writes blocks
-            // only, so this is the one place the chunk appears.
+            // `DumpSegmentMemIndex`'s `kPLAID` case: the chunk is the index
+            // (`PlaidIndexInMem::Dump`), written from the rows in one new chunk
+            // under the id the dump transaction's `GetAndSetNextChunkID` handed
+            // out. The checkpoint writes blocks only, so this is the one place
+            // the chunk appears - and the only writer, as in the reference: a
+            // load used to append here too, which left a chunk nothing had
+            // recorded.
             //
-            // The raw-token tail is sealed as well: the port's search path
-            // re-scores PLAID survivors from those `.mvec` documents, and the
-            // chunk writer serializes what the memory index holds rather than
-            // rebuilding it.
-            self.seal_multivector_index(&table, meta.id).await;
+            // No raw-token `.mvec` beside it: the reference has no such file for
+            // a PLAID column, and one here held a second copy of every vector.
             if self.write_plaid_index(&table, &meta.name).await.is_ok() {
                 // A reused instance must not serve the rows the chunk now
                 // holds from its memory tail.
