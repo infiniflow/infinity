@@ -84,10 +84,10 @@ reclaim_unsealed() -> usize:                          // 没有 now 参数：时
     candidates = stats.filter(eligible)                // §4.0/§4.2：有数据、非 import、退避已过
     order      = rrf_order(candidates)                 // §4.1
     dumped = 0
-    for key in order:
+    for (attempted, key) in order.enumerate():
         if budget_bytes() <= target { break }          // 达标：本轮结束
+        if cap != 0 && attempted >= cap { break }      // 按**尝试**计数，失败也算
         if dump_table(key).await { dumped += 1 }       // §4.3
-        if cap != 0 && attempted >= cap { break }  // 按**尝试**计数，失败也算
     // 出口：有进展 → 清除退避；一张都没成功 → 置单调时钟的 deadline（§4.2）
 ```
 
@@ -236,7 +236,7 @@ order    = score 降序
 
   次数是 **`1 + dumped`**（`dumped` 是本轮实际 dump 的张数），**上界是 `1 + unsealed_max_tables_per_round`**。一旦达标立即返回，所以常见的"压力解除"场景只有 1～2 次。按上界估算：10000 表 × `cap = 100` 是每轮 101 次求和与 101 次短锁。这是有意的（总量必须新鲜），但成本要按上界算，不能按"一次求和"。
 
-  **终止性靠"每轮至少一张表被清空 + 轮数封顶"，不靠总量单调下降。** 总量可能被并发写入推高到目标以上，所以"降到目标以下"这个条件不保证可达；只靠它作退出条件时，一个持续写入的引擎会让循环一直转到轮数上限。这是有意的：回收每次到点只做有限的工作，剩下的留给下一轮，而不是在一次调用里等到总量回落。因此退出是 `target_met() || attempted >= cap`，两者任一成立就返回（`attempted` 计尝试次数，失败的表也占名额）。
+  **终止性靠"每轮至少一张表被清空 + 轮数封顶"，不靠总量单调下降。** 总量可能被并发写入推高到目标以上，所以"降到目标以下"这个条件不保证可达；只靠它作退出条件时，一个持续写入的引擎会让循环一直转到轮数上限。这是有意的：回收每次到点只做有限的工作，剩下的留给下一轮，而不是在一次调用里等到总量回落。因此退出是 `target_met() || (cap != 0 && attempted >= cap)`，两者任一成立就返回（`attempted` 计尝试次数，失败的表也占名额；`cap == 0` 表示不限，那一项恒为假）。
 
 - **`MAX_TABLES_PER_ROUND` 是必须的护栏。** 没有它，一次触发可能在持有 `flush` 串行化的情况下连续写 1000 张表。默认 100（`unsealed_max_tables_per_round`，见 §5），超出的交给下一轮——总量回落渐进，符合后台任务的定位。
 - **`target_met` 的口径是 `budget_bytes()`，不是"候选集的 `footprint` 之和"。** `budget_bytes()` 是 `memindex_total + Σ 所有表的 unsealed_bytes()`（`index_build.rs:2448`）。用候选集求和会漏掉不在候选集里的表（import 中的、退避中的），退出线就偏了；而 `budget_bytes` 里 `memindex_total` 是全局原子，不等于 `Σ memindex_bytes`（后者是缓存，可能滞后一个批次）。
@@ -620,7 +620,7 @@ unsealed_max_tables_per_round = 100
 | 2 | `rrf_order(candidates)`：两路名次 + `K = 3` + 确定的平局规则 | 单测：构造"大而新"与"小而老"两组，断言年龄维度不被尺寸抹平；平局时按字节再按表名 |
 | 3 | `Engine::reclaim_unsealed()`（无 `now` 参数，时钟是 `current_ts()`）：目标 `quota/2`（`quota == 0` 早退）、候选集（逐表排除 import）、`has_unsealed` 判据、融合排序、逐个 dump（**两段式**：块写 `bound_ts = max(checkpoint_ts, append_ts.last())`、索引 dump 在 gate 外）、`unsealed_max_tables_per_round`（0 = 不限）、退避原子 | 单测：目标等于配额一半；按 `budget_bytes()` 退出；`cap = 0` 不限；无进展时退避 |
 | 4 | tick 接入：`unsealed_reclaim_interval` 到点**或** `unsealed_reclaim_requested` 置真 → `reclaim_unsealed()`；写路径只记账 + 置标志 | 单测：`a_write_over_the_quota_requests_a_scan_without_draining`；`one_scan_reclaims_several_tables_and_their_indexes`；`a_scan_under_the_target_does_nothing_even_when_requested` |
-| 5 | 调度关闭时的语义：`interval = 0` 不再由 `trigger_loop` 调用，但直接调用仍排水（`quota = 0` 才是总开关） | 单测：`a_zero_reclaim_interval_does_not_disable_the_loop`；`the_reclaim_target_is_half_the_quota` |
+| 5 | 调度关闭时的语义：`interval = 0` 停掉**周期**扫描（写路径置的标志仍会在 tick 上排水），直接调用也仍排水；`quota = 0` 才关掉整个机制 | 单测：`a_zero_reclaim_interval_does_not_disable_the_loop`；`the_reclaim_target_is_half_the_quota` |
 | 6 | 配置接线（`main.rs` / `conf/infinity_conf.toml`），两项 | 配置文件里能读到；`interval = 0` 关调度、`max_tables_per_round = 0` 表示不限 |
 | 7 | `index_memory_bytes` 补 SPANN 分支（`index_has_memory_tail` 的 SPANN 兜底 `true` **保留**，见 §4.0）；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`elapsed_millis` 保持私有（不再需要毫秒时钟） | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
 | 8 | `TableEntry::last_attempt_ts`（**单调毫秒**）+ `dump_failures`；排序的 `age` 只用 `append_ts.last()`（commit ts），候选门槛 `max(interval_ms, 1000) * 2^min(failures,6)`（`failures == 0` 时不设门槛）；`Context::unsealed_backoff_until` 也是单调毫秒的 deadline | 单测：连续失败 3 次的表本轮不进候选集、但它被写入后立刻回到队列；成功一次清零 |

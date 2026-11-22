@@ -481,17 +481,22 @@ impl SpannIndex {
                 continue;
             };
             if part.is_leaf() {
-                // Only a leaf that admits at least one row spends beam budget.
-                // A leaf the filter rejects entirely cannot contribute, so
-                // charging it made a selective filter stop early and come back
-                // short although admitted rows exist elsewhere.
-                let before = set.len();
+                // The budget is checked **before** the scan, so `beam = 1` scans
+                // exactly one leaf. Only a leaf that admits at least one row is
+                // charged; a leaf the mask rejects cannot contribute, and
+                // charging it made a selective filter spend its budget on
+                // partitions that add nothing and answer short.
+                //
+                // The admitted count comes from `search_into`, not from the
+                // growth of `set`: the set prunes at its capacity, so a
+                // replacement leaves its length unchanged although the leaf did
+                // admit rows.
+                if allowed.is_some() && scanned >= budget {
+                    break;
+                }
                 let query = part.make_query(&self.rotation, q);
-                part.search_into(&query, q, self.opts.metric, &mut set, allowed);
-                if set.len() > before || allowed.is_none() {
-                    if scanned >= budget {
-                        break;
-                    }
+                let admitted = part.search_into(&query, q, self.opts.metric, &mut set, allowed);
+                if admitted > 0 || allowed.is_none() {
                     scanned += 1;
                 }
             } else {

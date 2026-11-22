@@ -105,12 +105,43 @@ fn usage() -> ! {
 }
 
 /// Reads `key = "value"` out of a TOML text without pulling in a parser.
+///
+/// A trailing `# comment` is dropped, and only outside a quoted string: an
+/// operator who writes `unsealed_memory_quota = "512MB" # container budget`
+/// means the size, and the stricter validation below would otherwise reject the
+/// whole line and refuse to start. A `#` inside the quotes stays part of the
+/// value.
 fn toml_value(text: &str, key: &str) -> Option<String> {
-    text.lines()
+    let line = text
+        .lines()
         .map(str::trim)
-        .find(|l| l.starts_with(key) && l[key.len()..].trim_start().starts_with('='))
-        .and_then(|l| l.split_once('='))
-        .map(|(_, v)| v.trim().trim_matches('"').to_string())
+        .find(|l| l.starts_with(key) && l[key.len()..].trim_start().starts_with('='))?;
+    let (_, value) = line.split_once('=')?;
+    Some(
+        strip_toml_comment(value)
+            .trim()
+            .trim_matches('"')
+            .to_string(),
+    )
+}
+
+/// Everything before an unquoted `#`, with a quoted run kept verbatim.
+fn strip_toml_comment(value: &str) -> &str {
+    let mut quoted = false;
+    let mut escaped = false;
+    for (at, ch) in value.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '#' if !quoted => return &value[..at],
+            _ => {}
+        }
+    }
+    value
 }
 
 /// The reference's default invocation: `infinity [-f <config>] [-m]` starts the
@@ -1237,6 +1268,38 @@ mod config_parse_tests {
         assert_eq!(
             configured_size("unsealed_memory_quota = \"0\"\n", "unsealed_memory_quota").unwrap(),
             Some(0)
+        );
+    }
+
+    /// An inline comment after a quoted value is not part of the value.
+    ///
+    /// The shipped config documents each key with a trailing comment, and the
+    /// stricter validation would otherwise reject the size and stop startup.
+    #[test]
+    fn an_inline_comment_is_not_part_of_the_value() {
+        let text = "unsealed_memory_quota = \"512MB\" # container budget\n";
+        assert_eq!(
+            toml_value(text, "unsealed_memory_quota").as_deref(),
+            Some("512MB")
+        );
+        assert_eq!(
+            configured_size(text, "unsealed_memory_quota").unwrap(),
+            Some(512 * 1024 * 1024)
+        );
+        // A `#` inside the quotes is part of the value.
+        let text = "temp_dir = \"/var/inf#inity/tmp\"\n";
+        assert_eq!(
+            toml_value(text, "temp_dir").as_deref(),
+            Some("/var/inf#inity/tmp")
+        );
+        // No comment at all still works, and a bare number survives.
+        assert_eq!(
+            toml_value(
+                "unsealed_max_tables_per_round = 25\n",
+                "unsealed_max_tables_per_round"
+            )
+            .as_deref(),
+            Some("25")
         );
     }
 }

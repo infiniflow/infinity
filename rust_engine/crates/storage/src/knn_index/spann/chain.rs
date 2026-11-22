@@ -508,20 +508,18 @@ impl ChunkChain {
                 continue;
             };
             if meta.level <= 1 {
-                // A leaf whose every row the mask rejects must not spend beam
-                // budget: with a selective filter the budget would be gone
-                // after the first few leaves and the answer would come back
-                // short although admitted rows exist elsewhere. Admitting at
-                // least one row is what makes a probe count; the walk is still
-                // bounded, by the tree's own leaf count.
+                // The budget is checked **before** the scan, so `beam = 1`
+                // scans exactly one leaf. Only a leaf that admits at least one
+                // row is charged: a leaf the mask rejects cannot contribute, and
+                // charging it made a selective filter come back short.
+                if allowed.is_some() && scanned >= budget {
+                    break;
+                }
                 let admitted = match self.owner(key) {
                     Some(layer) => self.layers[layer].scan_leaf_into(key, q, allowed, &mut set),
                     None => 0,
                 };
                 if admitted > 0 || allowed.is_none() {
-                    if scanned >= budget {
-                        break;
-                    }
                     scanned += 1;
                 }
                 continue;

@@ -12517,6 +12517,107 @@ mod tests {
         assert_eq!(e.index_delims("kw_case", "doc"), Some(vec!['A', 'B']));
     }
 
+    /// Each `FULLTEXT` record tokenises with **its own** analyzer settings.
+    ///
+    /// The write path resolves a cold handle per index id, and the tokeniser it
+    /// builds must come from that record: taking the delimiters or the stemmer
+    /// from the column gave a record with a different analyzer the first
+    /// record's tokenisation, so its postings did not follow its declaration.
+    #[tokio::test]
+    async fn each_fulltext_record_keeps_its_own_delimiters() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ftd (doc VARCHAR);").await.unwrap();
+        // The column's analyzer is `standard`; the second record asks for comma
+        // delimiters. Order matters: the column-level helper resolves the
+        // column's *first* index, so a record that names no analyzer is the
+        // one that has to come first for the two to differ.
+        e.execute("CREATE INDEX ftd_a ON ftd (doc) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX ftd_b ON ftd (doc) USING FULLTEXT WITH (analyzer = 'keyword-,');")
+            .await
+            .unwrap();
+
+        // The record-level helper answers each record's own declaration. The
+        // fallback is the **column's** tokeniser, which on a column carrying a
+        // comma index resolves to the comma one - so a record that declares
+        // nothing must not end up with it.
+        let mut fallback = e.index_tokenizer("ftd", "doc");
+        fallback.delims = None;
+        let plain = e.index_tokenizer_of_name("ftd", "ftd_a", fallback.clone());
+        let comma = e.index_tokenizer_of_name("ftd", "ftd_b", fallback);
+        assert_eq!(comma.delims, Some(vec![',']), "ftd_b declared comma");
+        assert_eq!(
+            plain.delims, None,
+            "ftd_a declared no analyzer, so it keeps the default tokeniser"
+        );
+    }
+
+    /// A frozen secondary tail whose chunk write failed is retried by the next
+    /// seal and retired once it succeeds.
+    ///
+    /// The failed entries stay readable in `sealing`, but the live tail is new
+    /// rows - only the retry step can ever publish those entries again, so
+    /// without it they are stuck in memory for good.
+    #[tokio::test]
+    async fn a_frozen_tail_is_retried_by_the_next_seal() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rt (id INT, v INT);").await.unwrap();
+        e.execute("CREATE INDEX rt_v ON rt (v);").await.unwrap();
+        for i in 0..3 {
+            e.execute(&format!("INSERT INTO rt VALUES ({i}, {i});"))
+                .await
+                .unwrap();
+        }
+        let key = e.table_key("rt");
+        let index_id = e.test_index_id("rt", "v", "SECONDARY");
+        // Freeze the live tail by hand and leave it in `sealing`: the shape a
+        // run whose chunk write failed leaves behind.
+        let frozen = {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            let sealed =
+                std::sync::Arc::new(entry.secondary.indexes.get(&index_id).unwrap().seal());
+            entry
+                .secondary
+                .sealing
+                .entry(index_id)
+                .or_default()
+                .push(std::sync::Arc::clone(&sealed));
+            sealed
+        };
+        assert!(!frozen.is_empty(), "the frozen tail holds the rows");
+        assert_eq!(
+            rows(&e, "SELECT id FROM rt WHERE v = 1;").await,
+            vec![vec!["1".to_string()]],
+            "a frozen tail stays readable"
+        );
+
+        // The next seal starts from the frozen tail, with an empty live one.
+        e.dump_index_transaction("rt", "rt_v").await.unwrap();
+        let sealing = {
+            let tables = e.tables.lock().unwrap();
+            tables[&key]
+                .secondary
+                .sealing
+                .get(&index_id)
+                .map(|list| list.len())
+                .unwrap_or(0)
+        };
+        assert_eq!(sealing, 0, "the retry published the frozen tail");
+        assert_eq!(
+            rows(&e, "SELECT id FROM rt WHERE v = 1;").await,
+            vec![vec!["1".to_string()]],
+            "the chunk answers after the retry"
+        );
+    }
+
     /// DDL accepts exactly the names `AnalyzerPool::GetAnalyzer` constructs:
     /// the family is case sensitive, `ngram` parses a numeric prefix, and
     /// `sparsegram` validates its window.

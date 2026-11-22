@@ -1159,6 +1159,21 @@ impl Engine {
         TailState::HasRows
     }
 
+    /// Whether `index` has a **frozen** tail: entries a dump took but could not
+    /// publish, still in `secondary.sealing`.
+    ///
+    /// Those rows are readable (readers merge the frozen tails) but not
+    /// reclaimable, and its live tail is new rows, so only a dump that counts
+    /// this state can ever publish them again.
+    fn index_has_frozen_tail(&self, table: &str, meta: &IndexMeta) -> bool {
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        tables
+            .get(&key)
+            .and_then(|e| e.secondary.sealing.get(&meta.id))
+            .is_some_and(|list| !list.is_empty())
+    }
+
     /// Whether the index has chunk files the catalog does not record yet.
     ///
     /// The checkpoint mirrors an index's chunk files but has no commit ts to
@@ -1316,7 +1331,12 @@ impl Engine {
         // `Unknown` (a query holds the tail's lock) is treated as "something
         // new": the seal is the only way those rows leave memory, and skipping
         // it would strand them until the next write.
+        // A frozen tail from a run whose chunk write failed counts as
+        // "something new" too. Its entries are readable (readers merge
+        // `sealing`), so without this the dump would skip and they could never
+        // be published: the live tail is new rows, not those.
         if self.index_has_memory_tail(&table, &version.index) == TailState::Empty
+            && !self.index_has_frozen_tail(&table, &version.index)
             && !self.index_has_unpublished_chunks(&table, &version.index)
             && !self.index_has_uncovered_rows(&table, &version.index).await
         {
@@ -2260,6 +2280,23 @@ impl Engine {
             };
             let low_card = self.secondary_low_cardinality(&im.table, &column, &ty);
             let tail_kind = secondary_key_kind(&ty);
+            // Frozen tails an earlier attempt could not finish come first: a
+            // failed segment keeps its tail in `sealing` (readable, but not
+            // reclaimable), and only this loop can ever retry it - the live
+            // tail below is new rows, not those. Retiring them here is what
+            // makes the retry terminate.
+            let pending: Vec<Arc<index::SealedTail>> = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.secondary.sealing.get(&index_id).cloned())
+                    .unwrap_or_default()
+            };
+            for frozen in pending {
+                self.write_frozen_secondary_tail(
+                    &tkey, &im.table, index_id, low_card, tail_kind, &frozen,
+                );
+            }
             // `seal` empties the tail, and the chunk below only becomes visible
             // after it is written; the frozen entries stay in `sealing`, where
             // readers merge them, so the window in between loses no row.
@@ -2283,6 +2320,32 @@ impl Engine {
                     .push(Arc::clone(&sealed));
                 sealed
             };
+            self.write_frozen_secondary_tail(
+                &tkey, &im.table, index_id, low_card, tail_kind, &sealed,
+            );
+        }
+    }
+
+    /// Writes one frozen secondary tail into its chunk files and publishes the
+    /// readers.
+    ///
+    /// The tail leaves `secondary.sealing` **only** when every segment's chunk
+    /// was written and opened. A failed segment keeps it: retiring it would
+    /// drop those rows out of every read (no chunk covers them) and the entries
+    /// would be gone, so no later round could retry them. The retry itself is
+    /// [`Self::seal_secondary_indexes_filtered_of`]'s first step, which walks
+    /// whatever is still in `sealing`.
+    fn write_frozen_secondary_tail(
+        &self,
+        tkey: &str,
+        table: &str,
+        index_id: u64,
+        low_card: bool,
+        tail_kind: KeyKind,
+        sealed: &Arc<index::SealedTail>,
+    ) {
+        let tkey = tkey.to_string();
+        {
             let tail = sealed.entries();
             // `ChunkIndexMetaInfo`: the first row id in the dump and its row
             // count. Recorded per dump (one chunk per seal call).
@@ -2320,7 +2383,7 @@ impl Engine {
                             .push((ordered, (*id & 0xffff_ffff) as u32));
                     }
                 }
-                let set = self.index_segment_set(&im.table);
+                let set = self.index_segment_set(table);
                 let mut readers = Vec::new();
                 // Whether **every** segment's chunk reached a readable file.
                 // One failed segment means the frozen tail must stay where it
@@ -2334,7 +2397,7 @@ impl Engine {
                     // (`GetAndSetNextChunkID`), never from a count of files.
                     let next =
                         self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
-                    let seg_dir = self.index_segment_dir(&im.table, index_id, segment as u32);
+                    let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
                     if std::fs::create_dir_all(&seg_dir).is_err() {
                         all_written = false;
                         continue;
@@ -2409,7 +2472,7 @@ impl Engine {
                         // it - a partial write keeps the tail so the rows stay
                         // readable and the next round retries them.
                         if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
-                            pending.retain(|tail| !Arc::ptr_eq(tail, &sealed));
+                            pending.retain(|tail| !Arc::ptr_eq(tail, sealed));
                         }
                     }
                 }
@@ -2430,7 +2493,7 @@ impl Engine {
                     }
                 }
                 let (readers, meta, all_written) =
-                    self.write_secondary_low_chunks(&im.table, im.id, tail_kind, grouped);
+                    self.write_secondary_low_chunks(table, index_id, tail_kind, grouped);
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
                 entry
@@ -2456,7 +2519,7 @@ impl Engine {
                     // chunk or the frozen tail. A segment that failed keeps the
                     // tail readable and retryable.
                     if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
-                        pending.retain(|frozen| !Arc::ptr_eq(frozen, &sealed));
+                        pending.retain(|frozen| !Arc::ptr_eq(frozen, sealed));
                     }
                 }
             }
@@ -4422,14 +4485,54 @@ impl Engine {
     /// `whitespace` are carried by the delimiters.
     pub(crate) fn index_analyzer(&self, table: &str, column: &str) -> Option<String> {
         let name = self.column_analyzer_name(table, column)?;
-        match analyzer::parse_analyzer_name(&name) {
-            Ok(analyzer::AnalyzerName::Standard { .. })
-            | Ok(analyzer::AnalyzerName::Whitespace { .. })
-            | Err(_) => None,
-            Ok(_) => Some(name),
-        }
+        analyzer_family(&name)
     }
 
+    /// The tokeniser **one catalog record** was created with.
+    ///
+    /// All three settings - analyzer family, delimiters, stemmer - come from
+    /// the same record, so a column with two `FULLTEXT` indexes tokenises each
+    /// one the way it was declared. Deriving the delimiters or the stemmer from
+    /// the column instead (`index_delims` / `index_stemmer`) gave a second
+    /// record with a different analyzer the *first* record's settings, so its
+    /// postings did not follow its own declaration.
+    ///
+    /// `fallback` is only used when the record names no analyzer.
+    pub(crate) fn index_tokenizer_of_name(
+        &self,
+        table: &str,
+        index_name: &str,
+        fallback: TextTokenizer,
+    ) -> TextTokenizer {
+        // The record's **own** analyzer: the column-level fallback would give a
+        // record that declares nothing the other index's delimiters.
+        let Some(name) = self.analyzer_recorded_for_index(table, index_name) else {
+            return fallback;
+        };
+        let delimiters = match analyzer::parse_analyzer_name(&name) {
+            Ok(analyzer::AnalyzerName::Whitespace { delimiters }) => {
+                Some(delimiters.chars().collect())
+            }
+            // A record that names the standard family keeps the column's
+            // delimiters: the delimiters are a property of the *tokeniser*
+            // family, and `standard` splits the standard way.
+            _ => None,
+        };
+        let mut tokenizer = TextTokenizer::new(delimiters, analyzer_family(&name));
+        tokenizer.stemmer = match analyzer::parse_analyzer_name(&name) {
+            Ok(analyzer::AnalyzerName::Standard { language }) => {
+                match analyzer::standard_stemmer(language) {
+                    analyzer::Stemmer::Snowball(rust_stemmers::Algorithm::English) => None,
+                    stemmer => Some(stemmer),
+                }
+            }
+            _ => None,
+        };
+        tokenizer
+    }
+}
+
+impl Engine {
     /// `WalCmdDumpIndexV2` per index over `segment`: the chunk the dump that
     /// runs inside the import/compaction transaction produced
     /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:387`).
@@ -5188,4 +5291,19 @@ pub(crate) struct RecordedChunk {
     pub(crate) base_row_id: u64,
     pub(crate) row_count: u64,
     pub(crate) index_size: u64,
+}
+
+/// The analyzer **family** a name selects: `Some` only for a family the
+/// delimiter split does not reproduce (`ik`, `rag-chinese`, `ngram`,
+/// `japanese`, …).
+///
+/// `standard` is the default path and `keyword` / `whitespace` are carried by
+/// the delimiters, so all three answer `None`.
+fn analyzer_family(name: &str) -> Option<String> {
+    match analyzer::parse_analyzer_name(name) {
+        Ok(analyzer::AnalyzerName::Standard { .. })
+        | Ok(analyzer::AnalyzerName::Whitespace { .. })
+        | Err(_) => None,
+        Ok(_) => Some(name.to_string()),
+    }
 }

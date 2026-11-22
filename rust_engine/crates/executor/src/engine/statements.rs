@@ -2231,6 +2231,26 @@ impl Engine {
             .and_then(|e| e.analyzers.get(&column).cloned())
     }
 
+    /// The analyzer **recorded for the index itself**, never the column's.
+    ///
+    /// [`Self::analyzer_of_index`] falls back to the column's analyzer when the
+    /// record names none, which is right for a query written without `@index`
+    /// but wrong for a cold handle being built *for* a record: a record with
+    /// no analyzer means the default tokeniser, not a loan of the other
+    /// index's delimiters.
+    pub(crate) fn analyzer_recorded_for_index(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Option<String> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.analyzers_by_index.get(index_name).cloned())
+    }
+
     /// `(column, min_n, max_n, fold)` for every full-text index whose analyzer
     /// is a sparse gram analyzer. Only these indexes can consume the literal
     /// runs of a `regex()` predicate (C++ `SparseGramParams`).
@@ -4540,27 +4560,27 @@ impl Engine {
     }
 
     /// The tokeniser one full-text record was created with.
+    ///
+    /// All three settings come from the **record**, not from the column: a
+    /// column may carry two `FULLTEXT` indexes with different analyzers, and
+    /// taking the delimiters or the stemmer from the column gave the second
+    /// record the first one's tokenisation.
     fn index_tokenizer_of(&self, table: &str, index_name: &str) -> Option<TextTokenizer> {
-        let analyzer = self.analyzer_of_index(table, index_name);
-        let column = self
-            .storage
+        // A record with no analyzer entry at all keeps the column's tokeniser,
+        // which is what the write path has always used.
+        let fallback = self.index_tokenizer(table, &self.index_column_named(table, index_name)?);
+        Some(self.index_tokenizer_of_name(table, index_name, fallback))
+    }
+
+    /// The column a full-text record named `index_name` covers.
+    fn index_column_named(&self, table: &str, index_name: &str) -> Option<String> {
+        self.storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
             .ok()?
             .into_iter()
-            .find(|im| im.name == index_name)?
-            .column;
-        let mut tokenizer = TextTokenizer::new(
-            self.index_delims(table, &column),
-            analyzer.and_then(|name| match analyzer::parse_analyzer_name(&name) {
-                Ok(analyzer::AnalyzerName::Standard { .. })
-                | Ok(analyzer::AnalyzerName::Whitespace { .. })
-                | Err(_) => None,
-                Ok(_) => Some(name),
-            }),
-        );
-        tokenizer.stemmer = self.index_stemmer(table, &column);
-        Some(tokenizer)
+            .find(|im| im.name == index_name)
+            .map(|im| im.column)
     }
 
     /// The catalog id of the full-text index on `column` - the first one when

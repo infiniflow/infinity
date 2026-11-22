@@ -197,6 +197,15 @@ impl Partition {
     /// slot, instead of after the fact: widening the candidate pool by
     /// `1/selectivity` was how a filter reached the tree before, and at 1%
     /// selectivity that asked for the whole table (`§12.5`).
+    /// Scores every admitted member into `out`, returning how many the mask let
+    /// through.
+    ///
+    /// The count is what a filtered walk charges against its beam: a leaf whose
+    /// rows are all rejected cannot contribute, so charging it made a selective
+    /// filter spend its budget on partitions that add nothing and answer short.
+    /// It is **not** the growth of `out`: `SearchSet` prunes at its capacity, so
+    /// a replacement or a rejected candidate leaves its `len` unchanged even
+    /// though the leaf did admit rows.
     pub fn search_into(
         &self,
         query: &QueryCode,
@@ -204,13 +213,15 @@ impl Partition {
         metric: Metric,
         out: &mut SearchSet,
         allowed: Option<&RowMask>,
-    ) {
+    ) -> usize {
+        let mut admitted = 0usize;
         for (index, member) in self.members.iter().enumerate() {
             if let Some(allowed) = allowed {
                 if !allowed.contains(member.id) {
                     continue;
                 }
             }
+            admitted += 1;
             let (squared, err) = match self.raw_member(index) {
                 Some(raw) => (l2_sq(q_raw, raw), 0.0f32),
                 None => (
@@ -222,6 +233,7 @@ impl Partition {
                 metric_score(metric, squared, err, query.raw_norm, member.code.raw_norm);
             out.add(score, bound, member.id);
         }
+        admitted
     }
 }
 

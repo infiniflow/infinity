@@ -399,6 +399,19 @@ pub struct RowMask {
     exclude: Option<RowBitmap>,
 }
 
+/// An iterator over `set` that starts at the first row `>= row`.
+///
+/// `advance_to` is a container-level seek (a `BTreeMap` descent plus one
+/// container lookup), which is what keeps a per-document seek off the
+/// row-by-row walk.
+fn seek(set: &RowBitmap, row: u64) -> roaring::treemap::Iter<'_> {
+    let mut iter = set.iter();
+    if row != 0 {
+        iter.advance_to(row);
+    }
+    iter
+}
+
 impl RowMask {
     /// C++ `CommonQueryFilter` with no filter and no delete: every row is
     /// admitted, nothing is materialised, and `contains` is a constant.
@@ -450,31 +463,29 @@ impl RowMask {
     ///
     /// This is the seek the full-text cursors use (`DocFilter::next_ge`), and
     /// the reference gets it from `RoaringBitmap::NextSetBit`. Both halves are
-    /// walked by an **advancing** iterator rooted at `row`: an excluded row
-    /// costs the next step of the exclusion walk, not a new seek. Restarting
+    /// walked by an **advancing** iterator rooted at `row`, so an excluded row
+    /// costs one step of the exclusion walk rather than a new seek - restarting
     /// the scan per excluded row made a cursor over a mostly-deleted index
-    /// quadratic - with `0..100000` admitted and `0..98000` excluded, one call
-    /// walked every skipped row again from the start.
+    /// quadratic.
+    ///
+    /// The two cases need different walks. With an admit bitmap of its own, the
+    /// walk is over the admissions and the exclusion cursor only has to answer
+    /// "is this one excluded"; stepping it through a dense tombstone range would
+    /// cost one step per tombstone for an admission that may be far above them,
+    /// so it is **re-seeked** to each candidate instead. An all-admitting
+    /// predicate has nothing to seek, so it steps the exclusion cursor forward -
+    /// adjacent tombstones are then one step each.
     pub fn next_ge(&self, row: u64) -> Option<u64> {
-        fn seek(set: &RowBitmap, row: u64) -> roaring::treemap::Iter<'_> {
-            let mut iter = set.iter();
-            if row != 0 {
-                iter.advance_to(row);
-            }
-            iter
-        }
         match (&self.admit, &self.exclude) {
             (Some(admit), Some(exclude)) => {
                 let mut admit = seek(admit, row);
-                let mut excluded = seek(exclude, row).peekable();
                 loop {
                     let at = admit.next()?;
-                    // Both walks ascend, so the exclusion cursor only moves
-                    // forward: no candidate is compared twice.
-                    while excluded.peek().is_some_and(|e| *e < at) {
-                        excluded.next();
-                    }
-                    if excluded.peek() != Some(&at) {
+                    // Re-seek: `at` may sit far above the tombstones below it,
+                    // and walking them one by one is what made a sparse
+                    // admission over a dense tombstone range cost a step per
+                    // tombstone.
+                    if !exclude.contains(at) {
                         return Some(at);
                     }
                 }
@@ -635,6 +646,19 @@ mod row_mask_tests {
         assert_eq!(mask.next_ge(0), Some(98_000));
         assert_eq!(mask.next_ge(97_000), Some(98_000));
         assert_eq!(mask.next_ge(110_000), Some(110_000));
+    }
+
+    #[test]
+    fn a_sparse_admission_over_a_dense_tombstone_range_seeks_instead_of_stepping() {
+        // Two admissions, ten million tombstones between them. Stepping the
+        // exclusion cursor through the range would cost one step per tombstone
+        // for an admission that sits far above it, so the admit walk re-seeks
+        // per candidate.
+        let mask = RowMask::from_rows([0u64, 10_000_000].into_iter().collect())
+            .with_excluded(Some((0..10_000_000u64).collect()));
+        assert_eq!(mask.next_ge(0), Some(10_000_000));
+        assert_eq!(mask.next_ge(1), Some(10_000_000));
+        assert_eq!(mask.next_ge(10_000_001), None);
     }
 }
 

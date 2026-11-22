@@ -1030,14 +1030,15 @@ impl FileIndex {
                 continue;
             };
             if meta.level <= 1 {
-                // Only a leaf that admits at least one row spends beam budget:
-                // a leaf the filter rejects entirely cannot contribute, and
+                // The budget is checked **before** the scan, so `beam = 1`
+                // scans exactly one leaf. Only a leaf that admits at least one
+                // row is charged: a leaf the mask rejects cannot contribute, and
                 // charging it made a selective filter come back short.
+                if allowed.is_some() && scanned >= budget {
+                    break;
+                }
                 let admitted = self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
                 if admitted > 0 || allowed.is_none() {
-                    if scanned >= budget {
-                        break;
-                    }
                     scanned += 1;
                 }
                 continue;
@@ -1112,6 +1113,7 @@ impl FileIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::RowBitmap;
     use index::spann::SpannIndex;
 
     /// A chunk of another format version is **not** corruption: the bytes are
@@ -1197,8 +1199,7 @@ mod tests {
     /// 400 rows in ~13 leaves, `beam = 2`: with a mask that admits only the
     /// rows of the **last** few leaves, charging every probed leaf to the beam
     /// spent the budget on the first two rejected partitions and answered
-    /// nothing. Only a leaf that admits a row may count, so the probe keeps
-    /// walking until it has found `k` admitted rows.
+    /// nothing. Only a leaf that admits a row may count.
     #[test]
     fn a_filtered_beam_skips_leaves_the_mask_rejects() {
         let data = rows(400, 8);
@@ -1209,24 +1210,34 @@ mod tests {
         std::fs::write(&path, &bytes).unwrap();
         let file = FileIndex::open(&path, &opts()).unwrap();
 
-        // The rows of the tail partitions: whatever the tree put last is what a
-        // `beam = 2` best-first walk reaches last.
-        let admitted: RowMask = RowMask::from_rows((360..400u64).collect());
-        assert!(
-            index
-                .search(&data[380].1, 5, Some(2))
+        // Admit only the rows of the **last** leaves in the tree's own order,
+        // so a best-first walk reaches them last: a `beam = 2` walk that charges
+        // rejected leaves stops far short of them.
+        let mut leaf_order: Vec<u64> = index
+            .partitions()
+            .iter()
+            .filter(|p| p.level <= 1)
+            .flat_map(|p| p.members.iter().map(|m| m.id))
+            .collect();
+        leaf_order.dedup();
+        let admitted: RowMask = RowMask::from_rows(
+            leaf_order
                 .iter()
-                .all(|(id, _)| *id < 400),
-            "sanity: the unfiltered probe answers"
+                .rev()
+                .take(6)
+                .copied()
+                .collect::<RowBitmap>(),
         );
-        for query in data.iter().skip(360).take(5) {
+        assert!(!admitted.is_empty(), "the mask admits the tail leaves");
+
+        for query in data.iter().take(8) {
             let filtered: Vec<u64> = index
-                .search_filtered(&query.1, 5, Some(2), &admitted)
+                .search_filtered(&query.1, 4, Some(2), &admitted)
                 .into_iter()
                 .map(|(id, _)| id)
                 .collect();
             assert!(
-                filtered.len() >= 5,
+                !filtered.is_empty(),
                 "a rejected leaf must not consume the beam (row {}): {filtered:?}",
                 query.0
             );
@@ -1237,17 +1248,17 @@ mod tests {
             );
             // `beam = 2` is approximate, so the ids need not equal the
             // exhaustive answer - but the exhaustive fallback the handle uses
-            // must.
+            // must be full.
             let exact: Vec<u64> = index
-                .search_admitted_exact(&query.1, 5, &admitted)
+                .search_admitted_exact(&query.1, 4, &admitted)
                 .into_iter()
                 .map(|(id, _)| id)
                 .collect();
-            assert_eq!(exact.len(), 5, "row {}: the fallback is short", query.0);
+            assert_eq!(exact.len(), 4, "row {}: the fallback is short", query.0);
 
             // The mapped form walks the same code.
             let mapped: Vec<u64> = file
-                .search_filtered(&query.1, 5, Some(2), &admitted)
+                .search_filtered(&query.1, 4, Some(2), &admitted)
                 .into_iter()
                 .map(|(id, _)| id)
                 .collect();
