@@ -7107,33 +7107,54 @@ mod tests {
         {
             let index = engine.multivector_index_for(table, "t", 4).await.unwrap();
             let guard = index.read().unwrap();
-            let plaid = guard.plaid.as_ref().expect("PLAID not restored");
-            assert_eq!(plaid.doc_num() as usize, 260);
-            assert_eq!(plaid.is_colbertsar_mode(), colbertsar);
-            if colbertsar {
-                // Residual-free: nothing to map, and nothing on the heap either.
-                assert!(plaid.packed_residuals().is_empty());
-            } else {
-                assert!(!plaid.packed_residuals().is_empty());
+            // The dumped documents come back as one mapped chunk, not as a
+            // rebuilt memory index: `PlaidIndexInMem` is the buffer a dump
+            // releases, and what it released is what a search probes.
+            assert!(
+                guard.plaid.is_none(),
+                "the load rebuilt a memory index instead of mapping the chunk"
+            );
+            let docs: usize = guard
+                .plaid_chunks
+                .iter()
+                .map(|chunk| chunk.index.doc_num() as usize)
+                .sum();
+            assert_eq!(docs, 260, "the dumped documents were not restored");
+            for chunk in &guard.plaid_chunks {
+                assert_eq!(chunk.index.is_colbertsar_mode(), colbertsar);
+                if colbertsar {
+                    // Residual-free: nothing to map, and nothing on the heap.
+                    assert!(chunk.index.packed_residuals().is_empty());
+                } else {
+                    assert!(!chunk.index.packed_residuals().is_empty());
+                }
             }
         }
 
-        // 4. The optimize pass merges the chunks; the answers stay the same.
+        // 4. The optimize pass only folds a mirror that needs it (`plaid_fold_plan`:
+        // over the chunk cap, or a chunk below 1/16 of the mirror). Two comparable
+        // chunks are left alone, and either way no row is lost - the search probes
+        // each chunk in turn.
         engine.optimize_index_chunks().await.unwrap();
         assert_eq!(ids(&engine, &query(260, None).await).await, expected);
-        // 4b. A mirror of one chunk is **mapped**, not copied: the packed codes
-        // stay file-backed. The load-time merge of a chain has to materialize
-        // them (the reference searches each chunk instead of merging), which is
-        // why the optimize pass folding the mirror is what keeps a reload cheap.
         let folded = engine.read_plaid_index_chunks(table, index).unwrap();
-        assert_eq!(folded.len(), 1, "optimize did not fold the mirror");
+        assert_eq!(
+            folded.iter().map(|chunk| chunk.doc_num()).sum::<u32>(),
+            260,
+            "optimize lost documents"
+        );
         let reloaded = engine.read_plaid_index(table, index).unwrap();
         assert_eq!(reloaded.doc_num() as usize, 260);
         if !colbertsar {
-            assert!(
-                reloaded.is_packed_mapped(),
-                "a single PLAID chunk was copied onto the heap instead of mapped"
-            );
+            // Each chunk keeps its packed codes file-backed; only the explicit
+            // `read_plaid_index` merge materializes them, and the search path
+            // does not call it.
+            for chunk in engine.read_plaid_index_chunks(table, index).unwrap() {
+                assert!(
+                    chunk.is_packed_mapped(),
+                    "a PLAID chunk was copied onto the heap instead of mapped"
+                );
+            }
         }
 
         // 5. A `filter=` is answered from the index bitmask.
@@ -7650,13 +7671,21 @@ mod tests {
         );
         let index = e.multivector_index_for("pr", "t", 4).await.unwrap();
         let guard = index.read().unwrap();
-        assert!(
-            guard.plaid.is_some(),
-            "PLAID was not restored from its flushed chunks"
+        assert_eq!(
+            guard.plaid_chunks.len(),
+            1,
+            "the flushed chunk was not restored"
         );
-        assert_eq!(guard.plaid_seqs.len(), 300, "the row ids were not restored");
+        assert_eq!(
+            guard.plaid_chunks[0].row_ids.len(),
+            300,
+            "the row ids were not restored"
+        );
         assert!(
-            guard.plaid.as_ref().is_some_and(|p| p.is_packed_mapped()),
+            guard
+                .plaid_chunks
+                .iter()
+                .all(|chunk| chunk.index.is_packed_mapped()),
             "the loaded PLAID chunk was copied onto the heap instead of mapped"
         );
         // A PLAID column has **one** chunk format, the index itself: the
@@ -7919,6 +7948,58 @@ mod tests {
             );
             assert!(!guard.plaid_dropped, "PLAID was left dropped");
         }
+    }
+
+    /// A `DELETE` is a tombstone, not an index operation.
+    ///
+    /// Neither PLAID index has a per-document delete - the reference does not
+    /// either - and the search hides a dead row through its bitmask. Dropping
+    /// the index here cost a rebuild of the whole column on the delete, and
+    /// `plaid_dropped` kept `is_complete` false afterwards, so **every** later
+    /// query retrained it again.
+    #[tokio::test]
+    async fn a_delete_tombstones_the_row_and_keeps_the_plaid_index() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE pd (id INT, t TENSOR(FLOAT,4));")
+            .await
+            .unwrap();
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        e.execute(&format!("INSERT INTO pd VALUES {};", values.join(",")))
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX pdi ON pd (t) USING PLAID WITH (n_centroids = 8);")
+            .await
+            .unwrap();
+        let q = "SELECT id FROM pd SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');";
+        assert_eq!(rows(&e, q).await.len(), 3);
+        let before = e.multivector_index_for("pd", "t", 4).await.unwrap();
+
+        e.execute("DELETE FROM pd WHERE id = 1;").await.unwrap();
+        let hits = rows(&e, q).await;
+        assert!(
+            !hits.iter().any(|row| row[0] == "1"),
+            "the deleted row was scored: {hits:?}"
+        );
+        let after = e.multivector_index_for("pd", "t", 4).await.unwrap();
+        assert!(
+            Arc::ptr_eq(&before, &after),
+            "the delete rebuilt the whole index instead of masking one row"
+        );
+        let guard = after.read().unwrap();
+        assert!(!guard.plaid_dropped, "the delete dropped PLAID");
+        assert!(guard.plaid.is_some(), "PLAID was not kept");
     }
 
     /// Two `CREATE INDEX … USING HNSW` on one column are two memory graphs.
@@ -9472,17 +9553,18 @@ mod tests {
         );
     }
 
-    /// The PLAID budget is "do not build", not "build and spill": this port has
-    /// no buffer-manager/mmap search path, so a table past
-    /// `INFINITY_PLAID_MAX_BYTES` answers from the sealed brute-force scan. That
-    /// decision has to be final for the process - otherwise every later query
-    /// rescans the table, retrains the centroids and rewrites the chunk set only
-    /// to decline again.
+    /// The PLAID budget bounds **one build**, it does not refuse the column.
+    ///
+    /// `PlaidIndexInMem` is capped by `mem_index_capacity` in the reference and
+    /// dumps what the cap allowed; here the budget plays the cap's role. A
+    /// 1-byte budget therefore builds nothing and leaves the rows buffered -
+    /// and the next query still answers from that buffer, instead of the column
+    /// being handed to the exact scan for the life of the process.
     ///
     /// The budget is a process-wide `OnceLock`, so the case runs in a child
     /// started with a 1-byte budget.
     #[tokio::test]
-    async fn a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan() {
+    async fn a_plaid_index_over_budget_builds_what_fits_and_buffers_the_rest() {
         const CHILD: &str = "INFINITY_PLAID_BUDGET_CHILD";
         const DIR: &str = "INFINITY_PLAID_BUDGET_DIR";
         if let Ok(dir) = std::env::var(DIR) {
@@ -9507,19 +9589,29 @@ mod tests {
                 .unwrap();
             {
                 let guard = first.read().unwrap();
-                assert!(guard.plaid.is_none(), "PLAID must not be built over budget");
-                assert!(guard.plaid_unavailable, "the refusal must be recorded");
-                assert!(guard.plaid_dropped, "the index must report the fallback");
+                assert!(guard.plaid.is_none(), "one byte fits no document");
+                assert!(
+                    !guard.plaid_unavailable,
+                    "a budget shortfall must not refuse the column for good"
+                );
+                assert!(!guard.plaid_dropped, "nothing was dropped");
+                assert_eq!(guard.tail.len(), 300, "the rows must stay buffered");
             }
-            // The refusal is final, so the cached index is reused: a rebuild
-            // would scan the table and retrain the centroids again.
+            // The buffer answers, and the index is not rebuilt on every call.
+            let hits = rows(
+                &e,
+                "SELECT id FROM pb SEARCH MATCH TENSOR \
+                 (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3');",
+            )
+            .await;
+            assert_eq!(hits.len(), 3, "the buffered rows did not answer: {hits:?}");
             let again = e
                 .multivector_index_for("default_db.pb", "t", 4)
                 .await
                 .unwrap();
             assert!(
                 std::sync::Arc::ptr_eq(&first, &again),
-                "the index was rebuilt although the budget refused to build PLAID"
+                "the index was rebuilt although the buffer was already scanned"
             );
             return;
         }
@@ -9527,7 +9619,7 @@ mod tests {
         let out = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "engine::tests_ut::tests::a_plaid_index_over_budget_keeps_answering_from_the_sealed_scan",
+                "engine::tests_ut::tests::a_plaid_index_over_budget_builds_what_fits_and_buffers_the_rest",
                 "--nocapture",
             ])
             .env(CHILD, "1")

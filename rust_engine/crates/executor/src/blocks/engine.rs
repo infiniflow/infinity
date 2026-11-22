@@ -9549,44 +9549,12 @@ impl Engine {
         // `GetAndSetNextChunkID`: the counter, not "one past the newest file".
         let set = self.index_segment_set(&table);
         let index_id = self.index_position(&table, index_name)? as u64;
-        // **Tail absorption.** The newest chunk is the dump accumulator: while it
-        // has room and this delta is big enough to pay for rewriting it, the new
-        // documents extend *it* instead of becoming a sibling. Without this every
-        // checkpoint left one more chunk behind, the loader merged the whole
-        // chain on every open (the codes of a multi-chunk mirror have to be
-        // materialized, where a single chunk is mapped), and the optimize pass
-        // had to fold a mirror that never stopped growing.
-        let tail_docs = chunks
-            .last()
-            .map_or(0, |chunk| chunk.index.doc_num() as usize);
-        let target = self.plaid_chunk_target_rows();
-        let min_rows = crate::blocks::index_chunk::PLAID_CHUNK_MIN_ROWS.min(target);
-        if crate::blocks::index_chunk::plaid_should_absorb(
-            tail_docs,
-            docs as usize,
-            target,
-            min_rows,
-        ) {
-            let tail = chunks.last().expect("tail_docs came from a chunk");
-            let absorbed = Self::merge_plaid_chunk_indexes(&[&tail.index, &index])?;
-            let path = mirror.dir.join(format!("chunk_{}.idx", tail.id));
-            let written = Self::write_plaid_chunk_file(&path, &absorbed)?;
-            // Same id, larger row range: the record is rewritten, not added, so
-            // the chunk count stays where it was and `base_row_id + row_count`
-            // still ends at the rows the mirror covers.
-            self.record_chunk(
-                &set,
-                crate::engine::RecordedChunk {
-                    index_id,
-                    chunk_id: tail.id as u32,
-                    segment: 0,
-                    base_row_id: tail.base_row_id,
-                    row_count: tail_docs as u64 + docs as u64,
-                    index_size: written,
-                },
-            );
-            return Ok(indexed as usize + total);
-        }
+        // A dump writes a **new** chunk (`PlaidIndexInMem::Dump` +
+        // `GetAndSetNextChunkID`); it does not extend the newest one. Folding
+        // chunks is `OptimizePlaidIndex`'s job, on the optimize transaction -
+        // extending here made a checkpoint rewrite the newest chunk (an O(tail)
+        // copy per dump) and hid the growth from the loader, which then had to
+        // merge the whole chain on every open.
         let next = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
         let written = Self::write_plaid_chunk_file(&path, &index)?;

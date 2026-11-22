@@ -139,19 +139,6 @@ pub(crate) struct IvfOptions {
 /// is what seals, and a sealed segment's chunks never change again.
 pub(crate) const PLAID_CHUNK_TARGET_ROWS: usize = 1 << 20;
 
-/// Rows below which a chunk is always worth absorbing into.
-///
-/// One memory-index dump is at most `DEFAULT_MEMINDEX_CAPACITY` = 64k rows
-/// (`default_values.cppm:114`), so a chunk smaller than that is a single dump's
-/// worth: extending it costs one rewrite of a file that is smaller than the dump
-/// unit, which is cheaper than leaving a sibling the loader has to merge.
-pub(crate) const PLAID_CHUNK_MIN_ROWS: usize = 64 * 1024;
-
-/// How much bigger than the delta the tail chunk may be for an append to still
-/// be cheaper than a new chunk: `delta * RATIO >= tail`. At most `RATIO` bytes
-/// rewritten per byte written, the LSM size-tiered bound.
-pub(crate) const PLAID_ABSORB_RATIO: usize = 8;
-
 /// A chunk below `total / PLAID_SMALL_CHUNK_DIVISOR` is folded into its
 /// neighbour even when the chunk count is under the cap: eight chunks that are
 /// all tiny still make the loader copy the whole mirror.
@@ -163,30 +150,6 @@ pub(crate) const PLAID_OUTLIER_BUFFER: usize = 100;
 
 /// L2 distance above which a document counts as an outlier of the centroid set.
 pub(crate) const PLAID_OUTLIER_THRESHOLD: f32 = 0.1;
-
-/// Whether a dump's `delta` documents join the tail chunk instead of becoming a
-/// new one.
-///
-/// Two bounds hold the decision, and both are needed:
-///
-/// - **target**: the chunk would pass [`PLAID_CHUNK_TARGET_ROWS`], which is what
-///   keeps a segment's mirror at a handful of chunks;
-/// - **ratio**: extending a chunk rewrites it, so the delta has to be big enough
-///   to pay for that rewrite - otherwise a 10-row edit would rewrite a 1M-row
-///   chunk, which is the "every dump rewrites the whole index" behaviour this
-///   policy replaces. A chunk still below [`PLAID_CHUNK_MIN_ROWS`] is exempt: it
-///   is a single dump's worth, and absorbing it keeps a sibling out of the tree.
-pub(crate) fn plaid_should_absorb(
-    tail_docs: usize,
-    delta: usize,
-    target: usize,
-    min_rows: usize,
-) -> bool {
-    if delta == 0 || tail_docs + delta > target {
-        return false;
-    }
-    tail_docs < min_rows || delta.saturating_mul(PLAID_ABSORB_RATIO) >= tail_docs
-}
 
 /// Which chunks an optimize pass folds, from their document counts in chunk-id
 /// order: `Some(positions)` when the mirror needs work, `None` when it does not.

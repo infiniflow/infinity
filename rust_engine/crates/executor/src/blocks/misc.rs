@@ -2874,10 +2874,9 @@ mod tests {
     /// `CREATE INDEX … USING PLAID` over `plaid_rows(0, first)` plus a second
     /// batch, flushed between the batches.
     async fn plaid_mirror_with_two_chunks(dir: &std::path::Path) -> Engine {
-        // A 200-row chunk target instead of the 1M default: it leaves no room for
-        // the 60-row delta, so the second dump starts a sibling
-        // (`plaid_should_absorb`) and the append/merge paths below have two chunks
-        // to work on.
+        // Each dump opens its own chunk, so two dumps make two chunks whatever
+        // the target is. The target is set anyway: the fold tests below reuse
+        // this mirror and drive the optimize plans with it.
         let engine = Engine::open_async(dir, Default::default()).await.unwrap();
         engine.set_plaid_chunk_target_rows(200);
         engine
@@ -2933,7 +2932,23 @@ mod tests {
         engine.flush().await.unwrap();
         let chunks = engine.read_plaid_index_chunks("pc", "pidx").unwrap();
         assert_eq!(chunks.len(), 2);
-        // The read path merges the chunks back into one index.
+        // The search probes **each** chunk, the way `PhysicalMatchTensorScan`
+        // does; it does not need them folded first. Only the second chunk holds
+        // rows 200..260, so a filter that admits just those rows answers only if
+        // that chunk was searched.
+        let second_only = row_strings(
+            &engine,
+            "SELECT id FROM pc SEARCH MATCH TENSOR \
+             (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5;filter=id >= 200');",
+        )
+        .await;
+        assert_eq!(
+            second_only.len(),
+            5,
+            "the second chunk was not searched: {second_only:?}"
+        );
+        // `read_plaid_index` still folds the chain for the optimize pass and for
+        // readers outside the query path.
         let merged = engine.read_plaid_index("pc", "pidx").unwrap();
         assert_eq!(merged.doc_num(), 260);
         assert_eq!(merged.total_embedding_num(), 780);
@@ -3030,27 +3045,6 @@ mod tests {
         );
     }
 
-    /// The chunk policy's decision table, without an engine: the shapes a table
-    /// reaches in a test are far below the 1M-row target, so the interesting
-    /// cases have to be stated directly.
-    #[test]
-    fn a_chunk_grows_while_it_has_room_and_the_rewrite_is_worth_it() {
-        use crate::blocks::index_chunk::plaid_should_absorb;
-        let (target, min) = (1 << 20, 64 * 1024);
-        // Below the floor: absorb, a chunk smaller than one dump is a sibling the
-        // loader would merge on every open.
-        assert!(plaid_should_absorb(60_000, 10, target, min));
-        // Over the floor and a delta big enough to pay for the rewrite.
-        assert!(plaid_should_absorb(100_000, 20_000, target, min));
-        // Over the floor and a tiny delta: a new chunk, because absorbing would
-        // rewrite 100k rows for 10.
-        assert!(!plaid_should_absorb(100_000, 10, target, min));
-        // The target wins over the ratio: no chunk grows past it.
-        assert!(!plaid_should_absorb(target - 5, 10, target, min));
-        // Nothing new, nothing to write.
-        assert!(!plaid_should_absorb(0, 0, target, min));
-    }
-
     /// The optimize pass only starts on a plan: over the cap everything folds,
     /// under the cap only a chunk small enough to be pure overhead does.
     #[test]
@@ -3072,10 +3066,15 @@ mod tests {
         assert_eq!(plaid_fold_plan(&[10, 200, 200], 8), Some(vec![0, 1]));
     }
 
-    /// A dump that finds room in the newest chunk extends it instead of adding a
-    /// sibling: the chunk count, and with it the loader's merge, stays put.
+    /// A dump opens a **new** chunk; it does not extend the newest one.
+    ///
+    /// `DumpMemIndex` writes a fresh chunk id and advances
+    /// `current_begin_row_id_` past the rows it wrote; folding the two is
+    /// `OptimizePlaidIndex`'s job, on its own transaction. Extending the tail
+    /// here rewrote the newest chunk on every dump and hid the growth from the
+    /// loader.
     #[tokio::test]
-    async fn a_dump_absorbs_into_the_tail_chunk() {
+    async fn a_dump_opens_a_new_chunk_instead_of_extending_the_tail() {
         let dir = tempfile::tempdir().unwrap();
         let engine = Engine::open_async(dir.path(), Default::default())
             .await
@@ -3105,17 +3104,19 @@ mod tests {
         engine.flush().await.unwrap();
         engine.dump_index_transaction("pa", "paidx").await.unwrap();
 
-        // One chunk of 260 documents, in the same file, with its record rewritten
-        // rather than a second record added.
+        // A second chunk for the 60 new rows, starting where the first ended.
         let chunks = engine.read_plaid_index_chunks("pa", "paidx").unwrap();
-        assert_eq!(chunks.len(), 1, "the tail absorbed the delta");
-        assert_eq!(chunks[0].doc_num(), 260);
+        assert_eq!(chunks.len(), 2, "the dump extended the tail chunk");
+        assert_eq!(chunks[0].doc_num(), 200);
+        assert_eq!(chunks[1].doc_num(), 60);
         let records = engine.plaid_chunk_records("pa", "paidx").unwrap();
-        assert_eq!(records.len(), 1);
-        assert_eq!(records[0].1, 0, "the base row id does not move");
-        assert_eq!(records[0].2, 260, "the record covers the new rows too");
+        assert_eq!(records.len(), 2);
+        assert_eq!(
+            records[1].1, 200,
+            "the new chunk starts past the dumped rows"
+        );
 
-        // The absorbed rows keep answering, and the mirror still reloads.
+        // Both chunks answer, and the mirror still reloads.
         let query = "SELECT id FROM pa SEARCH MATCH TENSOR \
                      (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5');";
         assert_eq!(row_strings(&engine, query).await.len(), 5);

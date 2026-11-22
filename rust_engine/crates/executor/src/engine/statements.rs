@@ -5770,12 +5770,13 @@ impl Engine {
         if record.index_type.eq_ignore_ascii_case("PLAID") {
             let profile = std::env::var_os("INFINITY_DEBUG_PLAN").is_some();
             let mut started = std::time::Instant::now();
-            let mirror_read = self.read_plaid_index(table, &index_name);
+            let mirror_read = self.read_plaid_chunks(table, &index_name);
             if profile {
                 match &mirror_read {
                     Ok(loaded) => eprintln!(
-                        "DEBUG plaid mirror read ok, docs={} in {:?}",
-                        loaded.doc_num(),
+                        "DEBUG plaid mirror read ok, chunks={} docs={} in {:?}",
+                        loaded.len(),
+                        loaded.iter().map(|c| c.index.doc_num()).sum::<u32>(),
                         started.elapsed()
                     ),
                     Err(e) => eprintln!("DEBUG plaid mirror read failed: {e}"),
@@ -5783,119 +5784,148 @@ impl Engine {
                 started = std::time::Instant::now();
             }
             if let Ok(loaded) = mirror_read {
-                // The row ids the chunk's documents came from. With no tombstone
-                // and a document count that matches the live rows, every row is
-                // one document and the ids are `0..docs` - the scan below exists
-                // to recover *which* rows the documents came from, and there is
-                // nothing to recover. Scanning anyway materialised every row's
-                // tensor (204k rows: 3.9 s of a cold first query).
-                let docs = loaded.doc_num() as usize;
-                let seqs: Vec<u64> =
-                    if docs == reserved as usize && self.deleted_set(table).is_empty() {
-                        (0..docs as u64).collect()
-                    } else {
-                        self.multivector_row_ids(table, ci, dims).await?
-                    };
-                if profile {
-                    eprintln!(
-                        "DEBUG plaid mirror: docs={} rows={} ids in {:?}",
-                        loaded.doc_num(),
-                        seqs.len(),
-                        started.elapsed()
-                    );
-                    started = std::time::Instant::now();
-                }
-                // A mirror that covers a **prefix** of the rows is usable: the
-                // dump appends the rows past the ones it already mirrored, so the
-                // chain's documents are the first `covered` row ids. The rows past
-                // it are appended the same way a registered index's tail is.
-                //
-                // This used to require an exact document count, so a checkpoint
-                // that landed after the last dump made the next open rescan the
-                // table and retrain the centroids - minutes of work on the first
-                // query of a large table (measured on 62 k units: past the 120 s
-                // RPC timeout). Tombstones keep the strict path: `seqs` would no
-                // longer be `0..docs`, and the mirror's order is the row order it
-                // was written in, not the surviving rows.
-                let covered = loaded.doc_num() as usize;
-                let prefix_ok = self.deleted_set(table).is_empty();
-                if !seqs.is_empty()
-                    && (covered == seqs.len() || (prefix_ok && covered < seqs.len()))
-                {
-                    let mut index = MultiVectorIndex::new(
-                        dir.clone(),
-                        dims,
-                        self.mv_plaid_config(table, &index_name),
-                        self.mv_smve_config(table, &index_name),
-                        self.mv_emvb_config(table, &index_name),
-                    );
-                    self.attach_mv_chunk_root(table, index_id, &mut index);
-                    index.scanned_rows = reserved;
-                    // No `load_sealed` beside PLAID: the chunk the reference
-                    // writes for this index is the index itself, and there is no
-                    // raw-token file to map. The rows the chunk does not cover
-                    // are appended below, from the row store - the same list an
-                    // unbuilt `PlaidIndexInMem` would hold.
-                    let mirrored = &seqs[..covered];
-                    index.plaid_seq_doc = mirrored
+                // An **empty** chunk list is not a mirror: no dump ever ran, so
+                // there is nothing to load and the rebuild below is the only way
+                // to produce the first chunk. Treating it as a zero-document
+                // mirror put every row into the tail and marked the index
+                // complete, so the optimise/build step never ran and the column
+                // was served by the exact scan forever.
+                if !loaded.is_empty() {
+                    // Every document the chunk set holds, in chunk order - that
+                    // order is the order rows were dumped in, and each chunk's
+                    // `base_row_id` is the offset it starts at.
+                    let docs = loaded
                         .iter()
-                        .enumerate()
-                        .map(|(doc, seq)| (*seq, doc as u32))
-                        .collect();
-                    index.plaid_seqs = mirrored.to_vec();
-                    index.plaid = Some(loaded);
-                    if covered < seqs.len() {
-                        // Bounded by one chunk target: the checkpoint publishes
-                        // what reached it, and the rest waits for the next dump.
-                        for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
-                            if seq < covered {
-                                continue;
-                            }
-                            let Some(cell) = cells.get(ci) else {
-                                continue;
-                            };
-                            let text = match cell {
-                                Value::Str(s) => s.clone(),
-                                other => other.to_slt_string(),
-                            };
-                            if let Some(doc) = parse_multivector_doc(&text, dims) {
-                                index.insert(seq as u64, doc);
-                            }
-                        }
-                        index.scanned_rows = reserved;
-                    }
+                        .map(|chunk| chunk.index.doc_num() as usize)
+                        .sum::<usize>();
+                    // The row ids those documents came from. With no tombstone and a
+                    // document count that matches the live rows, every row is one
+                    // document and the ids are `0..docs` - the scan below exists to
+                    // recover *which* rows the documents came from, and there is
+                    // nothing to recover. Scanning anyway materialised every row's
+                    // tensor (204k rows: 3.9 s of a cold first query).
+                    let seqs: Vec<u64> =
+                        if docs == reserved as usize && self.deleted_set(table).is_empty() {
+                            (0..docs as u64).collect()
+                        } else {
+                            self.multivector_row_ids(table, ci, dims).await?
+                        };
                     if profile {
-                        eprintln!("DEBUG plaid load in {:?}", started.elapsed());
+                        eprintln!(
+                            "DEBUG plaid mirror: docs={} rows={} ids in {:?}",
+                            docs,
+                            seqs.len(),
+                            started.elapsed()
+                        );
+                        started = std::time::Instant::now();
                     }
-                    // Rows written since the last dump live in the registered
-                    // index's tail. `insert` appends them to the PLAID index it
-                    // just loaded (its documents and `plaid_seqs` agree), so
-                    // handing them over keeps them searchable; replacing the
-                    // registration without this dropped them from every answer.
-                    if let Some(previous) = cached.as_ref() {
-                        let rows = previous.read().map(|p| p.tail_rows()).unwrap_or_default();
-                        for (seq, doc) in rows {
-                            index.insert(seq, doc);
+                    // A mirror that covers a **prefix** of the rows is usable: the
+                    // next dump appends the rows past the ones already mirrored, so
+                    // the chunks hold the first `docs` row ids. The rows past them
+                    // are buffered exactly as an unbuilt `PlaidIndexInMem` buffers
+                    // them - the search scores that range from the column.
+                    //
+                    // This used to require an exact document count, so a checkpoint
+                    // that landed after the last dump made the next open rescan the
+                    // table and retrain the centroids - minutes of work on the first
+                    // query of a large table (measured on 62 k units: past the 120 s
+                    // RPC timeout). Tombstones keep the strict path: `seqs` would no
+                    // longer be `0..docs`, and the mirror's order is the row order it
+                    // was written in, not the surviving rows.
+                    let prefix_ok = self.deleted_set(table).is_empty();
+                    if !seqs.is_empty() && (docs == seqs.len() || (prefix_ok && docs < seqs.len()))
+                    {
+                        let mut index = MultiVectorIndex::new(
+                            dir.clone(),
+                            dims,
+                            self.mv_plaid_config(table, &index_name),
+                            self.mv_smve_config(table, &index_name),
+                            self.mv_emvb_config(table, &index_name),
+                        );
+                        self.attach_mv_chunk_root(table, index_id, &mut index);
+                        index.scanned_rows = reserved;
+                        // No `load_sealed` beside PLAID: the chunk the reference
+                        // writes for this index is the index itself, and there is no
+                        // raw-token file to map.
+                        //
+                        // The chunks are **not** folded together. `PlaidIndexInMem`
+                        // is one object, and the dumps it made are separate objects
+                        // that a search probes one by one
+                        // (`PhysicalMatchTensorScan`); folding them here decoded every
+                        // chunk and rebuilt the IVF on the read path, for a merge the
+                        // optimize pass may never need.
+                        for chunk in loaded {
+                            // `base_row_id` is the **document** offset the dump
+                            // started at, and `seqs` is the same document sequence,
+                            // so the slice names exactly the rows the chunk holds.
+                            let begin = chunk.base_row_id as usize;
+                            let n = chunk.index.doc_num() as usize;
+                            if begin + n > seqs.len() {
+                                break;
+                            }
+                            if profile {
+                                eprintln!(
+                                    "DEBUG plaid chunk {} base {} docs {}",
+                                    chunk.id, chunk.base_row_id, n
+                                );
+                            }
+                            index.plaid_chunks.push(PlaidChunk {
+                                row_ids: seqs[begin..begin + n].to_vec(),
+                                index: Arc::new(chunk.index),
+                            });
                         }
+                        // The rows the dump has not reached yet stay in the buffer:
+                        // `insert` finds no memory index and keeps them in the tail,
+                        // where the search scores them exactly.
+                        if docs < seqs.len() {
+                            for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+                                if seq < docs {
+                                    continue;
+                                }
+                                let Some(cell) = cells.get(ci) else {
+                                    continue;
+                                };
+                                let text = match cell {
+                                    Value::Str(s) => s.clone(),
+                                    other => other.to_slt_string(),
+                                };
+                                if let Some(doc) = parse_multivector_doc(&text, dims) {
+                                    index.insert(seq as u64, doc);
+                                }
+                            }
+                            index.scanned_rows = reserved;
+                        }
+                        if profile {
+                            eprintln!("DEBUG plaid load in {:?}", started.elapsed());
+                        }
+                        // Rows written since the last dump live in the registered
+                        // index's tail; they are buffered here too, or replacing the
+                        // registration without this dropped them from every answer.
+                        if let Some(previous) = cached.as_ref() {
+                            let rows = previous.read().map(|p| p.tail_rows()).unwrap_or_default();
+                            for (seq, doc) in rows {
+                                index.insert(seq, doc);
+                            }
+                        }
+                        let shared = Arc::new(std::sync::RwLock::new(index));
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .mv
+                            .insert(index_id, shared.clone());
+                        // The appended rows are **not** written back here. A load is
+                        // a read; the mirror is published by a dump or a checkpoint
+                        // (`write_plaid_index`), the way the reference's
+                        // `DumpMemIndex` is the only writer of a chunk. Writing from
+                        // the load path made the mirror grow on a query, and the
+                        // growth was invisible to the process that wrote it: the
+                        // chunk records it created are only visible after the next
+                        // checkpoint, so a second cold start read the old mirror and
+                        // answered with fewer rows than the first.
+                        return Ok(shared);
                     }
-                    let shared = Arc::new(std::sync::RwLock::new(index));
-                    self.tables
-                        .lock()
-                        .unwrap()
-                        .entry(tkey)
-                        .or_default()
-                        .mv
-                        .insert(index_id, shared.clone());
-                    // The appended rows are **not** written back here. A load is
-                    // a read; the mirror is published by a dump or a checkpoint
-                    // (`write_plaid_index`), the way the reference's
-                    // `DumpMemIndex` is the only writer of a chunk. Writing from
-                    // the load path made the mirror grow on a query, and the
-                    // growth was invisible to the process that wrote it: the
-                    // chunk records it created are only visible after the next
-                    // checkpoint, so a second cold start read the old mirror and
-                    // answered with fewer rows than the first.
-                    return Ok(shared);
                 }
             }
         }
@@ -10788,6 +10818,7 @@ impl Engine {
                             .and_then(|index| {
                                 index.read().ok().map(|guard| {
                                     guard.plaid.is_some()
+                                        || !guard.plaid_chunks.is_empty()
                                         || !guard.tail.is_empty()
                                         || !guard.sealed.is_empty()
                                 })
