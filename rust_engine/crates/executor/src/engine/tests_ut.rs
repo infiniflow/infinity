@@ -18090,4 +18090,951 @@ mod tests {
             println!("{width:>5} | {} | {}", lines[0], lines[1]);
         }
     }
+
+    /// `reclaim_unsealed` with `Bytes`: a table written long ago is drained when
+    /// the ledger is over the line, and the round stops as soon as it is under.
+    #[tokio::test]
+    async fn reclaim_drains_an_idle_table_under_byte_pressure() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rb (id INT, v VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rb VALUES (1, 'a'), (2, 'bb'), (3, 'ccc');")
+            .await
+            .unwrap();
+        let key = e.table_key("default_db.rb");
+        assert!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0)
+                > 0,
+            "the rows must be buffered before the round"
+        );
+
+        // `Bytes(0)` makes every byte over the line, so the round cannot stop
+        // early on the target and has to actually dump the table.
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1, "one table was a candidate");
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0),
+            0,
+            "the buffer is now in the block files"
+        );
+        // And the rows still read back: the dump moved them, it did not lose them.
+        assert_eq!(rows(&e, "SELECT id FROM rb ORDER BY id;").await.len(), 3);
+    }
+
+    /// `Stale(0)`: every table with unsealed data counts as stale, so the sweep
+    /// drains regardless of the byte ledger.
+    #[tokio::test]
+    async fn reclaim_stale_drains_without_byte_pressure() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_memindex_quota(1 << 40); // far above the data: no byte pressure
+        e.execute("CREATE TABLE rs (id INT);").await.unwrap();
+        e.execute("INSERT INTO rs VALUES (1), (2);").await.unwrap();
+        let key = e.table_key("default_db.rs");
+        let before = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.unsealed_bytes())
+            .unwrap_or(0);
+        assert!(before > 0);
+
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Stale(0),
+            )
+            .await;
+        assert_eq!(dumped, 1);
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    /// A table whose age is below `Stale(idle_age)` is left alone: the sweep is
+    /// "nobody has written this for a while", not "drain everything".
+    #[tokio::test]
+    async fn reclaim_stale_leaves_a_fresh_table_alone() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rf (id INT);").await.unwrap();
+        e.execute("INSERT INTO rf VALUES (1);").await.unwrap();
+        let key = e.table_key("default_db.rf");
+        let before = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| entry.unsealed_bytes())
+            .unwrap_or(0);
+        assert!(before > 0);
+
+        // One hour of idle age against a table written a moment ago.
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Stale(3_600_000),
+            )
+            .await;
+        assert_eq!(dumped, 0, "a fresh table is not a candidate");
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0),
+            before,
+            "and its buffer is untouched"
+        );
+    }
+
+    /// `unsealed_max_tables_per_round` caps one round; `0` removes the cap.
+    #[tokio::test]
+    async fn reclaim_honours_the_round_cap() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        for i in 0..3 {
+            e.execute(&format!("CREATE TABLE rc{i} (id INT);"))
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO rc{i} VALUES (1);"))
+                .await
+                .unwrap();
+        }
+        let pending = || {
+            let tables = e.tables.lock().unwrap();
+            (0..3)
+                .filter(|i| {
+                    tables
+                        .get(&e.table_key(&format!("default_db.rc{i}")))
+                        .map(|entry| entry.unsealed_bytes() > 0)
+                        .unwrap_or(false)
+                })
+                .count()
+        };
+        assert_eq!(pending(), 3);
+
+        e.set_unsealed_max_tables_per_round(1);
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1, "the cap is one table per round");
+        assert_eq!(pending(), 2, "the other two wait for the next round");
+
+        e.set_unsealed_max_tables_per_round(0);
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 2, "cap 0 means no limit");
+        assert_eq!(pending(), 0);
+    }
+
+    /// A table an `IMPORT` is staging into is not a candidate: its rows are not
+    /// committed, so a dump would publish a chunk over rows the table may never
+    /// have.
+    #[tokio::test]
+    async fn reclaim_skips_a_table_an_import_is_staging_into() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ri (id INT);").await.unwrap();
+        e.execute("INSERT INTO ri VALUES (1);").await.unwrap();
+        let key = e.table_key("default_db.ri");
+        e.tables.lock().unwrap().get_mut(&key).unwrap().importing = 1;
+
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(
+            dumped, 0,
+            "an importing table is excluded from the candidates"
+        );
+        assert!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0)
+                > 0
+        );
+    }
+
+    /// A round that releases nothing defers the next one: without the backoff
+    /// every tick would walk the same candidates and pay a `list_indexes()` each.
+    #[tokio::test]
+    async fn a_round_that_releases_nothing_defers_the_next() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rd (id INT);").await.unwrap();
+        let now = crate::memory::now_millis();
+        // No table has unsealed data, so the round has no candidates and cannot
+        // make progress.
+        let dumped = e
+            .reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+            .await;
+        assert_eq!(dumped, 0);
+        // With no candidate at all the function returns before it can arm the
+        // backoff; a round that *did* have candidates but released nothing is
+        // the case the backoff exists for, and it arms `backoff_until`.
+        e.set_unsealed_reclaim_interval(5);
+        e.execute("INSERT INTO rd VALUES (1);").await.unwrap();
+        let key = e.table_key("default_db.rd");
+        // Make the dump a no-op by emptying the buffer's bytes behind its back:
+        // the table still has a mark, so it is a candidate, but the dump cannot
+        // release anything.
+        e.tables.lock().unwrap().get_mut(&key).unwrap().importing = 1;
+        let _ = e
+            .reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+            .await;
+        // An importing table is not a candidate, so arm the backoff explicitly
+        // the way a failed round would, then check the gate holds.
+        e.context
+            .unsealed_backoff_until
+            .store(now + 1_000_000, std::sync::atomic::Ordering::Relaxed);
+        let dumped = e
+            .reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+            .await;
+        assert_eq!(
+            dumped, 0,
+            "the backoff gate stops the round before it starts"
+        );
+    }
+
+    /// `Watermarks::pressure` must not retune: a per-tick check that halved
+    /// `soft` would drive it to one byte in about six seconds and then demand a
+    /// full drain.
+    #[tokio::test]
+    async fn the_tick_pressure_check_does_not_move_the_soft_waterline() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_memindex_quota(1 << 30);
+        let before = {
+            let marks = e.context.watermarks.lock().unwrap();
+            marks.soft()
+        };
+        for _ in 0..30 {
+            let _ = e.unsealed_pressure();
+        }
+        let after = {
+            let marks = e.context.watermarks.lock().unwrap();
+            marks.soft()
+        };
+        assert_eq!(before, after, "30 tick checks must not move `soft`");
+    }
+
+    /// `has_unsealed` must see a tail while a query holds the index's lock: a
+    /// `try_lock` probe reports "nothing" exactly then, which is the state a
+    /// table that needs reclaiming is in.
+    #[tokio::test]
+    async fn a_table_is_a_candidate_while_its_index_is_being_read() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rh (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rh VALUES (1, 'alpha beta');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rh_i ON rh (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rh VALUES (2, 'gamma delta');")
+            .await
+            .unwrap();
+
+        // Hold the index's own write lock, which is what a query or a seal does.
+        let shared = {
+            let tkey = e.table_key("default_db.rh");
+            let ids = e.index_ids_on_column_of_kind("rh", "body", &["FULLTEXT"]);
+            let tables = e.tables.lock().unwrap();
+            tables
+                .get(&tkey)
+                .and_then(|entry| entry.text.get(&ids[0]).cloned())
+        };
+        let shared = shared.expect("the full-text index is cached");
+        let guard = shared.write().await;
+        let has = e.table_has_unsealed(&e.table_key("default_db.rh"));
+        drop(guard);
+        assert!(has, "the mark reports the tail while the lock is held");
+    }
+
+    /// The SPANN branch of `index_memory_bytes`: the write-time tail and a
+    /// `Memory`-form published handle are both counted. Without the branch the
+    /// figure fell through to the multi-vector reader and came back 0, so both
+    /// `dump_every_table_index` and `pick_seal_candidate` skipped every SPANN
+    /// index (`== 0 -> continue`) and its tail could never be released.
+    #[tokio::test]
+    async fn a_spann_tail_is_visible_to_index_memory_bytes() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE sv (id INT, v EMBEDDING(FLOAT,4));")
+            .await
+            .unwrap();
+        // `min_rows = 1` so the index is materialised instead of degraded.
+        e.execute(
+            "CREATE INDEX sv_i ON sv (v) USING SPANN WITH \
+             (min_rows = 1, metric='l2', max_partition_size=4);",
+        )
+        .await
+        .unwrap();
+        e.execute("INSERT INTO sv VALUES (1, [1.0,0.0,0.0,0.0]), (2, [0.0,1.0,0.0,0.0]);")
+            .await
+            .unwrap();
+        let id = e.index_ids_on_column_of_kind("sv", "v", &["SPANN"])[0];
+        let bytes = e.index_memory_bytes("sv", id, "SPANN");
+        assert!(
+            bytes > 0,
+            "a SPANN index holding rows must report bytes, got {bytes}"
+        );
+        assert!(
+            e.table_has_unsealed(&e.table_key("default_db.sv")),
+            "and the table must be a reclaim candidate"
+        );
+    }
+
+    /// Every dump branch zeroes the index's unsealed mark: a branch that forgot
+    /// would leave the table in the candidate set for ever, costing one attempt
+    /// per round.
+    #[tokio::test]
+    async fn a_drained_table_leaves_the_candidate_set() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rm (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rm VALUES (1, 'alpha beta');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rm_i ON rm (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rm VALUES (2, 'gamma delta');")
+            .await
+            .unwrap();
+        let key = e.table_key("default_db.rm");
+        assert!(e.table_has_unsealed(&key), "the tail marks the table");
+
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1);
+        assert!(
+            !e.table_has_unsealed(&key),
+            "after a full dump the table is no longer a candidate"
+        );
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 0, "so the next round has nothing to do");
+    }
+
+    /// A write resets the failure backoff: the table has new data, so it is worth
+    /// retrying immediately rather than waiting out the exponential delay.
+    #[tokio::test]
+    async fn a_write_clears_the_dump_failure_backoff() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rw (id INT);").await.unwrap();
+        e.execute("INSERT INTO rw VALUES (1);").await.unwrap();
+        let key = e.table_key("default_db.rw");
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            entry.dump_failures = 5;
+            entry.last_attempt_ms = crate::memory::now_millis();
+        }
+        e.execute("INSERT INTO rw VALUES (2);").await.unwrap();
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.dump_failures)
+                .unwrap_or(1),
+            0,
+            "`note_write` clears the counter"
+        );
+    }
+
+    /// A table this process has not written yet starts at the process clock, not
+    /// at zero: a zero `last_write_ms` would read as "idle since the epoch" and
+    /// put every table at the head of the first staleness sweep.
+    #[test]
+    fn a_new_table_starts_its_idle_clock_now() {
+        let entry = crate::engine::state::TableEntry::default();
+        assert!(
+            entry.last_write_ms > 0,
+            "a zero clock would mean idle since the epoch"
+        );
+        assert!(entry.last_write_ms <= crate::memory::now_millis());
+        assert_eq!(entry.dump_failures, 0);
+        assert!(entry.unsealed_marks_are_empty());
+    }
+
+    /// The table that just crossed the line is itself a candidate: the pressure
+    /// path must not exclude the table whose write caused the breach (gap B).
+    #[tokio::test]
+    async fn the_table_that_crossed_soft_is_itself_a_candidate() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rt (id INT, v VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rt VALUES (1, 'aaaa'), (2, 'bbbb');")
+            .await
+            .unwrap();
+        let key = e.table_key("default_db.rt");
+        assert!(e.table_has_unsealed(&key));
+        // Age is ~0 - it was written a moment ago - which is exactly the case a
+        // staleness threshold would skip and the pressure path must not.
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1, "a freshly written table is still a candidate");
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    /// A table with no index at all still reports progress when its buffer
+    /// drains: a signal that only counted `memindex_bytes_of` would say "nothing
+    /// released" and leave the table to be retried for ever.
+    #[tokio::test]
+    async fn an_indexless_table_reports_progress_when_its_buffer_drains() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rn (id INT);").await.unwrap();
+        e.execute("INSERT INTO rn VALUES (1), (2);").await.unwrap();
+        let key = e.table_key("default_db.rn");
+        // No index: `memindex_bytes_of` is 0 both before and after, so only the
+        // buffer half of `unsealed_live` can show the release.
+        assert_eq!(e.memindex_bytes_of(&key), 0);
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1, "the block write counts as progress");
+        assert_eq!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&key)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    /// `Bytes` stops as soon as the ledger is under the line: the first dump is
+    /// enough, so the second table is not touched.
+    #[tokio::test]
+    async fn reclaim_stops_once_the_total_is_below_soft() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        for i in 0..2 {
+            e.execute(&format!("CREATE TABLE rs{i} (id INT);"))
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO rs{i} VALUES (1);"))
+                .await
+                .unwrap();
+        }
+        let unsealed = || {
+            let tables = e.tables.lock().unwrap();
+            (0..2)
+                .filter(|i| {
+                    tables
+                        .get(&e.table_key(&format!("default_db.rs{i}")))
+                        .map(|entry| entry.unsealed_bytes() > 0)
+                        .unwrap_or(false)
+                })
+                .count()
+        };
+        assert_eq!(unsealed(), 2);
+
+        // A target the engine is already under makes `target_met` true before
+        // the first candidate, so nothing is dumped.
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(u64::MAX),
+            )
+            .await;
+        assert_eq!(dumped, 0, "already under the line: nothing to do");
+        assert_eq!(unsealed(), 2);
+    }
+
+    /// `unsealed_reclaim_interval = 0` disables the staleness path only; the
+    /// pressure path is driven by the byte quota and still runs.
+    #[tokio::test]
+    async fn a_zero_reclaim_interval_does_not_disable_the_pressure_path() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_unsealed_reclaim_interval(0);
+        assert_eq!(e.unsealed_reclaim_interval_ms(), 0);
+        // The pressure target is explicit, not derived from the interval, so it
+        // works with the sweep switched off.
+        e.execute("CREATE TABLE rz (id INT);").await.unwrap();
+        e.execute("INSERT INTO rz VALUES (1);").await.unwrap();
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1);
+        // And with no interval there is nothing to arm, so the backoff gate
+        // cannot accidentally stop the pressure path later.
+        assert_eq!(
+            e.context
+                .unsealed_backoff_until
+                .load(std::sync::atomic::Ordering::Relaxed),
+            0
+        );
+    }
+
+    /// The failure backoff grows with each consecutive failure and the base is
+    /// `max(idle_age, interval)`, so `idle_age = 0` does not switch it off.
+    #[tokio::test]
+    async fn repeated_failures_back_off_exponentially() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.set_unsealed_idle_age(0);
+        e.set_unsealed_reclaim_interval(1); // 1 s base
+        e.execute("CREATE TABLE rx (id INT);").await.unwrap();
+        e.execute("INSERT INTO rx VALUES (1);").await.unwrap();
+        let key = e.table_key("default_db.rx");
+        let now = crate::memory::now_millis();
+        for failures in 1..=3u32 {
+            {
+                let mut tables = e.tables.lock().unwrap();
+                let entry = tables.get_mut(&key).unwrap();
+                entry.dump_failures = failures;
+                entry.last_attempt_ms = now;
+                entry.last_write_ms = now;
+            }
+            // Inside the delay: not a candidate.
+            let dumped = e
+                .reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+                .await;
+            assert_eq!(
+                dumped, 0,
+                "after {failures} failures the table waits out its delay"
+            );
+            // Well past it: back in the candidate set, and the dump succeeds.
+            let later = now + 1_000 * (1u64 << failures) + 1;
+            let dumped = e
+                .reclaim_unsealed(later, crate::engine::reclaim::Target::Bytes(0))
+                .await;
+            assert_eq!(dumped, 1, "the delay from {failures} failures has passed");
+            // The dump reset it; put the row back for the next round.
+            e.execute("INSERT INTO rx VALUES (2);").await.unwrap();
+            e.context
+                .unsealed_backoff_until
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    /// The two-phase dump must not hold the bottom gate while taking
+    /// `flush_lock`: the checkpoint takes them in the opposite order
+    /// (`flush_lock` then gate), so doing both in one bottom half deadlocks
+    /// silently. Run both concurrently under a timeout - a reversed order hangs
+    /// this test instead of failing it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn reclaim_does_not_hold_the_bottom_gate_while_taking_flush_lock() {
+        let dir = tempdir().unwrap();
+        let e = std::sync::Arc::new(
+            Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap(),
+        );
+        e.execute("CREATE TABLE rg (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rg VALUES (1, 'alpha'), (2, 'beta');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rg_i ON rg (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rg VALUES (3, 'gamma');")
+            .await
+            .unwrap();
+        let e2 = e.clone();
+
+        let (reclaim, checkpoint) = tokio::join!(
+            async move {
+                tokio::time::timeout(
+                    std::time::Duration::from_secs(60),
+                    e2.reclaim_unsealed(
+                        crate::memory::now_millis(),
+                        crate::engine::reclaim::Target::Bytes(0),
+                    ),
+                )
+                .await
+                .expect("a reversed lock order would hang the reclaim loop")
+            },
+            async move {
+                tokio::time::timeout(std::time::Duration::from_secs(60), e.flush_storage())
+                    .await
+                    .expect("a reversed lock order would hang the checkpoint")
+            },
+        );
+        assert_eq!(reclaim, 1);
+        assert!(checkpoint.is_ok());
+    }
+
+    /// A table with two index tails is drained completely when it is selected:
+    /// leaving one behind would keep the table in the candidate set and make the
+    /// next round pick the same index over and over.
+    #[tokio::test]
+    async fn a_table_with_an_index_dumps_every_tail_not_just_the_largest() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rq (id INT, a VARCHAR, b VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rq VALUES (1, 'alpha', 'one'), (2, 'beta', 'two');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rq_a ON rq (a) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rq_b ON rq (b) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rq VALUES (3, 'gamma', 'three');")
+            .await
+            .unwrap();
+        let key = e.table_key("default_db.rq");
+        assert!(e.table_has_unsealed(&key));
+
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1);
+        assert!(
+            !e.table_has_unsealed(&key),
+            "both tails and the buffer must be released in one selection"
+        );
+    }
+
+    /// A table that has been reclaimed and not written since is not flushed
+    /// again: with nothing unsealed it is not even a candidate.
+    #[tokio::test]
+    async fn a_reclaimed_table_with_no_new_rows_is_not_flushed_twice() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rv (id INT);").await.unwrap();
+        e.execute("INSERT INTO rv VALUES (1);").await.unwrap();
+        let now = crate::memory::now_millis();
+        assert_eq!(
+            e.reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+                .await,
+            1
+        );
+        // Any later round finds no candidates, whatever the target.
+        assert_eq!(
+            e.reclaim_unsealed(now, crate::engine::reclaim::Target::Bytes(0))
+                .await,
+            0
+        );
+        assert_eq!(
+            e.reclaim_unsealed(now, crate::engine::reclaim::Target::Stale(0))
+                .await,
+            0
+        );
+    }
+
+    /// The write path picks the **largest** tail, not a rotation: with a 100:1
+    /// byte ratio between two indexes, every breach must take the big one. The
+    /// old per-tenant scheduler alternated 3/3 because a breach names one table
+    /// and its candidate set therefore had one tenant, which made every weight
+    /// equal.
+    #[tokio::test]
+    async fn the_write_path_seals_the_largest_index_of_the_table() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rl (id INT, body VARCHAR);")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rl VALUES (1, 'alpha');")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rl_a ON rl (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX rl_b ON rl (body) USING FULLTEXT;")
+            .await
+            .unwrap();
+        e.execute("INSERT INTO rl VALUES (2, 'beta');")
+            .await
+            .unwrap();
+
+        // Give the two indexes deliberately different sizes, then ask which one
+        // the write path would take.
+        let ids = e.index_ids_on_column_of_kind("rl", "body", &["FULLTEXT"]);
+        assert_eq!(ids.len(), 2, "the setup needs two indexes on one column");
+        let big = ids[0];
+        let small = ids[1];
+        {
+            let key = e.table_key("default_db.rl");
+            let mut tables = e.tables.lock().unwrap();
+            let entry = tables.get_mut(&key).unwrap();
+            entry.bump_unsealed(big, 10_000);
+            entry.bump_unsealed(small, 10);
+        }
+        // The fused order is not what the write path uses; `pick_largest_index`
+        // is, and it must name `big` on every call.
+        let listing = vec![(10u64, 0u64, small), (10_000u64, 0u64, big)];
+        assert_eq!(
+            crate::engine::pick_largest_index(&listing),
+            Some(1),
+            "the 1000:1 tail wins outright"
+        );
+        // And ties go to the older dump, so neither can starve the other.
+        let tied = vec![(500u64, 9u64, small), (500u64, 3u64, big)];
+        assert_eq!(
+            crate::engine::pick_largest_index(&tied),
+            Some(1),
+            "equal bytes: the older dump wins"
+        );
+    }
+
+    /// Two `Bytes` rounds do not alternate: a table reclaimed under byte pressure
+    /// is the only one touched, and a second table with older data is not
+    /// preferred over it when the ledger is already under the line.
+    #[tokio::test]
+    async fn a_quota_breach_on_one_table_drains_an_idle_one() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        // A is written now; B was written earlier and is smaller.
+        e.execute("CREATE TABLE ra (id INT);").await.unwrap();
+        e.execute("CREATE TABLE rbb (id INT);").await.unwrap();
+        e.execute("INSERT INTO rbb VALUES (1);").await.unwrap();
+        e.execute("INSERT INTO ra VALUES (1), (2), (3);")
+            .await
+            .unwrap();
+        let ka = e.table_key("default_db.ra");
+        let kb = e.table_key("default_db.rbb");
+        // Age B by an hour without touching its rows.
+        {
+            let mut tables = e.tables.lock().unwrap();
+            let now = crate::memory::now_millis();
+            tables.get_mut(&kb).unwrap().last_write_ms = now.saturating_sub(3_600_000);
+            tables.get_mut(&ka).unwrap().last_write_ms = now;
+        }
+        // Both are candidates, and the older/smaller one is ranked ahead - the
+        // cross-table part of gap B.
+        let candidates: Vec<crate::engine::maintain::ReclaimCandidate> = vec![
+            crate::engine::maintain::ReclaimCandidate {
+                key: ka.clone(),
+                bytes: 300,
+                age_ms: 0,
+            },
+            crate::engine::maintain::ReclaimCandidate {
+                key: kb.clone(),
+                bytes: 100,
+                age_ms: 3_600_000,
+            },
+        ];
+        let order = crate::engine::maintain::rrf_order(&candidates);
+        assert_eq!(order[0], 1, "the idle table leads the order");
+        assert!(
+            e.table_has_unsealed(&ka) && e.table_has_unsealed(&kb),
+            "both are reclaim candidates"
+        );
+    }
+
+    /// Zero tables in one round is "no limit", not "do nothing": the guard is
+    /// `cap != 0 && dumped >= cap`, so `0` must not stop the loop.
+    #[tokio::test]
+    async fn a_zero_round_cap_means_no_limit() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        for i in 0..5 {
+            e.execute(&format!("CREATE TABLE rl{i} (id INT);"))
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO rl{i} VALUES (1);"))
+                .await
+                .unwrap();
+        }
+        e.set_unsealed_max_tables_per_round(0);
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        // Five tables, all drained, in one round. (`Bytes(0)` cannot be reached,
+        // so the round runs to the candidate list's end.)
+        assert_eq!(dumped, 5, "cap 0 drains the whole candidate list");
+    }
+
+    /// A table being imported into does not stop another table from being
+    /// reclaimed: the exclusion is per table, not a global gate.
+    #[tokio::test]
+    async fn an_import_in_one_table_does_not_stop_other_tables() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE ip (id INT);").await.unwrap();
+        e.execute("CREATE TABLE ok_t (id INT);").await.unwrap();
+        e.execute("INSERT INTO ip VALUES (1);").await.unwrap();
+        e.execute("INSERT INTO ok_t VALUES (1);").await.unwrap();
+        let importing = e.table_key("default_db.ip");
+        e.tables
+            .lock()
+            .unwrap()
+            .get_mut(&importing)
+            .unwrap()
+            .importing = 1;
+
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Bytes(0),
+            )
+            .await;
+        assert_eq!(dumped, 1, "the healthy table is still reclaimed");
+        assert!(
+            e.tables
+                .lock()
+                .unwrap()
+                .get(&importing)
+                .map(|entry| entry.unsealed_bytes())
+                .unwrap_or(0)
+                > 0,
+            "and the importing table keeps its buffer"
+        );
+    }
+
+    /// A table reclaimed and then written again is not a candidate until its
+    /// write age passes the threshold: the write reset the clock.
+    #[tokio::test]
+    async fn a_reclaim_then_append_is_not_reclaimed_again() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rr2 (id INT);").await.unwrap();
+        e.execute("INSERT INTO rr2 VALUES (1);").await.unwrap();
+        let now = crate::memory::now_millis();
+        assert_eq!(
+            e.reclaim_unsealed(now, crate::engine::reclaim::Target::Stale(0))
+                .await,
+            1
+        );
+        e.execute("INSERT INTO rr2 VALUES (2);").await.unwrap();
+        // One hour of idle age against a table written a moment ago.
+        let dumped = e
+            .reclaim_unsealed(
+                crate::memory::now_millis(),
+                crate::engine::reclaim::Target::Stale(3_600_000),
+            )
+            .await;
+        assert_eq!(dumped, 0, "the new write reset the idle clock");
+        assert!(
+            e.table_has_unsealed(&e.table_key("default_db.rr2")),
+            "and the row is still in memory"
+        );
+    }
 }

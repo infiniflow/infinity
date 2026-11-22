@@ -91,12 +91,20 @@ pub(crate) async fn trigger_loop(
     cleanup_interval: std::time::Duration,
     compact_interval: std::time::Duration,
     optimize_interval: std::time::Duration,
+    reclaim_interval: std::time::Duration,
 ) {
+    use crate::engine::maintain::Pressure;
+
     pub(crate) const TICK: std::time::Duration = std::time::Duration::from_secs(1);
     let mut last_checkpoint = std::time::Instant::now();
     let mut last_cleanup = std::time::Instant::now();
     let mut last_compact = std::time::Instant::now();
     let mut last_optimize = std::time::Instant::now();
+    // The staleness sweep's own clock. The pressure check runs every tick, but
+    // the sweep only fires on its interval, and both share one decision per
+    // tick so a 30 s boundary that also finds pressure still produces a single
+    // round.
+    let mut last_reclaim = std::time::Instant::now();
     loop {
         {
             let Some(engine) = engine.upgrade() else {
@@ -137,6 +145,32 @@ pub(crate) async fn trigger_loop(
             {
                 last_cleanup = std::time::Instant::now();
                 engine.submit_cleanup();
+            }
+            // Periodic reclaim of unsealed memory (`docs/MEMORY_RECLAIM.md`
+            // §4.7). The check is a pure read of the byte ledger: `pressure`
+            // does **not** retune the waterlines, because a once-a-second
+            // `retune` would halve `soft` every second while the engine sat
+            // above 80% of its budget and end up demanding a full drain.
+            //
+            // Both paths share one decision per tick. The staleness sweep has
+            // its own interval; when that boundary coincides with pressure the
+            // tick does the pressure round only and records the sweep as
+            // handled, so one tick never produces two rounds.
+            let now_ms = crate::memory::now_millis();
+            let pressure = engine.unsealed_pressure();
+            let due_stale =
+                !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval;
+            if pressure.0 != Pressure::Normal {
+                last_reclaim = std::time::Instant::now();
+                let _ = engine
+                    .reclaim_unsealed(now_ms, crate::engine::reclaim::Target::Bytes(pressure.1))
+                    .await;
+            } else if due_stale {
+                last_reclaim = std::time::Instant::now();
+                let idle_age = engine.unsealed_idle_age();
+                let _ = engine
+                    .reclaim_unsealed(now_ms, crate::engine::reclaim::Target::Stale(idle_age))
+                    .await;
             }
             // The insert path takes a couple of queued splits per row and
             // leaves the rest of a bulk load's backlog behind it; this is the

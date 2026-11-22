@@ -306,6 +306,23 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
+    // `[buffer] unsealed_*`: the sweep that reclaims memory from tables nobody
+    // writes any more (`docs/MEMORY_RECLAIM.md` §5). An absent key keeps the
+    // engine's default, so "not configured" must not become `0` - that value
+    // means "path disabled" for the interval and "no age threshold" for the age.
+    let unsealed =
+        |key: &str| -> Option<u64> { toml_value(&text, key).map(|v| parse_interval_secs(&v)) };
+    if let Some(secs) = unsealed("unsealed_reclaim_interval") {
+        engine.set_unsealed_reclaim_interval(secs);
+    }
+    if let Some(secs) = unsealed("unsealed_idle_age") {
+        engine.set_unsealed_idle_age(secs);
+    }
+    if let Some(n) = toml_value(&text, "unsealed_max_tables_per_round") {
+        if let Ok(tables) = n.trim().parse::<usize>() {
+            engine.set_unsealed_max_tables_per_round(tables);
+        }
+    }
     if !maintenance {
         engine
             .start_background_tasks(
@@ -313,6 +330,7 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
                 std::time::Duration::from_secs(cleanup),
                 std::time::Duration::from_secs(compact),
                 std::time::Duration::from_secs(optimize),
+                std::time::Duration::from_millis(engine.unsealed_reclaim_interval_ms()),
             )
             .await;
     }

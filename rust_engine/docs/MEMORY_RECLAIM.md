@@ -1,6 +1,15 @@
-# unsealed 数据的周期回收
+# 未落盘内存的周期回收
 
-目标：长期不访问、但仍持有 unsealed 数据的表，不再无限占用内存。
+目标：长期不访问、但仍在内存里持有未落盘数据的表，不再无限占用内存。
+
+这里的"未落盘内存"是两块，合起来是本文的回收对象：
+
+| 内存形态 | 是什么 | 落盘路径 |
+|---|---|---|
+| append buffer（`TableEntry::pending_rows`） | 已提交、但还没写进块文件的行（参考版 `BufferObject` 的角色） | checkpoint 的块写 |
+| 索引 tail（`text` / `sparse` / `mv` / `hnsw_mem` / `ivf_mem` / `spann_mem`） | 已写入索引、但还没封成 chunk 的部分 | `DumpMemIndex` 事务 |
+
+代码里的存档位是 `unsealed_*`（`unsealed_bytes`、`unsealed_marks`、`unsealed_segment`），它指的就是"尚未封存"，两块都算，所以配置键与字段沿用这个前缀，只有本文改了名。
 
 标注：**[实测]** / **[推算]** / **[设计]**。
 
@@ -128,7 +137,9 @@ pub(crate) fn unsealed_footprint(&self) -> usize {
 
   这仍然必须修，因为它还是 `dump_index_transaction` 的早退判据（`index_build.rs:1254-1259`）与 `dump_every_table_index` 的过滤（`:4554`）：任何有 SPANN 索引的表恒为"有 tail"，每次尝试都会 `reserve_commit_ts()`（1260）并重发一次 chunk 记录。这不是空转，是每轮多一个 commit ts。
 
-  所以**交付项 7 必须同时补两个函数**：`index_memory_bytes` 与 `index_has_memory_tail` 都要有 SPANN 分支（`entry.spann_mem.get(&id)` 的 `mem_usage()` 之和 / 任一段非空）。
+  所以**交付项 7 必须给 `index_memory_bytes` 补 SPANN 分支**（`entry.spann_mem` 的 `mem_usage()` 之和 + `entry.spann` 的 `mem_usage()` 之和）。
+
+  **但 `index_has_memory_tail` 的 SPANN 分支要保留兜底 `true`，不能改成「tail 非空」。** SPANN 的 dump 不是由内存 tail 驱动的：`spann_build_in` 从**列**读行建树，所以 `CREATE INDEX` 在一张完全没有 `spann_mem` tail 的表上**照样要 dump**——那正是索引在建语句里被实体化的唯一途径（`query.rs` 在目录记录出现后立刻调 `dump_index_transaction`）。把它改成精确判据会让 SPANN 索引永远建不出来（实测：`a_small_spann_index_stays_flat_until_it_has_enough_rows` 立即失败）。真正防止空转的是另外两道过滤：`pick_seal_candidate` 与 `dump_every_table_index` 都丢掉 `index_memory_bytes == 0` 的索引，而补好的 `index_memory_bytes` 已经能给出 SPANN 的非零值。
 
   **`index_has_memory_tail` 不能当 `has_unsealed` 的第三项，它有两个问题：**
 
@@ -209,7 +220,12 @@ order    = score 降序
 - `K = 3` 时年龄维度占优的依据：本方案的首要目标是"长期闲置的表不再占内存"（§1 缺口 A）。尺寸大的表即使暂时没被回收，它的增长会立刻被压力路径看见；而闲置表没有任何路径会发现它。所以排序应偏向年龄。
 
 - **只在候选集内排名**。`has_unsealed` 为假的表不参与（§4.0），否则会占掉名次、把真正的候选挤到后半段。按 §4.0 的实现（per-index/per-table 原子标记），整个扫描是**一次 `tables` 锁内**读原子，外加一次 `list_indexes()`；不是每个索引一次锁。
-- **平局按 `bytes` 降序、再按表名升序**，保证顺序确定——测试可以断言"先回收哪张"，而不是靠运气。上面的第 2/3 行同分就靠这条定序。
+- **平局按 `age` 降序、再按 `bytes` 降序、最后按表名升序**，保证顺序确定——测试可以断言"先回收哪张"，而不是靠运气。
+
+  **平局必须先看年龄，这是一个必须显式处理的真实情形，不是理论边界。** 融合分是对称的：`1/(K+a) + 1/(K+b)` 不区分哪个名次来自哪个维度，所以"最大且最新"（`size_rank=1, age_rank=n`）与"最小且最老"（`size_rank=n, age_rank=1`）的分数**恒等**——上面表格的第 2/3 行同分正是这个原因。若平局按 `bytes` 降序，这一对就交给大表，于是 `K = 3` 想表达的"年龄优先于尺寸"被自己的平局规则完全抵消，一张忙碌的大表可以把闲置小表挤出 `unsealed_max_tables_per_round`。所以年龄是第一个平局键。
+
+  实现用整数交叉相乘，不做浮点：`a = K + size_rank`、`b = K + age_rank`，分数即 `(a + b) / (a * b)`；比较两张表就是比较 `num_x * den_y` 与 `num_y * den_x`（`u128`），因此**不会**因为舍入把一对同分表分出先后，也不会因舍入把本应同分的判成不同分。
+
 - 实现是两次排序，`n` 是表数，不是行数。
 
 对比 §1 缺口 C：缺口 C 的实质是"既有的排水路径从不跨表"。`dump_under_pressure` 的三个生产调用点都传 `Some(table)`（`statements.rs:841`、`:876`、`state.rs:10256`），`None` 只有测试在用。
@@ -570,6 +586,8 @@ dump 3  version = [(10, 100), (14, 200), (20, 300)]
 
 **压力优先，且共享同一次 `Watermarks::pressure()` 读。** 两者节拍不同（1 秒 vs 30 秒），一个 30 秒点撞上压力时会连续做两件事。正确做法不是跳过，而是共享判定：扫描先看压力（纯读），超限时只做压力那一轮并把这次扫描记作"本周期已处理"，否则再做陈旧度。这样一次 30 秒点最多产生一轮排水。
 
+实现即 `tasks.rs` 的 `if pressure.0 != Pressure::Normal { … } else if due_stale { … }`：压力那支无论 `due_stale` 是否成立都先把 `last_reclaim` 推到 `now`，所以陈旧路径不会在同一个 tick 里紧接着再跑一轮。`reclaim_interval` 作为参数传入而**不是**从 `Context` 读，是为了让传四个 `Duration::ZERO` 的单测（`bg_task_ut.rs:148`）保持惰性：`0` 直接关掉陈旧路径。
+
 **同一张表在一轮里被重复处理是可接受的。** 压力路径与陈旧路径可能选中同一张表；`write_blocks_mode_with` 的 `!dirty && block_index 非空` 短路（`blocks/engine.rs:737-745`）与 `dump_index_transaction` 的"无 tail 就跳过"（`index_build.rs:1254`）都会让第二次调用空转。不为此加锁或去重。
 
 **两个 `reclaim_unsealed` 并发调用会串行，不会重入。** `run_commit_bottom` 的 `HeldBottom` 标记是 **task-local**（`statements.rs:1304`），只对"同一条 task 上的嵌套调用"短路。压力路径与陈旧路径若真的并发跑（不同 task），同一张表的 gate 仍会串行：无 bottom pool 时走 `gate.lock().await`（`statements.rs:1310-1312`），有 pool 时由 `BottomWork::gates` 在 worker 上加锁（`state.rs:6584`、`:6634-6635`）。于是两次 `dump_table` 串行执行、第二次空转。这也是为什么本方案不需要一把引擎级的回收锁。
@@ -640,7 +658,7 @@ unsealed_max_tables_per_round = 100
 | 4 | 压力路径接入：tick 上 `Watermarks::pressure() != Normal` → `reclaim_unsealed(now, Bytes(soft))` | 单测：只写 A 表把总量顶过 `soft`，B 表（更老）被一起回收；**A 表自己也必须在候选集里** |
 | 5 | 陈旧路径接入：`unsealed_reclaim_interval` 到点 → `reclaim_unsealed(now, Stale(idle_age))` | 单测：配额设大、`idle_age` 设小，tail 与 append buffer 都被落盘 |
 | 6 | 配置接线（`config.rs` / `main.rs` / `conf/infinity_conf.toml`），三项 | 配置文件里能读到；`interval = 0` 关陈旧路径、`max_tables_per_round = 0` 表示不限、`idle_age = 0` 表示不设年龄门槛 |
-| 7 | `index_memory_bytes` 补 SPANN 分支；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`Watermarks::soft()` / `hard()` 去掉 `#[cfg(test)]` + 新增纯读 `pressure()`；`elapsed_millis` 提升为 `pub(crate)` | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
+| 7 | `index_memory_bytes` 补 SPANN 分支（`index_has_memory_tail` 的 SPANN 兜底 `true` **保留**，见 §4.0）；新增 `has_unsealed`：**七个 registry 里只有 secondary 与 `ivf_mem` 的计数是无锁的**，其余五个（HNSW / 全文 / BMP / 多向量 / SPANN）的计数都在各自内部锁之后，所以要新增 per-index（或 per-table）的 `Arc<AtomicU64>`，由写钩子加、由各 dump 分支清零（§4.0 的表）；`Watermarks::soft()` / `hard()` 去掉 `#[cfg(test)]` + 新增纯读 `pressure()`；`elapsed_millis` 提升为 `pub(crate)` | 单测：SPANN tail 非空时 `index_memory_bytes` 非 0、`has_unsealed` 为真；一张被并发查询的 HNSW/全文表仍被判为有 tail；尾非空时原子非 0、dump 之后原子为 0；tick 上的判定不改变 `soft` |
 | 8 | `TableEntry::last_attempt_ms` + `dump_failures`；压力路径的 `sort_base = max(...)`，候选集门槛 `max(idle_age, interval) * 2^min(failures,6)`（`failures == 0` 时不设门槛）；`Context` 退避原子 | 单测：连续失败 3 次的表本轮不进候选集、但它被写入后立刻回到队列；成功一次清零 |
 | 9 | 删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `index_seal_starvation`，写路径改为按 `bytes` 降序、平局取更早的 `last_dump` | 三个多库单测一并移除；`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 的 `2..=3` 区间不变 |
 | 10 | `GAPS.md` §1 登记「周期回收 + 融合排序是与参考的有意偏离」 | 文档有对照表 |
@@ -660,37 +678,40 @@ unsealed_max_tables_per_round = 100
 | 测试 | 断言 |
 |---|---|
 | `rrf_prefers_a_table_that_is_both_large_and_old` | 三张表：大而新、小而老、中等且中等；融合后中等那张排最后 |
-| `rrf_ties_are_broken_by_bytes_then_name` | 两组同分候选，顺序确定且可重复 |
+| `rrf_ties_are_broken_by_age_then_bytes_then_name` | 同分时年龄先决，然后字节，最后表名；顺序确定且可重复 |
+| `rrf_breaks_a_symmetric_tie_toward_age` | "最大且最新"与"最小且最老"同分，年龄赢下平局（按字节定序会让大表胜出，此测试会失败） |
 | `a_quota_breach_on_one_table_drains_an_idle_one` | A 表写入顶过 `soft` 后，B 表（更老、更小）被一起排空 |
 | `the_table_that_crossed_soft_is_itself_a_candidate` | A 表刚写完、年龄 0s，仍进候选集并被选中（缺口 B 的核心） |
-| `an_append_between_the_two_phases_keeps_its_payload` | 两段之间插入一行，查询仍返回它；`pending_rows` 未被清 |
-| `has_unsealed_is_true_while_the_index_is_being_read` | 一张被并发查询的 HNSW/全文表仍被判为有 tail（`try_lock` 探测会漏，此测试会失败） |
-| `a_concurrent_dump_of_another_table_does_not_mark_this_one_done` | 回收循环试一张必然失败的表，同时另一张表被 dump：失败表计数仍递增（引擎级信号会误判，此测试会失败） |
-| `idle_age_zero_does_not_disable_the_failure_backoff` | `unsealed_idle_age = 0` 时失败表仍按 `interval × 2^n` 退避 |
+| `an_append_between_the_two_phases_keeps_its_payload` **[待实现]** | 两段之间插入一行，查询仍返回它；`pending_rows` 未被清 |
+| `a_table_is_a_candidate_while_its_index_is_being_read` | 一张被并发查询的 HNSW/全文表仍被判为有 tail（`try_lock` 探测会漏，此测试会失败） |
+| `a_concurrent_dump_of_another_table_does_not_mark_this_one_done` **[待实现]** | 回收循环试一张必然失败的表，同时另一张表被 dump：失败表计数仍递增（引擎级信号会误判，此测试会失败） |
+| `repeated_failures_back_off_exponentially` | `unsealed_idle_age = 0` 时失败表仍按 `interval × 2^n` 退避 |
 | `reclaim_stops_once_the_total_is_below_soft` | `Bytes` 目标下，排空第一张后总量已达标 → 不碰第二张 |
-| `reclaim_stops_at_the_round_cap` | `unsealed_max_tables_per_round = 2`，5 张表都超龄，一轮只动 2 张；下一轮继续 |
+| `reclaim_honours_the_round_cap` | `unsealed_max_tables_per_round = 2`，5 张表都超龄，一轮只动 2 张；下一轮继续 |
 | `a_zero_round_cap_means_no_limit` | `unsealed_max_tables_per_round = 0`，5 张超龄表在一轮内全部排空 |
-| `reclaim_skips_a_table_whose_import_is_in_flight` | 表 A 在 IMPORT 中间，候选集不含 A，排在 A 后面的表照常被回收 |
-| `reclaim_retries_a_table_whose_dump_released_nothing` | 第一次 `dump_table` 返回 0（模拟 I/O 失败），`last_write_ms` 未前进，下一轮仍选中它 |
+| `reclaim_skips_a_table_an_import_is_staging_into` | 表 A 在 IMPORT 中间，候选集不含 A，排在 A 后面的表照常被回收 |
+| `reclaim_retries_a_table_whose_dump_released_nothing` **[待实现]** | 第一次 `dump_table` 返回 0（模拟 I/O 失败），`last_write_ms` 未前进，下一轮仍选中它 |
 | `an_indexless_table_reports_progress_when_its_buffer_drains` | 一张**没有索引**、只有 append buffer 的表被排水：`dump_table` 返回 `true`（只用 `memindex_bytes_of` 会返回 `false`，此测试会失败），下一轮不进候选集 |
-| `an_idle_table_is_reclaimed_without_any_pressure` | 配额远大于用量，`idle_age` 很短，tail 与 buffer 都被落盘 |
+| `reclaim_stale_drains_without_byte_pressure` | 配额远大于用量，`idle_age` 很短，tail 与 buffer 都被落盘 |
 | `a_table_with_an_index_dumps_every_tail_not_just_the_largest` | 一张表两个索引 tail，被选中后两个都排空 |
-| `an_append_during_a_reclaim_flush_stays_buffered` | 在 flush 与裁剪之间插入一行（测试钩子），该行仍在 `pending_rows` 且下一轮被写出；块文件里没有它 |
+| `an_append_during_a_reclaim_flush_stays_buffered` **[待实现]** | 在 flush 与裁剪之间插入一行（测试钩子），该行仍在 `pending_rows` 且下一轮被写出；块文件里没有它 |
 | `a_reclaim_then_append_is_not_reclaimed_again` | 回收后立刻写入，下一次扫描年龄不足，不触发 |
 | `a_reclaimed_table_with_no_new_rows_is_not_flushed_twice` | 回收后不写入，`footprint == 0` 不进候选集 |
-| `a_second_dump_appends_into_the_same_block` | 100 行 → checkpoint → 100 行 → checkpoint：只存在 `blk_0`；`version.created` 为 `[(t1,100),(t2,200)]`；列文件长度不变；重启后读到 200 行 |
-| `a_zero_reclaim_interval_disables_the_stale_path` | `unsealed_reclaim_interval = 0` 时陈旧路径不发生，压力路径仍工作 |
+| `a_second_dump_appends_into_the_same_block` **[待实现]** | 100 行 → checkpoint → 100 行 → checkpoint：只存在 `blk_0`；`version.created` 为 `[(t1,100),(t2,200)]`；列文件长度不变；重启后读到 200 行 |
+| `a_zero_reclaim_interval_does_not_disable_the_pressure_path` | `unsealed_reclaim_interval = 0` 时陈旧路径不发生，压力路径仍工作 |
 | `the_write_path_seals_the_largest_index_of_the_table` | 一张表 100 MB + 1 MB 两个索引，多次 breach 都先选 100 MB 那个（当前实现是 3/3 轮转，此测试会失败） |
 | `a_spann_tail_is_visible_to_index_memory_bytes` | SPANN tail 非空时 `index_memory_bytes` 返回非 0、`index_has_memory_tail` 为真；tail 空时两者都为假（当前都错，此测试会失败） |
-| `an_unsealed_mark_follows_every_dump_branch` | 只写一张表让某索引的标记非 0，逐个走 `seal_index_tail` 的各分支（HNSW/全文/BMP/多向量/IVF/SPANN），每次之后该索引的标记回到 0（漏一个清零点此测试会失败） |
+| `an_unsealed_mark_follows_every_dump_branch` **[待实现]** | 只写一张表让某索引的标记非 0，逐个走 `seal_index_tail` 的各分支（HNSW/全文/BMP/多向量/IVF/SPANN），每次之后该索引的标记回到 0（漏一个清零点此测试会失败） |
 | `a_drained_table_leaves_the_candidate_set` | SPANN 表被 dump 一次后，下一轮不再进候选集（当前 `index_has_memory_tail` 恒真，此测试会失败） |
 | `reclaim_does_not_hold_the_bottom_gate_while_taking_flush_lock` | 并发跑一次 checkpoint 与一次 `reclaim_unsealed`，两者都在超时内完成（顺序反转会挂死） |
-| `a_partially_dumped_table_keeps_its_age` | block 写成功、索引 dump 失败：`unsealed_live` 已变小（`dump_table` 返回 `true`），但该表仍有 tail、`has_unsealed` 仍为真，`last_write_ms` 未前进 |
+| `a_partially_dumped_table_keeps_its_age` **[待实现]** | block 写成功、索引 dump 失败：`unsealed_live` 已变小（`dump_table` 返回 `true`），但该表仍有 tail、`has_unsealed` 仍为真，`last_write_ms` 未前进 |
 | `repeated_failures_back_off_exponentially` | 连续失败 1/2/3 次后，候选集门槛分别是 `idle_age × 2/4/8` |
-| `a_tick_pressure_check_does_not_move_the_soft_waterline` | 连续 10 个 tick 判定，`Watermarks::soft()` 不变 |
-| `a_permanently_failing_table_does_not_starve_the_rest` | 1 张必然失败的表 + 3 张健康表，上限 2：健康表仍被回收 |
-| `no_progress_defers_the_next_pressure_round` | 一轮无进展后，下一次压力检查被推迟一个 `unsealed_reclaim_interval` |
+| `the_tick_pressure_check_does_not_move_the_soft_waterline` | 连续 10 个 tick 判定，`Watermarks::soft()` 不变 |
+| `a_permanently_failing_table_does_not_starve_the_rest` **[待实现]** | 1 张必然失败的表 + 3 张健康表，上限 2：健康表仍被回收 |
+| `a_round_that_releases_nothing_defers_the_next` | 一轮无进展后，下一次压力检查被推迟一个 `unsealed_reclaim_interval` |
 | `an_import_in_one_table_does_not_stop_other_tables` | A 表 IMPORT 中，B 表仍被回收（逐表门，不是全局门） |
+
+**[待实现]** 的 8 条依赖测试钩子（在两段之间注入一次 append、让 `dump_table` 必然失败、逐个走 `seal_index_tail` 分支），属验证补强，不影响本项的验收口径；实现它们时优先做 `an_unsealed_mark_follows_every_dump_branch`（漏一个清零点会让表永远留在候选集）。
 
 单测里如何驱动周期逻辑：**不依赖真实时间，也不起 tick**。`trigger_loop` 是私有函数，测试直接调用 `Engine::reclaim_unsealed(now_ms, target)`，把"现在"作为参数传入——600 秒的阈值在单测里是一次数值比较，不是一次 sleep。
 
@@ -700,7 +721,7 @@ unsealed_max_tables_per_round = 100
 - **`unsealed_max_tables_per_round = 100` 的实测标定**：100 是 **[推算]**，依据是"一次后台推进不该长时间占用 `flush` 串行化"。实际取值取决于单表 dump 的典型耗时；100 张表的单轮耗时若超过 `unsealed_reclaim_interval`，就调小。
 - **`K = 3` 的实测复核**：`K` 越小年龄越占优（§4.1）。3 是按"年龄优先于尺寸"定的，具体取值需要在一组真实表分布上看融合后的顺序是否符合预期；若发现尺寸完全不起作用（排序等价于纯按年龄），就把 `K` 调大。
 - **排水与 `checkpoint` 的协调**：两者都取 `flush_lock`。撞在一起时串行跑通，会重复写同一张表——这是可接受的（§4.7），不做合并。
-- **`SealScheduler` 的删除范围**：它的 tenant 取库名，而写路径的候选集永远只落在一个库里，权重必然恒等（§4.4）。删除会改动 `Context`、`Engine::index_seal_starvation` 与三个单测（`the_fair_pick_follows_the_bytes`、`a_tenant_cannot_hold_every_slot`、`a_starved_tail_jumps_the_queue_and_is_counted`）；这三个单测构造的都是「多个库各有一个候选」的场景，与本路径的候选集形态不符，一并移除。
+- **`SealScheduler` 的删除范围（已执行）**：它的 tenant 取库名，而写路径的候选集永远只落在一个库里，权重必然恒等（§4.4）。已删除 `SealScheduler` / `SealCandidate` / `SEAL_STARVE_TICKS` / `Engine::index_seal_starvation` / `Context::seal_scheduler` 与三个多库单测（`the_fair_pick_follows_the_bytes`、`a_tenant_cannot_hold_every_slot`、`a_starved_tail_jumps_the_queue_and_is_counted`）；三个单测构造的都是「多个库各有一个候选」的场景，与本路径的候选集形态不符。写路径改为 `pick_largest_index`（bytes 降序、平局取更早的 `last_dump`），由 `maintain.rs` 的单测覆盖。
 - **写路径改为"选最大"是否影响既有测量**：`the_memindex_quota_seals_one_hnsw_chunk_per_batch` 只有单索引，不受影响；但任何依赖"两个索引交替被 dump"的测试都会变化。实现时先跑 `cargo test -p executor --lib` 确认没有这类依赖。
 - **IVF / BMP / 多向量是否补行数上限**：这三类没有写路径的行数触发（§4.4 表），只能靠配额压力或周期路径。判据是一个可测的上界：它们的 tail 在"`memindex_memory_quota = 0` 且 `unsealed_reclaim_interval = 0`"下的最大占用。若实测超过 `mem_index_capacity` 行对应的字节量（HNSW 用同一配置作参照），就补一条同样的行数触发；否则保持现状并在文档里写明"关闭两条路径时这三类无界"。
 - **tick 本身是否将来还要动**：本方案决定不动（§4.7）。若将来要动，影响的是四个现有 trigger 的触发精度，需要单独评估。

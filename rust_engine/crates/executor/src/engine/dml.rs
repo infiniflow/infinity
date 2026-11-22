@@ -326,8 +326,7 @@ impl Engine {
             let entry = tables.entry(tkey.clone()).or_default();
             entry.append_totals = Some(totals.clone());
             entry.append_ts = Some(settled.clone());
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         // A hint for the mirror, not committed state: if the process dies
         // before the rows do, the mirror clips every total to the rows it
@@ -450,8 +449,7 @@ impl Engine {
                 tail.forget(&gone);
             }
         }
-        entry.mirror_dirty = true;
-        entry.mirror_epoch += 1;
+        entry.note_write();
         drop(tables);
         first
     }
@@ -1763,6 +1761,7 @@ impl Engine {
         seq: u64,
         schema: &[String],
     ) -> Vec<(
+        u64,
         String,
         Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
     )> {
@@ -1842,6 +1841,7 @@ impl Engine {
             .map(|im| (im.id, im.column))
             .collect();
         let mut out: Vec<(
+            u64,
             String,
             Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
         )> = Vec::new();
@@ -1861,7 +1861,7 @@ impl Engine {
                     ),
                 ))
             });
-            out.push((column.clone(), std::sync::Arc::clone(&*mem)));
+            out.push((*id, column.clone(), std::sync::Arc::clone(&*mem)));
         }
         out
     }
@@ -1870,7 +1870,7 @@ impl Engine {
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (column, mem) in self.hnsw_graphs_for(table, seq, &schema).await {
+        for (index_id, column, mem) in self.hnsw_graphs_for(table, seq, &schema).await {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
@@ -1879,6 +1879,7 @@ impl Engine {
             let mut mem = mem.lock().await;
             if v.len() == mem.dims {
                 mem.insert(seq, &v).await;
+                self.note_unsealed(table, index_id, 1);
             }
         }
     }
@@ -1914,7 +1915,7 @@ impl Engine {
             if graphs.is_empty() {
                 return;
             }
-            for (column, mem) in graphs {
+            for (index_id, column, mem) in graphs {
                 let Some(ci) = schema.iter().position(|c| c == &column) else {
                     continue;
                 };
@@ -1937,6 +1938,7 @@ impl Engine {
                     self.hnsw_build_workers(),
                 )
                 .await;
+                self.note_unsealed(table, index_id, batch.len() as u64);
             }
         }
     }
@@ -1972,6 +1974,7 @@ impl Engine {
             return;
         };
         let by_id = self.index_column_map(table);
+        let mut grew: Vec<u64> = Vec::new();
         for (index_id, rows) in entry.ivf_mem.iter_mut() {
             let Some(column) = by_id.get(index_id) else {
                 continue;
@@ -1984,7 +1987,30 @@ impl Engine {
             let dims = types.get(ci).and_then(|t| type_dim(t)).unwrap_or(0);
             if !v.is_empty() && (dims == 0 || v.len() == dims) {
                 rows.push((seq, v));
+                grew.push(*index_id);
             }
+        }
+        // Outside the `ivf_mem` borrow: the same entry owns the marks map.
+        for index_id in grew {
+            entry.bump_unsealed(index_id, 1);
+        }
+    }
+
+    /// Records that an index's in-memory tail grew, for the periodic reclaim
+    /// loop's candidate test (`TableEntry::unsealed_marks`).
+    ///
+    /// A separate call rather than an inline `entry.bump_unsealed` because most
+    /// hooks take their `tables` guard in a different scope than the check
+    /// "did this row reach the tail". Over-reporting is safe (one wasted
+    /// attempt, absorbed by the failure backoff); under-reporting would keep a
+    /// table in memory forever, so a hook errs toward recording.
+    pub(crate) fn note_unsealed(&self, table: &str, index_id: u64, rows: u64) {
+        if rows == 0 {
+            return;
+        }
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            entry.bump_unsealed(index_id, rows);
         }
     }
 
@@ -2099,14 +2125,14 @@ impl Engine {
     ) {
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
             .map(|e| {
                 e.mv.iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2119,7 +2145,7 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
@@ -2142,6 +2168,8 @@ impl Engine {
             if let Some(doc) = parse_multivector_doc(text, dims) {
                 index.insert(seq as u64, doc);
             }
+            drop(index);
+            self.note_unsealed(table, index_id, 1);
         }
     }
 
@@ -2149,7 +2177,7 @@ impl Engine {
     pub(crate) async fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<SparseIndex>>)> = self
             .tables
             .lock()
             .unwrap()
@@ -2157,7 +2185,7 @@ impl Engine {
             .map(|e| {
                 e.sparse
                     .iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2167,7 +2195,7 @@ impl Engine {
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
@@ -2189,6 +2217,8 @@ impl Engine {
                 .map(|(i, x)| (i as i32, x as f32))
                 .collect();
             index.insert(seq as u64, entries);
+            drop(index);
+            self.note_unsealed(table, index_id, 1);
         }
     }
 
@@ -2310,7 +2340,7 @@ impl Engine {
         }
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let mut indexes: Vec<(String, SharedTextIndex)> = self
+        let mut indexes: Vec<(u64, String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
@@ -2318,7 +2348,7 @@ impl Engine {
             .map(|e| {
                 e.text
                     .iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2336,17 +2366,20 @@ impl Engine {
         if indexes.len() < by_id.len() {
             for column in self.fulltext_columns(table) {
                 if schema.iter().all(|c| c != &column)
-                    || indexes.iter().any(|(cached, _)| cached == &column)
+                    || indexes.iter().any(|(_, cached, _)| cached == &column)
                 {
                     continue;
                 }
                 let tokenizer = self.index_tokenizer(table, &column);
+                let ids = self.index_ids_on_column_of_kind(table, &column, &["FULLTEXT"]);
                 if let Ok(shared) = self.text_index_for(table, &column, tokenizer).await {
-                    indexes.push((column, shared));
+                    for id in ids {
+                        indexes.push((id, column.clone(), shared.clone()));
+                    }
                 }
             }
         }
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
@@ -2439,6 +2472,12 @@ impl Engine {
                     index.finish_publish(first_row);
                     let seal = index.should_seal(capacity);
                     drop(index);
+                    // The chunk above may already have been sealed inside the
+                    // index, but the rows are unsealed from this loop's point of
+                    // view until a dump publishes their chunk; recording them
+                    // here is what lets the periodic loop find the table. A seal
+                    // that just happened only makes the mark conservative.
+                    self.note_unsealed(table, index_id, prepared.len() as u64);
                     if seal {
                         // The segment is written with the lock released: the
                         // tail moves to `TextIndex::inflight`, where queries keep
@@ -3092,6 +3131,48 @@ impl Engine {
         self.context
             .memindex_capacity
             .store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets `[buffer] unsealed_reclaim_interval` (seconds): how often the
+    /// staleness sweep runs. `0` disables that path.
+    pub fn set_unsealed_reclaim_interval(&self, secs: u64) {
+        self.context.unsealed_reclaim_interval.store(
+            secs.saturating_mul(1000),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// Sets `[buffer] unsealed_idle_age` (seconds): the age at which a table
+    /// counts as stale. `0` means "no threshold", i.e. every table with
+    /// unsealed data is stale.
+    pub fn set_unsealed_idle_age(&self, secs: u64) {
+        self.context.unsealed_idle_age.store(
+            secs.saturating_mul(1000),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// Sets `[buffer] unsealed_max_tables_per_round`. `0` means unlimited.
+    pub fn set_unsealed_max_tables_per_round(&self, tables: usize) {
+        self.context
+            .unsealed_max_tables_per_round
+            .store(tables, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// `[buffer] unsealed_reclaim_interval` in milliseconds, read back by the
+    /// CLI so an absent key falls through to the engine default instead of
+    /// becoming `0` (which would disable the sweep).
+    pub fn unsealed_reclaim_interval_ms(&self) -> u64 {
+        self.context
+            .unsealed_reclaim_interval
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// `[buffer] unsealed_idle_age` in milliseconds, for the sweep's target.
+    pub(crate) fn unsealed_idle_age(&self) -> u64 {
+        self.context
+            .unsealed_idle_age
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// `SET VARIABLE <name> <value>` at `scope`.

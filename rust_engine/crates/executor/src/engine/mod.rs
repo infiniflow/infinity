@@ -72,6 +72,7 @@ pub(crate) mod index_build;
 pub(crate) mod maintain;
 pub(crate) mod query;
 pub(crate) mod recall;
+pub(crate) mod reclaim;
 pub(crate) mod state;
 pub(crate) mod tasks;
 pub(crate) mod text_index;
@@ -79,7 +80,7 @@ pub(crate) mod text_query;
 pub(crate) mod types;
 
 pub(crate) use index_build::{chunk_commit_ts, with_chunk_ts, RecordedChunk};
-pub(crate) use maintain::{Pressure, SealCandidate, SealScheduler, Watermarks, SEAL_STARVE_TICKS};
+pub(crate) use maintain::{pick_largest_index, Pressure, Watermarks};
 pub(crate) use recall::RecallMonitor;
 
 pub use state::*;

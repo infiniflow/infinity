@@ -1101,6 +1101,16 @@ impl Engine {
                 .and_then(|m| m.read().ok().map(|g| !g.tail.is_empty()))
                 .unwrap_or(false);
         }
+        // A SPANN dump is **not** driven by a memory tail: `spann_build_in` reads
+        // the column and builds the tree from the rows, so `CREATE INDEX` over a
+        // table with no `spann_mem` tail at all still has to dump (that is how
+        // the index is materialised at creation - `query.rs` calls
+        // `dump_index_transaction` as soon as the catalog entry exists). `true`
+        // is therefore the honest answer, and the two callers that must skip a
+        // no-op keep that from costing anything: `pick_seal_candidate` and
+        // `dump_every_table_index` both drop an index whose
+        // `index_memory_bytes` is 0, and `index_memory_bytes` has a SPANN branch
+        // that counts the tail and a `Memory`-form handle.
         true
     }
 
@@ -1605,6 +1615,41 @@ impl Engine {
         // this the peak of a dump stays resident until then (and on macOS,
         // forever).
         storage::trim_allocator();
+        // Re-derive the index's unsealed mark from the index itself rather than
+        // tracking which arm released what: this is the one place every dump
+        // passes through, and it already holds the locks the probe needs. A mark
+        // left non-zero after a successful dump would keep the table in the
+        // reclaim candidate set for ever; one zeroed while rows remain would
+        // strand those rows in memory, which is worse. Asking the index makes
+        // both impossible.
+        self.sync_unsealed_mark(&table, meta);
+    }
+
+    /// Sets one index's unsealed mark to what the index actually holds.
+    ///
+    /// Called from the dump path only (after a seal), where the index's own
+    /// locks are already part of the operation; the per-tick candidate scan
+    /// never calls this.
+    fn sync_unsealed_mark(&self, table: &str, meta: &IndexMeta) {
+        let holds = self.index_has_memory_tail(table, meta);
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            if holds {
+                // Keep it non-zero without claiming a row count we do not have:
+                // the mark is a "has data" flag to the candidate scan.
+                if entry
+                    .unsealed_marks
+                    .get(&meta.id)
+                    .map(|m| m.load(std::sync::atomic::Ordering::Relaxed))
+                    .unwrap_or(0)
+                    == 0
+                {
+                    entry.bump_unsealed(meta.id, 1);
+                }
+            } else {
+                entry.clear_unsealed(meta.id);
+            }
+        }
     }
 
     /// Drops one multi-vector index's cached instance so the next query
@@ -4478,29 +4523,28 @@ impl Engine {
     /// absorb every breach, and the table that just grew would never drain
     /// (`test_optimize_from_different_database` in the restart suite).
     async fn dump_largest_memory_index(&self, only: Option<&str>) {
-        let Some((tenant, im)) = self.pick_seal_candidate(only) else {
+        let Some(im) = self.pick_seal_candidate(only) else {
             return;
         };
         let _ = self.dump_index_transaction(&im.table, &im.name).await;
-        // The slot the pick took is released once the seal finished, so the
-        // per-tenant in-flight bound reflects real work.
-        if let Ok(mut scheduler) = self.context.seal_scheduler.lock() {
-            scheduler.done(&tenant);
-        }
     }
 
-    /// §9.6's fair pick over the tails that hold bytes: weighted by pending
-    /// bytes per **database**, one seal per tenant in flight, and a tail that
-    /// has not been dumped for [`SEAL_STARVE_TICKS`] jumps the queue.
+    /// The largest tail that still holds bytes, ties to the oldest dump.
     ///
-    /// The old rule was "largest wins, ties to the oldest dump". It is the same
-    /// greedy choice §9.6 calls a noisy-neighbour failure: a database holding
-    /// most of the bytes absorbed every seal while another database's tail grew
-    /// unbounded, and nothing counted the starvation.
-    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<(String, IndexMeta)> {
+    /// The write path names **one** table, so its candidate set is that table's
+    /// indexes and there is nothing to be fair between. An earlier per-tenant
+    /// weighted scheduler degenerated here to plain rotation for exactly that
+    /// reason: a breach is always raised by one table, so the candidate set had
+    /// one tenant and every candidate carried the same weight. Byte size is what
+    /// actually releases memory per transaction, and the `last_dump` tie-break
+    /// keeps two equally sized indexes from starving each other.
+    ///
+    /// Cross-table fairness is the periodic loop's job (`Engine::reclaim_unsealed`
+    /// with [`rrf_order`]), which does see every table at once.
+    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<IndexMeta> {
         let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        let mut picked: Vec<(SealCandidate, IndexMeta)> = Vec::new();
+        let mut held: Vec<(u64, u64, IndexMeta)> = Vec::new();
         for im in indexes {
             if let Some(wanted) = &wanted {
                 if &self.table_key(&im.table) != wanted {
@@ -4514,26 +4558,18 @@ impl Engine {
             if bytes == 0 {
                 continue;
             }
-            let tenant = im.table.split('.').next().unwrap_or(&im.table).to_string();
-            picked.push((
-                SealCandidate {
-                    tenant,
-                    bytes: bytes as u64,
-                    last_dump: self.last_dump_ts(&im.table, &im.name),
-                },
-                im,
-            ));
+            let last_dump = self.last_dump_ts(&im.table, &im.name);
+            held.push((bytes as u64, last_dump, im));
         }
-        if picked.is_empty() {
+        if held.is_empty() {
             return None;
         }
-        let list: Vec<SealCandidate> = picked.iter().map(|(c, _)| c.clone()).collect();
-        let now = self.current_ts();
-        let mut scheduler = self.context.seal_scheduler.lock().unwrap();
-        let at = scheduler.pick(&list, now, SEAL_STARVE_TICKS)?;
-        let tenant = list[at].tenant.clone();
-        let (_, im) = picked.swap_remove(at);
-        Some((tenant, im))
+        let listing: Vec<(u64, u64, u64)> = held
+            .iter()
+            .map(|(bytes, last_dump, im)| (*bytes, *last_dump, im.id))
+            .collect();
+        let at = crate::engine::pick_largest_index(&listing)?;
+        Some(held.swap_remove(at).2)
     }
 
     /// Seals every tail of `only` (or of every table when `None`).
@@ -4542,7 +4578,7 @@ impl Engine {
     /// breach because a table with several indexes would otherwise spend a
     /// transaction per index on every write. Under memory pressure that trade
     /// flips - one transaction per tail is cheaper than being over the hard line.
-    async fn dump_every_table_index(&self, only: Option<&str>) {
+    pub(crate) async fn dump_every_table_index(&self, only: Option<&str>) {
         let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for im in indexes {
@@ -4605,18 +4641,6 @@ impl Engine {
             .unwrap_or_default();
         out.sort_unstable();
         out
-    }
-
-    /// `index_seal_starvation` (§9.5): tails that jumped the queue because their
-    /// previous dump was too long ago. Not surfaced through `SHOW VARIABLE` - the
-    /// global variable list mirrors the reference's `global_name_map_`, and this
-    /// counter has no counterpart there.
-    pub fn index_seal_starvation(&self) -> u64 {
-        self.context
-            .seal_scheduler
-            .lock()
-            .map(|s| s.starvation())
-            .unwrap_or(0)
     }
 
     /// The commit ts of the last dump this index published, or 0 when it has
@@ -4700,6 +4724,27 @@ impl Engine {
         // The handles are cloned out before any index lock is taken: holding a
         // read guard while fetching would close the `tables` -> index cycle
         // `Engine::text_index_for` documents.
+        if kind.eq_ignore_ascii_case("SPANN") {
+            // Both forms the ledger already counts: the write-time tail
+            // (`spann_mem`) and a published tree that is still `Memory`. A
+            // `File` handle reports 0 (its slots are page cache). Without this
+            // branch the figure fell through to the multi-vector reader and
+            // returned 0, so `dump_every_table_index` and `pick_seal_candidate`
+            // skipped every SPANN index (`== 0 -> continue`) and its tail could
+            // never be released by a quota breach.
+            let (tail, published) = {
+                let tables = self.tables.lock().unwrap();
+                let Some(entry) = tables.get(&tkey) else {
+                    return 0;
+                };
+                (
+                    entry.spann_mem.get(&index_id).cloned(),
+                    entry.spann.get(&index_id).cloned(),
+                )
+            };
+            return tail.map(|t| t.mem_usage()).unwrap_or(0)
+                + published.map(|h| h.mem_usage()).unwrap_or(0);
+        }
         let (text, sparse, mv) = {
             let tables = self.tables.lock().unwrap();
             let Some(entry) = tables.get(&tkey) else {

@@ -25,12 +25,10 @@
 //!   proposed, above `hard` the writing thread seals inline. That is the "one
 //!   ledger" of §12.1 - rows (`mem_index_capacity`) no longer decide *when* to
 //!   dump, they only bound how much a single index keeps.
-//! * [`SealScheduler`] is the §9.6 fair pick: weighted by pending bytes per
-//!   database, at most `max_inflight` seals per tenant, and a tail that has
-//!   waited past the starvation bound goes first and is counted
-//!   (`index_seal_starvation`).
-
-use std::collections::HashMap;
+//! * [`rrf_order`] merges the two ranks the periodic reclaim loop needs - size
+//!   and age - into one order. The write path does not use it: a breach names
+//!   one table, so it only has to choose among that table's indexes, which is
+//!   `pick_largest_index`.
 
 /// Which waterline the pending bytes are above (§9.5).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -90,15 +88,30 @@ impl Watermarks {
         self.budget
     }
 
-    /// The lower two waterlines, for the tests that pin them.
-    #[cfg(test)]
+    /// The lower two waterlines. `soft` is read by the periodic reclaim loop
+    /// to name its byte target, so it is not test-only.
     pub(crate) fn soft(&self) -> u64 {
         self.soft
     }
 
+    /// The hard line, only the tests pin it: production reads it through
+    /// [`Self::level`], which is what the waterlines exist to feed.
     #[cfg(test)]
     pub(crate) fn hard(&self) -> u64 {
         self.hard
+    }
+
+    /// The level `pending` bytes sit at, **without** retuning the waterlines.
+    ///
+    /// The write path uses [`Self::level`] through `Engine::seal_pressure`,
+    /// which calls [`Self::retune`] first: the AIMD halving is driven by writes,
+    /// so its frequency is the write frequency. The periodic loop runs every
+    /// second, and calling `retune` there would halve `soft` once a second while
+    /// the engine stayed above 80% with no writes at all - 64 MiB down to one
+    /// byte in about six seconds, after which the byte target would demand
+    /// draining the whole pool. A read-only level check is what a timer may do.
+    pub(crate) fn pressure(&self, pending: u64) -> Pressure {
+        self.level(pending)
     }
 
     /// The level `pending` bytes sit at.
@@ -134,145 +147,118 @@ impl Watermarks {
     }
 }
 
-/// How long a tail may go without a dump before it is escalated as starved.
-///
-/// The engine has no per-task clock on this path, so the bound is counted in
-/// commit-ts ticks (one tick per commit): 1000 commits is the design's "2 s" for
-/// a busy engine, and it is what makes a table that loses every weighted round
-/// still get sealed.
-pub(crate) const SEAL_STARVE_TICKS: u64 = 1000;
-
-/// One tail that could be sealed, as the scheduler sees it.
+/// One table the periodic reclaim loop may dump, as the fusion sees it.
 #[derive(Clone, Debug)]
-pub(crate) struct SealCandidate {
-    /// `db.table`, the tenant the fair share is computed over.
-    pub tenant: String,
-    /// Bytes this tail holds right now (the scheduling weight).
+pub(crate) struct ReclaimCandidate {
+    /// `db.table`, the identity the winner is reported by.
+    pub key: String,
+    /// Unsealed bytes right now: the size dimension.
     pub bytes: u64,
-    /// Commit ts of its last dump, `0` when never: the starvation input.
-    pub last_dump: u64,
+    /// How long the table has been idle: the age dimension.
+    pub age_ms: u64,
 }
 
-/// §9.6's fair pick, narrowed to the one maintenance task kind the engine has
-/// (seal a memory index into its chunk).
+/// Reciprocal-rank fusion of the size and age ranks (`K = 3`).
 ///
-/// Weighted fair queueing over tenants: every `pick` credits each tenant by its
-/// pending bytes and debits the winner by the whole round's credit, so a database
-/// holding 10x the bytes is picked about 10x as often instead of one big table
-/// absorbing every breach. Two bounds sit on top:
+/// The two dimensions are **not** summed: bytes scale with table size while age
+/// is a duration, so any weighted sum needs a coefficient that only makes sense
+/// for one deployment. Ranks do not: `score = 1/(K + size_rank) +
+/// 1/(K + age_rank)`.
 ///
-/// * at most `max_inflight` seals per tenant (a tenant cannot occupy the whole
-///   dump pool);
-/// * a candidate whose tail has not been dumped for `starved_after` ticks jumps
-///   the queue and increments [`Self::starvation`] - the design's
-///   `index_seal_starvation`, which used to be a silent starvation.
-#[derive(Debug)]
-pub(crate) struct SealScheduler {
-    credit: HashMap<String, i128>,
-    inflight: HashMap<String, usize>,
-    max_inflight: usize,
-    starvation: u64,
+/// `K = 3` so age dominates. The loop's purpose is that a table nobody writes
+/// stops holding memory (§1 gap A). A large table that is still growing is
+/// visible to the pressure path on every tick; an idle one has no other path
+/// that would ever look at it. With `K = 3` the ranks score 0.500/0.269/0.269/
+/// 0.154, so being the oldest is worth as much as being both biggest and
+/// second-oldest - and rank 1 on either axis beats rank 2 on both, which is
+/// what keeps a huge inactive table from being buried under a merely busy one.
+/// (`K = 60`, RRF's usual value, flattens this to 0.0328/0.0255/0.0255/0.0286
+/// and lets size win outright.)
+///
+/// **Ties break toward age, not size.** The fused score is symmetric: a table
+/// ranked `(1, 4)` scores exactly what one ranked `(4, 1)` does, because
+/// `1/(K+a) + 1/(K+b)` does not care which axis produced which rank. So *every*
+/// "biggest but newest" / "smallest but oldest" pair ties, and a byte-descending
+/// tie-break would then hand the pair to the big table - reversing the very
+/// preference `K = 3` exists to express, and letting a busy large table push an
+/// idle small one past the round's cap. Age descending is therefore the first
+/// tie-break, bytes descending the second, and the key the last, so the order is
+/// still a pure function of the inputs and a test can assert *which* table leads
+/// instead of relying on sort stability.
+pub(crate) fn rrf_order(candidates: &[ReclaimCandidate]) -> Vec<usize> {
+    const K: usize = 3;
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+    let mut by_size: Vec<usize> = (0..candidates.len()).collect();
+    by_size.sort_by(|a, b| {
+        candidates[*b]
+            .bytes
+            .cmp(&candidates[*a].bytes)
+            .then_with(|| candidates[*a].key.cmp(&candidates[*b].key))
+    });
+    let mut by_age: Vec<usize> = (0..candidates.len()).collect();
+    by_age.sort_by(|a, b| {
+        candidates[*b]
+            .age_ms
+            .cmp(&candidates[*a].age_ms)
+            .then_with(|| candidates[*a].key.cmp(&candidates[*b].key))
+    });
+    let mut size_rank = vec![0usize; candidates.len()];
+    for (rank, at) in by_size.iter().enumerate() {
+        size_rank[*at] = rank + 1;
+    }
+    let mut age_rank = vec![0usize; candidates.len()];
+    for (rank, at) in by_age.iter().enumerate() {
+        age_rank[*at] = rank + 1;
+    }
+    // `1/a + 1/b` is `(a + b) / (a * b)` with `a = K + size_rank`,
+    // `b = K + age_rank`. Comparing two such scores by cross-multiplication is
+    // exact integer arithmetic, so no rounding can reorder a pair.
+    let score = |i: usize| -> (u128, u128) {
+        let a = (K + size_rank[i]) as u128;
+        let b = (K + age_rank[i]) as u128;
+        (a + b, a * b)
+    };
+    let mut order: Vec<usize> = (0..candidates.len()).collect();
+    order.sort_by(|x, y| {
+        let (num_x, den_x) = score(*x);
+        let (num_y, den_y) = score(*y);
+        (num_y * den_x)
+            .cmp(&(num_x * den_y))
+            // Symmetric scores: prefer the older table (see the doc comment).
+            .then_with(|| candidates[*y].age_ms.cmp(&candidates[*x].age_ms))
+            .then_with(|| candidates[*y].bytes.cmp(&candidates[*x].bytes))
+            .then_with(|| candidates[*x].key.cmp(&candidates[*y].key))
+    });
+    order
 }
 
-impl SealScheduler {
-    pub(crate) fn new(max_inflight: usize) -> Self {
-        Self {
-            credit: HashMap::new(),
-            inflight: HashMap::new(),
-            max_inflight: max_inflight.max(1),
-            starvation: 0,
-        }
-    }
-
-    pub(crate) fn starvation(&self) -> u64 {
-        self.starvation
-    }
-
-    pub(crate) fn inflight(&self, tenant: &str) -> usize {
-        self.inflight.get(tenant).copied().unwrap_or(0)
-    }
-
-    /// A seal for `tenant` finished (or was dropped): release its slot.
-    pub(crate) fn done(&mut self, tenant: &str) {
-        if let Some(count) = self.inflight.get_mut(tenant) {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                self.inflight.remove(tenant);
-            }
-        }
-    }
-
-    /// The candidate to seal, or `None` when every tenant is at its in-flight
-    /// bound (or there is nothing to seal).
-    pub(crate) fn pick(
-        &mut self,
-        candidates: &[SealCandidate],
-        now_ts: u64,
-        starved_after: u64,
-    ) -> Option<usize> {
-        if candidates.is_empty() {
-            return None;
-        }
-        let mut weight: HashMap<&str, i128> = HashMap::new();
-        for c in candidates {
-            *weight.entry(c.tenant.as_str()).or_insert(0) += c.bytes as i128;
-        }
-        let round: i128 = weight.values().sum();
-        for (tenant, w) in &weight {
-            *self.credit.entry((*tenant).to_string()).or_insert(0) += *w;
-        }
-
-        let open = |scheduler: &Self, c: &SealCandidate| {
-            scheduler.inflight(&c.tenant) < scheduler.max_inflight
-        };
-        // A tail whose previous dump is older than the bound goes first; among
-        // those, the longest wait wins, so a starved queue drains in order.
-        let mut starved: Option<(u64, usize)> = None;
-        for (i, c) in candidates.iter().enumerate() {
-            if !open(self, c) {
-                continue;
-            }
-            // Never dumped is normal (a fresh tail is ordered by weight); the
-            // counter is for a tail that *had* its turn and did not get another.
-            if c.last_dump == 0 {
-                continue;
-            }
-            let age = now_ts.saturating_sub(c.last_dump);
-            if age > starved_after && starved.is_none_or(|(seen, _)| age > seen) {
-                starved = Some((age, i));
-            }
-        }
-        let chosen = match starved {
-            Some((_, i)) => {
-                self.starvation += 1;
-                i
-            }
-            None => {
-                let mut best: Option<(i128, u64, usize)> = None;
-                for (i, c) in candidates.iter().enumerate() {
-                    if !open(self, c) {
-                        continue;
-                    }
-                    let score = self.credit.get(&c.tenant).copied().unwrap_or(0);
-                    let waited = now_ts.saturating_sub(c.last_dump);
-                    let better = match best {
-                        None => true,
-                        Some((seen, seen_wait, _)) => {
-                            score > seen || (score == seen && waited > seen_wait)
-                        }
-                    };
-                    if better {
-                        best = Some((score, waited, i));
-                    }
-                }
-                best?.2
+/// The index a write-path breach should dump: the one holding the most bytes,
+/// with ties going to whichever was dumped longest ago.
+///
+/// The write path names one table, so the candidate set is that table's indexes
+/// and there is nothing to be fair *between* - the earlier per-tenant scheduler
+/// degenerated to pure rotation here, because a breach is always raised by one
+/// table and its candidate set therefore has one tenant. Bytes descending is
+/// what actually releases the most per dump; the `last_dump` tie-break is what
+/// keeps two equally sized indexes from starving each other (without it a
+/// strict `bytes > seen` picks the first of the pair on every breach, and the
+/// other one's chunk never appears).
+pub(crate) fn pick_largest_index(held: &[(u64, u64, u64)]) -> Option<usize> {
+    let mut best: Option<(usize, u64, u64)> = None;
+    for (at, (bytes, last_dump, _id)) in held.iter().enumerate() {
+        let better = match best {
+            None => true,
+            Some((_, seen_bytes, seen_dump)) => {
+                *bytes > seen_bytes || (*bytes == seen_bytes && *last_dump < seen_dump)
             }
         };
-        let tenant = candidates[chosen].tenant.clone();
-        *self.credit.entry(tenant.clone()).or_insert(0) -= round;
-        *self.inflight.entry(tenant).or_insert(0) += 1;
-        Some(chosen)
+        if better {
+            best = Some((at, *bytes, *last_dump));
+        }
     }
+    best.map(|(at, _, _)| at)
 }
 
 #[cfg(test)]
@@ -329,69 +315,109 @@ mod tests {
         assert_eq!(w.soft(), base);
     }
 
-    fn candidate(tenant: &str, bytes: u64, last_dump: u64) -> SealCandidate {
-        SealCandidate {
-            tenant: tenant.to_string(),
+    fn cand(key: &str, bytes: u64, age_ms: u64) -> ReclaimCandidate {
+        ReclaimCandidate {
+            key: key.to_string(),
             bytes,
-            last_dump,
+            age_ms,
         }
     }
 
     #[test]
-    fn the_fair_pick_follows_the_bytes() {
-        // db2 holds 10x the bytes, so it wins about 10 of 11 rounds.
-        let mut s = SealScheduler::new(1);
-        let small = candidate("db1", 1 << 20, 10);
-        let big = candidate("db2", 10 << 20, 10);
-        let (mut one, mut two) = (0usize, 0usize);
-        for _ in 0..11 {
-            let list = [small.clone(), big.clone()];
-            match s.pick(&list, 100, 1000) {
-                Some(0) => one += 1,
-                Some(1) => two += 1,
-                other => panic!("unexpected pick {other:?}"),
-            }
-            // The caller would have sealed it already: release the slot.
-            s.done(if one > two { "db1" } else { "db2" });
-        }
-        assert_eq!(two, 10, "the heavy tenant gets its share ({one}/{two})");
-        assert_eq!(one, 1);
+    fn rrf_prefers_a_table_that_is_both_large_and_old() {
+        // Big-and-new, small-and-old, and middling-and-middling. The fused order
+        // must not collapse to either single rank: the two extremes tie, and the
+        // middling table loses both dimensions and comes last.
+        let list = [
+            cand("db.big_new", 1_000, 10),
+            cand("db.small_old", 10, 10_000),
+            cand("db.mid", 100, 1_000),
+        ];
+        let order = rrf_order(&list);
+        assert_eq!(order.len(), 3);
+        // Both single-axis winners outrank the middling one.
+        assert!(
+            order[0] == 0 || order[0] == 1,
+            "a single-axis winner must lead: {order:?}"
+        );
+        assert!(
+            order[1] == 0 || order[1] == 1,
+            "the other single-axis winner must be second: {order:?}"
+        );
+        assert_eq!(order[2], 2, "middling in both dimensions comes last");
     }
 
     #[test]
-    fn a_tenant_cannot_hold_every_slot() {
-        let mut s = SealScheduler::new(1);
-        let a = candidate("db1", 100, 10);
-        let b = candidate("db2", 1, 10);
-        let list = [a, b];
-        assert_eq!(s.pick(&list, 100, 1_000_000), Some(0));
-        // db1 is at its bound, so the pick must come from db2 even though db1
-        // carries all the weight.
-        assert_eq!(s.pick(&list, 100, 1_000_000), Some(1));
-        assert_eq!(s.pick(&list, 100, 1_000_000), None);
-        s.done("db1");
-        assert_eq!(s.pick(&list, 100, 1_000_000), Some(0));
+    fn rrf_breaks_a_symmetric_tie_toward_age() {
+        // The fused score is symmetric, so "biggest but newest" ties "smallest
+        // but oldest" exactly (`1/4 + 1/5` either way). Breaking that tie by
+        // bytes would hand it to the fresh table and undo the whole point of the
+        // age axis, so the tie-break prefers age: the idle table leads.
+        let list = [
+            cand("db.huge_fresh", 1_000_000_000, 1),
+            cand("db.tiny_stale", 1, 6_000_000),
+        ];
+        let order = rrf_order(&list);
+        assert_eq!(order[0], 1, "the idle table goes first: {order:?}");
+
+        // Not merely a two-element accident: with a third table lowest on both
+        // axes it stays last, and the tie between the extremes still resolves
+        // toward age.
+        let list = [
+            cand("db.huge_fresh", 1_000_000_000, 1),
+            cand("db.tiny_stale", 1, 6_000_000),
+            cand("db.mid", 500_000, 3_000_000),
+        ];
+        let keys: Vec<&str> = rrf_order(&list)
+            .iter()
+            .map(|i| list[*i].key.as_str())
+            .collect();
+        assert_eq!(keys[0], "db.tiny_stale", "age wins the tie: {keys:?}");
+        assert_eq!(
+            keys[2], "db.mid",
+            "middling on both axes goes last: {keys:?}"
+        );
     }
 
     #[test]
-    fn a_starved_tail_jumps_the_queue_and_is_counted() {
-        let mut s = SealScheduler::new(4);
-        let fresh = candidate("db1", 100 << 20, 999);
-        let stale = candidate("db2", 1, 10);
-        let list = [fresh, stale];
-        // `now - last_dump = 990 > 900`: the small but stale tail goes first.
-        assert_eq!(s.pick(&list, 1000, 900), Some(1));
-        assert_eq!(s.starvation(), 1);
-        // Immediately re-picking the same stale tail would starve again; the
-        // caller records the new dump ts, which is what we model here.
-        let list = [candidate("db1", 100 << 20, 999), candidate("db2", 1, 1000)];
-        assert_eq!(s.pick(&list, 1000, 900), Some(0));
-        assert_eq!(s.starvation(), 1);
-        // A never-dumped tail is not "starved" - it is simply new, and the
-        // weight decides. Counting it would make the counter meaningless.
-        let never = candidate("db3", 1, 0);
-        let list = [candidate("db1", 100 << 20, 999), never];
-        assert_eq!(s.pick(&list, 1000, 900), Some(0));
-        assert_eq!(s.starvation(), 1);
+    fn rrf_ties_are_broken_by_age_then_bytes_then_name() {
+        // Same age, different bytes: bytes decide.
+        let list = [
+            cand("db.c", 500, 7),
+            cand("db.b", 500, 7),
+            cand("db.a", 900, 7),
+        ];
+        let order = rrf_order(&list);
+        let keys: Vec<&str> = order.iter().map(|i| list[*i].key.as_str()).collect();
+        assert_eq!(keys, vec!["db.a", "db.b", "db.c"]);
+
+        // Same bytes and same age: the name is the final tie-break.
+        let list = [cand("db.z", 10, 10), cand("db.y", 10, 10)];
+        let keys: Vec<String> = rrf_order(&list)
+            .iter()
+            .map(|i| list[*i].key.clone())
+            .collect();
+        assert_eq!(keys, vec!["db.y", "db.z"]);
+    }
+
+    #[test]
+    fn rrf_of_an_empty_set_is_empty() {
+        assert!(rrf_order(&[]).is_empty());
+    }
+
+    #[test]
+    fn the_largest_index_wins_and_ties_go_to_the_older_dump() {
+        // (bytes, last_dump, id)
+        let held = [(10, 5, 1), (900, 7, 2), (900, 3, 3)];
+        assert_eq!(
+            pick_largest_index(&held),
+            Some(2),
+            "equal bytes, older dump"
+        );
+        let held = [(900, 3, 3), (900, 7, 2)];
+        assert_eq!(pick_largest_index(&held), Some(0));
+        let held = [(5, 0, 1), (7, 0, 2)];
+        assert_eq!(pick_largest_index(&held), Some(1), "bytes decide first");
+        assert_eq!(pick_largest_index(&[]), None);
     }
 }

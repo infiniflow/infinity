@@ -1780,15 +1780,17 @@ impl Engine {
                     crate::spann_mem::SpannTail::new(*dims, opts.clone())
                         .expect("a tail over a validated dimension")
                 });
+                let mut held = 0u64;
                 for (seq, row) in &rows {
                     let Some(value) = row.get(*column) else {
                         continue;
                     };
                     let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
-                    if !vector.is_empty() {
-                        let _ = tail.insert(*seq as u64, &vector);
+                    if !vector.is_empty() && tail.insert(*seq as u64, &vector).is_ok() {
+                        held += 1;
                     }
                 }
+                entry.bump_unsealed(*index_id, held);
             }
             // Only the rows the caller is not writing elsewhere: a staged block
             // must not also sit in the buffer, or the same 8192 rows stay
@@ -1800,8 +1802,7 @@ impl Engine {
                 resolve,
                 || (live.ids.clone(), live.defaults.clone()),
             );
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         Ok(buffered)
     }
@@ -3513,19 +3514,20 @@ impl Engine {
                         crate::spann_mem::SpannTail::new(*dims, opts.clone())
                             .expect("a tail over a validated dimension")
                     });
+                    let mut held = 0u64;
                     for (seq, cells) in &attributed {
                         let Some(value) = cells.get(column_id) else {
                             continue;
                         };
                         let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
-                        if !vector.is_empty() {
-                            let _ = tail.insert(*seq as u64, &vector);
+                        if !vector.is_empty() && tail.insert(*seq as u64, &vector).is_ok() {
+                            held += 1;
                         }
                     }
+                    entry.bump_unsealed(*index_id, held);
                 }
                 entry.buffer_attributed_rows(attributed, &live_ids, &live_defaults);
-                entry.mirror_dirty = true;
-                entry.mirror_epoch += 1;
+                entry.note_write();
             }
             if !rows.contains_key(&table) {
                 order.push(table.clone());

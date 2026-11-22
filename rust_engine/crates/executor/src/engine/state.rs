@@ -4702,6 +4702,67 @@ pub(crate) struct SecondaryIndexes {
     pub(crate) sealing: HashMap<u64, Vec<std::sync::Arc<index::SealedTail>>>,
 }
 
+/// Same as `#[derive(Default)]` except for the reclaim clock: a table this
+/// process has not written yet is age **0**, not age "since the epoch".
+///
+/// `last_write_ms` starts at the process's monotonic start so the staleness
+/// sweep measures idleness from when the engine opened - a table loaded from
+/// disk with rows still in memory reads as freshly touched rather than infinitely
+/// old, which would put every table at the head of the first sweep.
+impl Default for TableEntry {
+    fn default() -> Self {
+        Self {
+            write_batches: 0,
+            importing: 0,
+            block_rows: None,
+            pending_rows: Default::default(),
+            staged_import_blocks: Default::default(),
+            pending_bytes: 0,
+            memindex_bytes: 0,
+            unsealed_marks: Default::default(),
+            last_write_ms: crate::memory::now_millis(),
+            last_attempt_ms: 0,
+            dump_failures: 0,
+            row_counter: None,
+            append_totals: None,
+            append_ts: None,
+            append_copy: None,
+            deleted_ids: None,
+            deleted_set: None,
+            delete_ts: None,
+            segments: Default::default(),
+            analyzers: Default::default(),
+            imports: None,
+            analyzers_by_index: Default::default(),
+            column_index_analyzers: Default::default(),
+            comments: Default::default(),
+            hnsw_mem: Default::default(),
+            hnsw_options: Default::default(),
+            index_pending_bytes: Default::default(),
+            hnsw_probed: false,
+            hnsw_topup: false,
+            sparse: Default::default(),
+            mv: Default::default(),
+            text: Default::default(),
+            text_epoch: 0,
+            text_built: Default::default(),
+            text_min_ts: 0,
+            secondary: Default::default(),
+            vector: Default::default(),
+            ivf: Default::default(),
+            ivf_mem: Default::default(),
+            spann: Default::default(),
+            spann_mem: Default::default(),
+            block_index: None,
+            live_rows: None,
+            mirror_dirty: false,
+            mirror_epoch: 0,
+            mirror_rows: None,
+            row_cache: None,
+        }
+    }
+}
+
 impl TableEntry {
     /// An `IMPORT` holds this table's indexes: the append-path dump triggers
     /// are suppressed until it commits (see [`TableEntry::importing`]).
@@ -4868,6 +4929,54 @@ impl TableEntry {
         self.pending_bytes + self.pending_rows.column_count() * std::mem::size_of::<Vec<Value>>()
     }
 
+    /// Records that this table's rows changed, stamping the reclaim loop's
+    /// clock at the same time.
+    ///
+    /// Every site that advanced [`Self::mirror_epoch`] also has to advance
+    /// [`Self::last_write_ms`]: they answer the same question ("the files are
+    /// behind the rows"), so splitting them would let a table look idle to the
+    /// sweeper while it was written a second ago. One method keeps that
+    /// impossible to get wrong.
+    pub(crate) fn note_write(&mut self) {
+        self.mirror_dirty = true;
+        self.mirror_epoch += 1;
+        self.last_write_ms = crate::memory::now_millis();
+        // A write means the table has something new to dump, so a backoff from
+        // an earlier failure no longer applies.
+        self.dump_failures = 0;
+    }
+
+    /// Whether every unsealed mark is zero - the table has nothing to dump.
+    pub(crate) fn unsealed_marks_are_empty(&self) -> bool {
+        self.unsealed_marks
+            .values()
+            .all(|mark| mark.load(std::sync::atomic::Ordering::Relaxed) == 0)
+    }
+
+    /// The mark for `index_id`, created on first use so a write hook never has
+    /// to know whether a dump already registered it.
+    pub(crate) fn unsealed_mark(&mut self, index_id: u64) -> &Arc<std::sync::atomic::AtomicU64> {
+        self.unsealed_marks
+            .entry(index_id)
+            .or_insert_with(|| Arc::new(std::sync::atomic::AtomicU64::new(0)))
+    }
+
+    /// Adds `rows` to one index's unsealed count. Saturating: the mark is
+    /// allowed to over-report, never to wrap.
+    pub(crate) fn bump_unsealed(&mut self, index_id: u64, rows: u64) {
+        self.unsealed_mark(index_id)
+            .fetch_add(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Zeroes one index's unsealed count. Called by **every** dump branch: a
+    /// branch that forgets leaves the table in the candidate set forever, and
+    /// the reclaim loop then spends one attempt per round on it.
+    pub(crate) fn clear_unsealed(&mut self, index_id: u64) {
+        if let Some(mark) = self.unsealed_marks.get(&index_id) {
+            mark.store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// The buffered row `seq` in the **caller's** column order.
     ///
     /// The buffer is columnar, so this **materialises** the row: the cells live
@@ -4900,7 +5009,6 @@ impl TableEntry {
 /// `src/storage/common/block_index.cppm`). Upstream removed the older
 /// `TableEntry` / `SegmentEntry` / `BlockManager` classes (PR #2722), so this
 /// type stands in for their catalog-level successors, not for a single class.
-#[derive(Default)]
 pub(crate) struct TableEntry {
     /// Number of write batches (`COPY`/`INSERT`) seen by this process.
     pub(crate) write_batches: usize,
@@ -4959,6 +5067,41 @@ pub(crate) struct TableEntry {
     /// Bytes this table's in-memory index forms held when the process-wide
     /// total was last updated for it (see `Context::memindex_total`).
     pub(crate) memindex_bytes: usize,
+    /// Per-index count of rows (or bytes) an in-memory index tail holds, so the
+    /// periodic reclaim loop can ask "does this table have anything to dump?"
+    /// without taking any index's own lock.
+    ///
+    /// Only `SecondaryIndex` (`row_count`/`approx_bytes`) and `ivf_mem` expose a
+    /// lock-free count. HNSW's rows sit behind an `Arc<tokio::sync::Mutex<…>>`,
+    /// the full-text tail behind a `tokio::RwLock`, and BMP / multi-vector /
+    /// SPANN tails behind `std::sync::RwLock`s whose blocking `read()` must not
+    /// run on a runtime worker (`AGENTS.md` §7.2). Probing them with `try_lock`
+    /// is worse still: it reports "no data" exactly while a query holds the
+    /// lock, which is the state a table that needs reclaiming is in.
+    ///
+    /// So every write hook bumps the entry and every dump branch zeroes it. The
+    /// value is allowed to over-report - a stale non-zero only costs one wasted
+    /// attempt, which the failure backoff absorbs - but under-reporting would
+    /// leave a table in memory forever.
+    pub(crate) unsealed_marks: HashMap<u64, Arc<std::sync::atomic::AtomicU64>>,
+    /// Monotonic milliseconds of the last write to this table, or the process
+    /// start when it has not been written in this process.
+    ///
+    /// The age the periodic loop sorts on. It advances exactly where
+    /// [`Self::mirror_epoch`] does (an append, a delete, a schema or row-id
+    /// rewrite), because those are the same events that make the table dirty.
+    pub(crate) last_write_ms: u64,
+    /// When the reclaim loop last *tried* this table and the attempt released
+    /// nothing. Used only by the pressure path to push a failing table to the
+    /// queue's tail.
+    pub(crate) last_attempt_ms: u64,
+    /// Consecutive failed attempts, reset by a success or a write.
+    ///
+    /// The backoff is exponential in this count. Refreshing `last_attempt_ms`
+    /// on every failure without the counter would pin the table's age at zero
+    /// and leave it at the tail forever - the starvation the counter exists to
+    /// avoid, only inverted.
+    pub(crate) dump_failures: u32,
     /// `(segment, offset, sealed)` of the row-id allocator.
     pub(crate) row_counter: Option<(u32, u32, bool)>,
     /// Cumulative row count after every append transaction of this table
@@ -5922,9 +6065,23 @@ pub(crate) struct Context {
     /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
     /// table. Derived from `memindex_quota`, never set directly.
     pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
-    /// The fair seal scheduler (§9.6): weights per database, one seal in flight
-    /// per tenant, and the `index_seal_starvation` counter.
-    pub(crate) seal_scheduler: std::sync::Mutex<crate::engine::maintain::SealScheduler>,
+    /// Monotonic milliseconds before which the periodic reclaim loop must not
+    /// start another round, because the last one released nothing.
+    ///
+    /// One timer shared by both targets: "no progress" means the same thing to
+    /// each (candidates were picked and every `dump_table` returned `false`), so
+    /// two timers would only let the pair take turns spinning every tick.
+    pub(crate) unsealed_backoff_until: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_reclaim_interval` in milliseconds: how often the
+    /// staleness sweep runs. `0` disables that path.
+    pub(crate) unsealed_reclaim_interval: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_idle_age` in milliseconds: the age at which the
+    /// staleness sweep considers a table reclaimable, and the base of the
+    /// failure backoff. `0` means "no age threshold".
+    pub(crate) unsealed_idle_age: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_max_tables_per_round`: how many tables one round may
+    /// dump. `0` means unlimited.
+    pub(crate) unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize,
     /// Per-index recall monitors (§11.3 item 4), keyed by table **and** catalog
     /// index id: an id is unique within a table, not across the engine, so keying
     /// on it alone let two tables with an index of the same id share one target,

@@ -44,6 +44,26 @@
 门禁：`test_cross_engine_bytes_20_table`（各索引 chunk 数）、`_30_segments`（配额驱动的 dump 与 tiling）、
 `_45_ddl`（9 阶段，含 create/drop index）、`_50_mutations`（重启/崩溃后的索引覆盖）。
 
+### 1.2 未落盘内存的周期回收（有意的设计偏离）
+
+**重写版有一条参考没有的周期回收路径**：每 tick 检查一次内存水位，另按 `unsealed_reclaim_interval` 做一次陈旧度扫描，
+以**表**为单位把 append buffer 与索引 tail 落盘（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的配额与按批容量触发，
+所以一张写完就没人动的表会一直占着内存。
+
+| | 参考 | 重写版 |
+|---|---|---|
+| 触发 | 写路径的 `MemIndexTracer` 配额、`MemIndexCapacity` 行数 | 同左，**外加**每 tick 的水位检查与按间隔的陈旧度扫描 |
+| 单位 | 单个 `MemIndex`（`SegmentIndexMeta`） | **整表**：一次选中就排空该表所有索引 tail 与 append buffer |
+| 选表排序 | 无跨表排序（每次 breach 只处理写入表） | 尺寸与年龄两路名次做 RRF（`K = 3`，年龄优先），平局按年龄、字节、表名 |
+| 单轮上限 | 无（一次 breach 一个索引） | `unsealed_max_tables_per_round`（默认 100，`0` = 不限） |
+
+**影响**：内存回收的时机与参考不同，且比参考更早（闲置表也会被回收）。因此**服务端模式下的 dump 记录数与 chunk 划分
+可能与参考不同**——跨引擎字节门禁里凡是比较「chunk 数 / chunk 边界」的用例，若把配额设得很小并让服务端跑过 30 秒，
+就会看到差异。行数据本身不受影响（内存里的行本就在块文件和 WAL 里）。
+
+配置：`[buffer] unsealed_reclaim_interval`（`0` 关闭陈旧路径）、`unsealed_idle_age`（`0` = 不设年龄门槛）、
+`unsealed_max_tables_per_round`。
+
 ## 2 未实现 / 未接线
 
 **本节没有未接线项**（`CREATE INDEX` 的 HNSW/全文封存时机见 §2.9）。这一层的现状：

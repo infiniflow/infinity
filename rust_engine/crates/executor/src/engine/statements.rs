@@ -518,7 +518,10 @@ impl Engine {
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
                 memindex_pending: Arc::new(std::sync::Mutex::new(MemIndexPending::default())),
                 watermarks: std::sync::Mutex::new(Watermarks::new(0)),
-                seal_scheduler: std::sync::Mutex::new(SealScheduler::new(1)),
+                unsealed_backoff_until: std::sync::atomic::AtomicU64::new(0),
+                unsealed_reclaim_interval: std::sync::atomic::AtomicU64::new(30_000),
+                unsealed_idle_age: std::sync::atomic::AtomicU64::new(600_000),
+                unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize::new(100),
                 recall: std::sync::Mutex::new(std::collections::HashMap::new()),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
@@ -1480,8 +1483,7 @@ impl Engine {
             entry.block_rows = None;
             entry.block_index = None;
             entry.live_rows = None;
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         // The files this engine mapped no longer describe the table: drop the
         // mappings so the next read maps what is on disk now.
@@ -2206,8 +2208,7 @@ impl Engine {
         let _ = room;
         entry.row_counter = Some((at_seg, at_off as u32, copy));
         if n > 0 {
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         drop(tables);
         // One `create` per append in the mirror's `version` file.
@@ -2283,8 +2284,7 @@ impl Engine {
                     id: cursor.segment,
                     rows: offset,
                 });
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         let mut batches = cursor.batches.clone();
         batches.push(n);
@@ -11792,6 +11792,10 @@ impl Engine {
         cleanup_interval: std::time::Duration,
         compact_interval: std::time::Duration,
         optimize_interval: std::time::Duration,
+        // The staleness sweep's period (`[buffer] unsealed_reclaim_interval`).
+        // Zero disables that path; it is the fifth interval rather than a field
+        // read inside the loop so a test that passes four zeros stays inert.
+        reclaim_interval: std::time::Duration,
     ) {
         let processor = Arc::new(BGTaskProcessor::new(1));
         processor.start().await;
@@ -11815,6 +11819,7 @@ impl Engine {
                 cleanup_interval,
                 compact_interval,
                 optimize_interval,
+                reclaim_interval,
             )
             .await
         });
