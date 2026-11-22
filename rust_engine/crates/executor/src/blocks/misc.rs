@@ -3338,4 +3338,50 @@ mod tests {
         sorted.sort_by_key(|(seq, _)| *seq);
         assert_eq!(parallel, sorted);
     }
+
+    /// A `create` may not name an append whose rows the write did not reach.
+    ///
+    /// The journal is filled in a commit's top half; the segment map that
+    /// decides which rows a write walks moves in its bottom. A checkpoint that
+    /// lands between the two sees an append it will not write, and stamping
+    /// that append's ts here is not cosmetic: the `version` creates are the row
+    /// floor a reopen derives from the files (`Engine::recover_blocks` ->
+    /// `newest`), so the WAL replay would skip exactly that batch and a
+    /// `kill -9` would lose it - the `restart_test` checkpoint race, 8192 rows
+    /// short after a restart.
+    #[tokio::test]
+    async fn a_create_never_names_an_append_the_write_did_not_cover() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        // Two appends of four rows each; the write covers only the first.
+        let totals = vec![4u64, 8];
+        let ts = vec![10u64, 20];
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 4, 4),
+            vec![(10, 4)],
+            "the uncovered append's ts must not reach the file"
+        );
+        // A write that stops inside the second append gives its rows no create
+        // naming 20 either: the rest of that append is in no block.
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 6, 6),
+            vec![(10, 4), (10, 2)]
+        );
+        // Once the journal and the segment map agree, the ts is the append's
+        // own - the pre-existing shape, unchanged.
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 8, 8),
+            vec![(10, 4), (20, 4)]
+        );
+        // A journal that stops short of the rows present (an append the
+        // previous process lost) keeps its old shape: one create at the newest
+        // known ts, which is also the newest ts this write covers.
+        assert_eq!(
+            e.block_version_batches(&[4], &[10], 0, 6, 6),
+            vec![(10, 6)],
+            "the disagreeing journal falls back to the covered ts"
+        );
+    }
 }

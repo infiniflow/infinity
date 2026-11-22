@@ -836,6 +836,12 @@ impl Engine {
         let totals = self.append_totals(&table);
         let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
+        // The rows this write covers, table-wide. The append journal is
+        // table-wide too (`append_ts_of` maps a row id through `counts`), so
+        // the two are comparable: a `create` in a block's `version` may only
+        // name a ts whose append lies entirely inside this total. See
+        // [`Self::block_version_batches`].
+        let covered_rows: u64 = counts.iter().map(|(_, rows)| *rows).sum();
         // The reference decides per block, by ts: a block is flushed when
         // `record_ts < min(bound_ts, block_max_ts)` where `record_ts` is
         // the ts at which the block was last written and `block_max_ts` the
@@ -1067,7 +1073,13 @@ impl Engine {
                     })
                 };
                 if let Some((rows, filter)) = staged {
-                    let batches = self.block_version_batches(&totals, &append_ts, slot_base, rows);
+                    let batches = self.block_version_batches(
+                        &totals,
+                        &append_ts,
+                        slot_base,
+                        rows,
+                        covered_rows,
+                    );
                     let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
                     for k in 0..rows {
                         if let Some(ts) = deleted_at.get(&(first_id + k)) {
@@ -1197,8 +1209,13 @@ impl Engine {
                     &chunk,
                     bitmap_bits,
                 )?;
-                let batches =
-                    self.block_version_batches(&totals, &append_ts, slot_base, chunk.len());
+                let batches = self.block_version_batches(
+                    &totals,
+                    &append_ts,
+                    slot_base,
+                    chunk.len(),
+                    covered_rows,
+                );
                 let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
                 // The slot of a deleted row is its in-segment offset inside the
                 // block (`BlockVersion::Delete`); the id window is the block's.
@@ -1474,16 +1491,34 @@ impl Engine {
         ts: &[u64],
         block_start: usize,
         rows_in_block: usize,
+        covered_rows: u64,
     ) -> Vec<(u64, u32)> {
         let end = block_start + rows_in_block;
+        // A `create` may only name a ts whose append this write **covers**.
+        // `totals`/`ts` are the commit journal, read under the table lock, and
+        // the journal is written in a commit's top half while the segment map
+        // that decides what gets walked moves in its bottom: a checkpoint that
+        // lands in between sees an append whose rows it will not write. Naming
+        // that append's ts on rows that *are* in the file is not a cosmetic
+        // inaccuracy - `Engine::open` derives the row replay floor from these
+        // `create` timestamps (`recover_blocks` -> `newest`), so a `kill -9`
+        // then skips exactly the append it named and the batch is gone (the
+        // `restart_test` checkpoint race: 8192 rows short after a restart).
+        //
+        // Nothing changes while the journal and the segment map agree, which
+        // is every write whose rows are already placed.
+        let ahead = totals.last().copied().unwrap_or(0) > covered_rows;
+        let clamped =
+            |i: usize| -> bool { !ahead || totals.get(i).is_some_and(|t| *t <= covered_rows) };
         // An append the previous process lost, or one made before the ts log
         // existed, has no commit ts of its own. The newest known ts is the
         // closest stand-in: it keeps the create visible to a reader at the
-        // current ts, and puts it where the append order says it belongs.
-        let fallback = ts
-            .iter()
+        // current ts, and puts it where the append order says it belongs. It
+        // never comes from an append this write does not cover.
+        let fallback = (0..ts.len())
             .rev()
-            .copied()
+            .filter(|i| clamped(*i))
+            .map(|i| ts[i])
             .find(|t| *t != 0)
             .unwrap_or(CPP_MIRROR_TS);
         let mut batches: Vec<(u64, u32)> = Vec::new();
@@ -1497,7 +1532,8 @@ impl Engine {
             if hi > lo {
                 let batch_ts = match ts.get(i).copied().unwrap_or(0) {
                     0 => fallback,
-                    t => t,
+                    t if clamped(i) => t,
+                    _ => fallback,
                 };
                 batches.push((batch_ts, (hi - lo) as u32));
             }
@@ -8570,6 +8606,91 @@ impl Engine {
             }
         }
         Ok(out)
+    }
+
+    /// The row ids of the tensor documents of `table.column`, ascending - the
+    /// rows a PLAID chunk's document offsets were dumped from.
+    ///
+    /// This is the row-id half of [`Self::for_each_tensor_doc`] and nothing
+    /// more: a caller that only needs to know **which** rows a chunk set covers
+    /// (a reopened engine lining its chunks up with the table) must not parse
+    /// the tensors, and must not even render them. A cell is rendered by
+    /// `decode_tensor_value`, which formats every float the row holds; on a
+    /// 62 k-row MULTIVECTOR table that is ~1.4 GB of text, 66 s of a cold first
+    /// query, spent to answer "does this row hold a document at all".
+    ///
+    /// A tensor cell exists exactly when its slot is not NULL - a slot that
+    /// exists always renders as `[...]` - so the column's null bitmap answers
+    /// the question and the outline is never touched.
+    ///
+    /// `None` when the column is not a tensor column: "looks like a tensor" is
+    /// then a property of the cell's *text*, which the caller has to read.
+    pub(crate) fn tensor_row_ids(&self, table: &str, col: usize) -> Option<Vec<u64>> {
+        let table = self.qualified_table(table);
+        let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
+        let type_text = meta.types.get(col)?;
+        if tensor_shape(type_text).is_none() && tensorarray_shape(type_text).is_none() {
+            return None;
+        }
+        let column_type = column_type_of(type_text)?;
+        let layout = layout_of(type_text, column_type)?;
+        let column_id = meta.ids.get(col).copied().unwrap_or(col as u64);
+        let root = self.blocks_root();
+        let read_ts = crate::read_ts();
+        // One `Arc` lookup for the whole walk: `deleted_set` takes the table lock
+        // and loads the journal on a miss, which the row loop must not do.
+        let dead = self.deleted_set(&table);
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok(block) = self.block_map(&table, &root, id) else {
+                continue;
+            };
+            let Some((body, _outline)) = block.column(column_id) else {
+                continue;
+            };
+            // The null bitmap is the tail of the column body, after the data
+            // region: splitting is arithmetic, so no column byte is read.
+            let (_, null) = split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+            let version = block.version();
+            let created_at = Self::created_at(version, read_ts);
+            for slot in 0..created_at {
+                // Same verdict a scan takes: a slot created after the read ts
+                // does not exist yet, one deleted after it is still there.
+                if !Self::slot_visible(version, slot, created_at, read_ts) {
+                    continue;
+                }
+                if !null
+                    .get(slot / 8)
+                    .is_some_and(|byte| byte & (1 << (slot % 8)) != 0)
+                {
+                    continue;
+                }
+                let seq = ((id.segment_id as usize) << 32)
+                    | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
+                if !dead.contains(&(seq as u64)) {
+                    out.push(seq as u64);
+                }
+            }
+        }
+        // The rows above the last checkpoint are the append buffer's, exactly as
+        // they are for a scan. They are already `Value`s, so the shape test they
+        // get is the text one.
+        for (seq, values) in self.pending_rows_of(&table) {
+            if dead.contains(&(seq as u64)) {
+                continue;
+            }
+            let Some(Value::Str(text)) = values.get(col) else {
+                continue;
+            };
+            let text = text.trim();
+            if text.starts_with('[') && text.ends_with(']') {
+                out.push(seq as u64);
+            }
+        }
+        // Blocks come in scan order and the buffer's rows are above them, but the
+        // caller treats the list as the document order of the table.
+        out.sort_unstable();
+        Some(out)
     }
 
     /// Hands every tensor document of `table.column` to `each`, in row order,

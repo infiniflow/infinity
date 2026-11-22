@@ -4038,13 +4038,44 @@ impl Engine {
     /// Every row id the table holds, tombstoned slots included, ascending.
     ///
     /// The ids alone: a recovery that only needs to know which rows an index
-    /// is missing must not decode the rows to find out.
+    /// is missing must not decode the rows to find out. This used to go through
+    /// [`Self::read_blocks_including_deleted_from`], which renders **every cell
+    /// of every column** and then dropped all of it for the `seq` - a
+    /// MULTIVECTOR cell is one `fmt_f32_cpp` per float it holds, so on rgrep's
+    /// index (62 k rows, 1.4 GB of tensor text) a reopen spent minutes here
+    /// before the first query could start (sampled: all of it inside
+    /// `fmt_f32_cpp` under `recover_mem_index`).
+    ///
+    /// How many rows a block holds is its `version` file's answer - the same
+    /// number `decode_rows_of_values` walks (`created.last()`), so the ids are
+    /// the ones a decode would have produced, and no column is read.
     pub(crate) fn row_ids_including_deleted(&self, table: &str) -> Result<Vec<usize>> {
-        Ok(self
-            .read_blocks_including_deleted_from(&self.qualified_table(table), 0)
-            .into_iter()
-            .map(|(seq, _)| seq)
-            .collect())
+        let table = self.qualified_table(table);
+        let root = self.blocks_root();
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok(block) = self.block_map(&table, &root, id) else {
+                continue;
+            };
+            let rows = block
+                .version()
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as usize)
+                .unwrap_or(0);
+            let base = ((id.segment_id as usize) << 32)
+                | (id.block_id as usize * storage::format::DEFAULT_BLOCK_CAPACITY);
+            out.extend(base..base + rows);
+        }
+        // The tail above the last checkpoint is the append buffer's. Its ids are
+        // taken as ids - materialising the rows to read their first field would
+        // clone every buffered tensor.
+        if let Some(entry) = self.tables.lock().unwrap().get(&self.table_key(&table)) {
+            out.extend((0..entry.pending_rows.len()).map(|k| entry.pending_rows.row_id(k)));
+        }
+        out.sort_unstable();
+        out.dedup();
+        Ok(out)
     }
 
     /// Full rows from the C++ block mirror.
@@ -6145,6 +6176,14 @@ impl Engine {
     /// retrain the index instead of mapping it.
     async fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
         let _ = dims;
+        // A tensor column answers the question from its null bitmap without
+        // rendering a single tensor: `fetch_rows_with_ids` below builds every
+        // row of the table as `Value`s, and that decodes a MULTIVECTOR cell by
+        // formatting each float it holds (~1.4 GB of text, 66 s, on rgrep's
+        // 62 k rows) only to look at the first and last byte of it.
+        if let Some(ids) = self.tensor_row_ids(table, ci) {
+            return Ok(ids);
+        }
         let mut out = Vec::new();
         for (seq, row) in self.fetch_rows_with_ids(table).await? {
             let text = match row.get(ci) {

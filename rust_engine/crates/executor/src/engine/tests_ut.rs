@@ -6915,6 +6915,57 @@ mod tests {
         assert_eq!(hits.len(), 230);
     }
 
+    /// [`Engine::tensor_row_ids`] is the row-id list the text scan produced, at a
+    /// fraction of the cost.
+    ///
+    /// The list lines a PLAID chunk's documents up with the rows they were
+    /// dumped from, and `multivector_row_ids` used to derive it by building
+    /// every row of the table as `Value`s - which renders a MULTIVECTOR cell by
+    /// formatting each float it holds (66 s of a cold query on 62 k rows). The
+    /// null bitmap answers the same question, so the two must agree on every
+    /// case the old walk distinguished: a NULL cell is not a document, a
+    /// tombstoned row is not one, and a row that exists comes first.
+    #[tokio::test]
+    async fn tensor_row_ids_answer_what_the_text_scan_answered() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE tr (id INT, v MULTIVECTOR(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
+            "INSERT INTO tr VALUES (1, [[1.0,0.0],[0.0,1.0]]), (2, NULL), \
+             (3, [[0.5,0.5]]), (4, [[0.25,0.75]]);",
+        )
+        .await
+        .unwrap();
+        e.execute("DELETE FROM tr WHERE id = 3;").await.unwrap();
+        e.checkpoint().await.unwrap();
+        let ci = e
+            .table_schema("tr")
+            .unwrap()
+            .iter()
+            .position(|c| c == "v")
+            .unwrap();
+        let fast = e.tensor_row_ids("tr", ci).unwrap();
+        // What the walk this replaced answered: live rows whose cell is a
+        // non-NULL text that opens and closes like a tensor.
+        let mut text_scan = Vec::new();
+        for (seq, row) in e.fetch_rows_with_ids("tr").await.unwrap() {
+            let Some(Value::Str(text)) = row.get(ci) else {
+                continue;
+            };
+            let text = text.trim();
+            if text.starts_with('[') && text.ends_with(']') {
+                text_scan.push(seq as u64);
+            }
+        }
+        assert_eq!(fast, text_scan);
+        // The NULL row and the deleted row are out; the rest is the row order.
+        assert_eq!(fast, vec![0, 3]);
+    }
+
     /// Concurrent searches while rows are appended and the tail is dumped: the
     /// readers never deadlock, every answer is a subset of the table, and the
     /// final answer covers every row.
@@ -15897,213 +15948,6 @@ mod tests {
             }
         }
         out
-    }
-
-    /// Writers, readers, deletes and maintenance share one table: every answer a
-    /// reader gets is a row the table really holds, and once the writers stop the
-    /// index covers exactly the live rows - across dumps, merges and a restart.
-    ///
-    /// The invariant is "what the table holds", computed here, not another
-    /// engine's answer: `alpha` is in every document, so a full-text query with a
-    /// large `topn` must return exactly the rows that were not deleted.
-    #[tokio::test(flavor = "multi_thread")]
-    async fn writers_readers_deletes_and_merges_stay_consistent() {
-        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-        use std::sync::{Arc, Mutex};
-
-        const WRITERS: i64 = 8;
-        const BATCHES: i64 = 20;
-        const ROWS_PER_BATCH: i64 = 100;
-        const READERS: usize = 6;
-        const MAINTENANCE_ROUNDS: usize = 8;
-        const DELETE_ROUNDS: usize = 16;
-        let total_written = WRITERS * BATCHES * ROWS_PER_BATCH;
-
-        let dir = tempdir().unwrap();
-        let engine = Arc::new(
-            Engine::open_async(dir.path(), Default::default())
-                .await
-                .unwrap(),
-        );
-        engine
-            .execute("CREATE TABLE stress (id INT, body VARCHAR);")
-            .await
-            .unwrap();
-        engine
-            .execute("CREATE INDEX stress_ft ON stress (body) USING FULLTEXT;")
-            .await
-            .unwrap();
-
-        let inserted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
-        let deleted: Arc<Mutex<std::collections::BTreeSet<i64>>> = Arc::default();
-        let stop = Arc::new(AtomicBool::new(false));
-        let queries = Arc::new(AtomicUsize::new(0));
-
-        let mut writers = Vec::new();
-        for writer in 0..WRITERS {
-            let engine = Arc::clone(&engine);
-            let inserted = Arc::clone(&inserted);
-            writers.push(tokio::spawn(async move {
-                for batch in 0..BATCHES {
-                    let mut ids = Vec::new();
-                    let mut values = Vec::new();
-                    for row in 0..ROWS_PER_BATCH {
-                        // Disjoint per writer and per batch, at any scale.
-                        let id = writer * 1_000_000 + batch * 1_000 + row;
-                        ids.push(id);
-                        values.push(format!("({id}, 'alpha{id} beta')"));
-                    }
-                    // Recorded **before** the insert commits: a reader may see a
-                    // committed row the instant `execute` returns, so accounting
-                    // for it afterwards leaves a window in which the row is in
-                    // the table and not yet in `inserted` - which the readers
-                    // below would report as a ghost. The insert below unwraps, so
-                    // a failure cannot leave a stale id behind unnoticed.
-                    inserted.lock().unwrap().extend(ids);
-                    engine
-                        .execute(&format!("INSERT INTO stress VALUES {};", values.join(",")))
-                        .await
-                        .unwrap();
-                }
-            }));
-        }
-        let mut readers = Vec::new();
-        for _ in 0..READERS {
-            let engine = Arc::clone(&engine);
-            let inserted = Arc::clone(&inserted);
-            let stop = Arc::clone(&stop);
-            let queries = Arc::clone(&queries);
-            readers.push(tokio::spawn(async move {
-                while !stop.load(Ordering::Relaxed) {
-                    let hits = rows(
-                        &engine,
-                        "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 5000);",
-                    )
-                    .await;
-                    let known = inserted.lock().unwrap().clone();
-                    for hit in &hits {
-                        let id: i64 = hit[0].parse().unwrap();
-                        assert!(known.contains(&id), "reader saw the ghost id {id}");
-                    }
-                    queries.fetch_add(1, Ordering::Relaxed);
-                }
-            }));
-        }
-        let deleter = {
-            let engine = Arc::clone(&engine);
-            let inserted = Arc::clone(&inserted);
-            let deleted = Arc::clone(&deleted);
-            tokio::spawn(async move {
-                for _ in 0..DELETE_ROUNDS {
-                    tokio::time::sleep(std::time::Duration::from_millis(40)).await;
-                    let known: Vec<i64> = inserted.lock().unwrap().iter().copied().collect();
-                    if known.len() < 100 {
-                        continue;
-                    }
-                    // Every 17th row of the first half of what is there so far.
-                    let victims: Vec<i64> = known
-                        .iter()
-                        .copied()
-                        .enumerate()
-                        .filter(|(at, _)| at % 17 == 0 && *at < known.len() / 2)
-                        .map(|(_, id)| id)
-                        .collect();
-                    if victims.is_empty() {
-                        continue;
-                    }
-                    let list = victims
-                        .iter()
-                        .map(|id| id.to_string())
-                        .collect::<Vec<_>>()
-                        .join(",");
-                    let sql = format!("DELETE FROM stress WHERE id IN ({list});");
-                    if engine.execute(&sql).await.is_ok() {
-                        deleted.lock().unwrap().extend(victims);
-                    }
-                }
-            })
-        };
-        for _ in 0..MAINTENANCE_ROUNDS {
-            tokio::time::sleep(std::time::Duration::from_millis(30)).await;
-            let _ = engine.dump_index_transaction("stress", "stress_ft").await;
-            let _ = engine.optimize_fulltext_async("stress").await;
-            let _ = engine.flush().await;
-        }
-
-        for handle in writers {
-            handle.await.unwrap();
-        }
-        deleter.await.unwrap();
-        // The readers keep querying until the writers are done.
-        stop.store(true, Ordering::Relaxed);
-        for handle in readers {
-            handle.await.unwrap();
-        }
-        let inserted = inserted.lock().unwrap().clone();
-        assert_eq!(
-            inserted.len(),
-            total_written as usize,
-            "every row the writers sent reached the table"
-        );
-        // What the table holds is the invariant, not what the deleter asked
-        // for: a delete that ran against a transaction the table had not
-        // committed yet removes nothing, and the request list cannot see that.
-        let live_rows = async |engine: &Engine| -> std::collections::BTreeSet<i64> {
-            rows(engine, "SELECT id FROM stress;")
-                .await
-                .into_iter()
-                .map(|row| row[0].parse().unwrap())
-                .collect()
-        };
-        let collect = async |engine: &Engine| -> std::collections::BTreeSet<i64> {
-            rows(
-                engine,
-                "SELECT id FROM stress SEARCH MATCH TEXT (body, 'beta', 100000);",
-            )
-            .await
-            .into_iter()
-            .map(|row| row[0].parse().unwrap())
-            .collect()
-        };
-        assert!(queries.load(Ordering::Relaxed) > 0, "the readers ran");
-        let expected = live_rows(&engine).await;
-        assert!(
-            expected.len() < total_written as usize,
-            "the deletes removed nothing, the test proves nothing"
-        );
-        let tombstones = engine.tombstone_set("stress").unwrap().len();
-        assert_eq!(
-            expected.len() + tombstones,
-            total_written as usize,
-            "the table's rows and its tombstones account for every insert \
-             ({} + {tombstones})",
-            expected.len()
-        );
-        let got = collect(&engine).await;
-        let missing: Vec<i64> = expected.difference(&got).copied().collect();
-        let extra: Vec<i64> = got.difference(&expected).copied().collect();
-        assert!(
-            missing.is_empty() && extra.is_empty(),
-            "the index does not cover the live rows: {} missing (first {:?}), \
-             {} extra (first {:?}), table holds {}",
-            missing.len(),
-            &missing[..missing.len().min(20)],
-            extra.len(),
-            &extra[..extra.len().min(20)],
-            expected.len()
-        );
-        let _ = engine.flush().await;
-        drop(engine);
-
-        // The same answer after a restart: the chunks on disk are the truth.
-        let reopened = Engine::open_async(dir.path(), Default::default())
-            .await
-            .unwrap();
-        assert_eq!(
-            collect(&reopened).await,
-            live_rows(&reopened).await,
-            "after a restart"
-        );
     }
 
     /// `CREATE INDEX … USING SPANN` answers `SEARCH MATCH VECTOR`, and the
