@@ -18,6 +18,9 @@
 //! base. Recovery must then still reconstruct the full state, and mutations
 //! made after recovery must themselves survive a further restart.
 
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::Arc;
+
 use executor::{Engine, QueryResult};
 use storage::WalManager;
 
@@ -102,4 +105,75 @@ async fn deleting_the_wal_file_after_checkpoint_keeps_state() {
         1,
         "state lost when the compacted WAL is gone"
     );
+}
+
+/// The `restart_test` shape: one directory, iteration after iteration. Each
+/// round inserts 8192 rows per statement on one connection while a checkpoint
+/// runs under it, then the process is "killed" (dropped without `close`), and
+/// the next round must see every row a committed `INSERT` returned.
+///
+/// The two floors a reopen derives are not the same: the checkpoint frame
+/// covers what the KV store holds (`synced`), the block mirror covers the rows
+/// of a **bounded** range. A commit that lands while the mirror runs is in the
+/// first and in no block, so its rows are only in the WAL - and a replay that
+/// skips the segment because the frame covers it loses them. This is
+/// `test_insert.py::test_insert_checkpoint`'s failure: `count(*)` one 8192-row
+/// batch short after a restart (`163840 == 172032`).
+#[tokio::test(flavor = "multi_thread")]
+async fn a_crash_after_a_racing_checkpoint_keeps_every_committed_row() {
+    let dir = tempfile::tempdir().unwrap();
+    {
+        let e = open(dir.path()).await;
+        e.execute("CREATE TABLE t (c1 INTEGER);").await.unwrap();
+    }
+    let mut total = 0i64;
+    for round in 0..6u64 {
+        let e = Arc::new(open(dir.path()).await);
+        assert_eq!(
+            count(&e).await,
+            total,
+            "round {round}: rows lost across the restart"
+        );
+        let inserted = Arc::new(AtomicI64::new(0));
+        {
+            let stop = Arc::new(AtomicBool::new(false));
+            let writer = {
+                let e = Arc::clone(&e);
+                let inserted = Arc::clone(&inserted);
+                let stop = Arc::clone(&stop);
+                tokio::spawn(async move {
+                    let mut next = 0i64;
+                    while !stop.load(Ordering::Relaxed) {
+                        let values: Vec<String> =
+                            (next..next + 8192).map(|i| format!("({i})")).collect();
+                        if e.execute(&format!("INSERT INTO t VALUES {};", values.join(",")))
+                            .await
+                            .is_ok()
+                        {
+                            next += 8192;
+                            inserted.fetch_add(8192, Ordering::Relaxed);
+                        } else {
+                            break;
+                        }
+                    }
+                })
+            };
+            // Let a few batches land, then checkpoint underneath the writer -
+            // `flush_data()` on the harness's second connection. The delay walks
+            // so the checkpoint lands at a different point of a batch in every
+            // round.
+            tokio::time::sleep(std::time::Duration::from_millis(150 + 7 * round)).await;
+            e.flush().await.unwrap();
+            stop.store(true, Ordering::Relaxed);
+            writer.await.unwrap();
+        }
+        let inserted = inserted.load(Ordering::Relaxed);
+        assert_eq!(
+            count(&e).await,
+            total + inserted,
+            "round {round}: rows lost by the checkpoint itself"
+        );
+        total += inserted;
+        drop(e); // the kill: no checkpoint, no drain
+    }
 }
