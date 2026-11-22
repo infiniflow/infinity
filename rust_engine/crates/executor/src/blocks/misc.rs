@@ -2874,7 +2874,12 @@ mod tests {
     /// `CREATE INDEX … USING PLAID` over `plaid_rows(0, first)` plus a second
     /// batch, flushed between the batches.
     async fn plaid_mirror_with_two_chunks(dir: &std::path::Path) -> Engine {
+        // A 200-row chunk target instead of the 1M default: it leaves no room for
+        // the 60-row delta, so the second dump starts a sibling
+        // (`plaid_should_absorb`) and the append/merge paths below have two chunks
+        // to work on.
         let engine = Engine::open_async(dir, Default::default()).await.unwrap();
+        engine.set_plaid_chunk_target_rows(200);
         engine
             .execute("CREATE TABLE pc (id INT, t TENSOR(FLOAT,2));")
             .await
@@ -2964,6 +2969,10 @@ mod tests {
         assert_eq!(expected.len(), 260);
         let token_offset = chunks[0].total_embedding_num();
 
+        // Two 200/60-row chunks are not worth folding under the small-chunk rule
+        // (`60 * 16 >= 260`): the cap is what makes an optimize pass fold them,
+        // so the test pins it at one chunk.
+        engine.set_max_open_chunks_per_index(1);
         engine.optimize_indexes().await.unwrap();
         let merged = engine.read_plaid_index_chunks("pc", "pidx").unwrap();
         assert_eq!(
@@ -3019,6 +3028,175 @@ mod tests {
             before_rows,
             "the search path answers the same rows after the merge"
         );
+    }
+
+    /// The chunk policy's decision table, without an engine: the shapes a table
+    /// reaches in a test are far below the 1M-row target, so the interesting
+    /// cases have to be stated directly.
+    #[test]
+    fn a_chunk_grows_while_it_has_room_and_the_rewrite_is_worth_it() {
+        use crate::blocks::index_chunk::plaid_should_absorb;
+        let (target, min) = (1 << 20, 64 * 1024);
+        // Below the floor: absorb, a chunk smaller than one dump is a sibling the
+        // loader would merge on every open.
+        assert!(plaid_should_absorb(60_000, 10, target, min));
+        // Over the floor and a delta big enough to pay for the rewrite.
+        assert!(plaid_should_absorb(100_000, 20_000, target, min));
+        // Over the floor and a tiny delta: a new chunk, because absorbing would
+        // rewrite 100k rows for 10.
+        assert!(!plaid_should_absorb(100_000, 10, target, min));
+        // The target wins over the ratio: no chunk grows past it.
+        assert!(!plaid_should_absorb(target - 5, 10, target, min));
+        // Nothing new, nothing to write.
+        assert!(!plaid_should_absorb(0, 0, target, min));
+    }
+
+    /// The optimize pass only starts on a plan: over the cap everything folds,
+    /// under the cap only a chunk small enough to be pure overhead does.
+    #[test]
+    fn the_fold_plan_folds_at_the_cap_and_for_a_small_chunk() {
+        use crate::blocks::index_chunk::plaid_fold_plan;
+        // One chunk: nothing to fold, whatever its size.
+        assert_eq!(plaid_fold_plan(&[10], 8), None);
+        // Two comparable chunks: leave them, the loader's merge is cheap enough.
+        assert_eq!(plaid_fold_plan(&[200, 60], 8), None);
+        // Over the cap: everything into one, or every open merges the chain.
+        assert_eq!(
+            plaid_fold_plan(&[10, 10, 10, 10, 10, 10, 10, 10, 10], 8),
+            Some((0..9).collect())
+        );
+        // Under the cap but a chunk below 1/16 of the mirror: it folds into its
+        // neighbour, and only that pair - folding all of them would rewrite the
+        // mirror for a 10-row chunk.
+        assert_eq!(plaid_fold_plan(&[200, 60, 10], 8), Some(vec![1, 2]));
+        assert_eq!(plaid_fold_plan(&[10, 200, 200], 8), Some(vec![0, 1]));
+    }
+
+    /// A dump that finds room in the newest chunk extends it instead of adding a
+    /// sibling: the chunk count, and with it the loader's merge, stays put.
+    #[tokio::test]
+    async fn a_dump_absorbs_into_the_tail_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE TABLE pa (id INT, t TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        engine
+            .execute(&format!("INSERT INTO pa VALUES {};", plaid_rows(0, 200)))
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE INDEX paidx ON pa (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pa", "paidx").await.unwrap();
+        let first = engine.read_plaid_index_chunks("pa", "paidx").unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].doc_num(), 200);
+
+        engine
+            .execute(&format!("INSERT INTO pa VALUES {};", plaid_rows(200, 260)))
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pa", "paidx").await.unwrap();
+
+        // One chunk of 260 documents, in the same file, with its record rewritten
+        // rather than a second record added.
+        let chunks = engine.read_plaid_index_chunks("pa", "paidx").unwrap();
+        assert_eq!(chunks.len(), 1, "the tail absorbed the delta");
+        assert_eq!(chunks[0].doc_num(), 260);
+        let records = engine.plaid_chunk_records("pa", "paidx").unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].1, 0, "the base row id does not move");
+        assert_eq!(records[0].2, 260, "the record covers the new rows too");
+
+        // The absorbed rows keep answering, and the mirror still reloads.
+        let query = "SELECT id FROM pa SEARCH MATCH TENSOR \
+                     (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5');";
+        assert_eq!(row_strings(&engine, query).await.len(), 5);
+        drop(engine);
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let merged = engine.read_plaid_index("pa", "paidx").unwrap();
+        assert_eq!(merged.doc_num(), 260);
+    }
+
+    /// Under the cap, a chunk below 1/16 of the mirror is folded into its
+    /// neighbour by the optimize pass - and it keeps every row.
+    #[tokio::test]
+    async fn a_small_chunk_folds_into_its_neighbour() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = plaid_mirror_with_two_chunks(dir.path()).await;
+        // 200 + 60 already. A target of 64 rows leaves no room for the 10-row
+        // dump either, so it becomes a third chunk - the one the fold rule has to
+        // pick up, since nothing else in this mirror is worth folding.
+        engine.set_plaid_chunk_target_rows(64);
+        engine
+            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(260, 270)))
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pc", "pidx").await.unwrap();
+        // The dump itself folds it: `fold_dumped_mirror` runs on the cheap plan,
+        // so an embedder with no optimize tick still converges. The 10-row chunk
+        // joins its 60-row neighbour; the 200-row one is left alone.
+        let after: Vec<u32> = engine
+            .read_plaid_index_chunks("pc", "pidx")
+            .unwrap()
+            .iter()
+            .map(|chunk| chunk.doc_num())
+            .collect();
+        assert_eq!(after, vec![200, 70], "the small chunk folded on the dump");
+
+        // An explicit pass has nothing left to do, and must not touch the mirror.
+        engine.optimize_indexes().await.unwrap();
+        let again: Vec<u32> = engine
+            .read_plaid_index_chunks("pc", "pidx")
+            .unwrap()
+            .iter()
+            .map(|chunk| chunk.doc_num())
+            .collect();
+        assert_eq!(again, vec![200, 70]);
+
+        let merged = engine.read_plaid_index("pc", "pidx").unwrap();
+        assert_eq!(merged.doc_num(), 270, "no row was lost by the fold");
+        // Documents are addressed by row order: the folded chunk must not move
+        // the rows of the chunk after it.
+        assert_eq!(merged.doc_offsets()[200], 200 * 3);
+    }
+
+    /// The trigger's cheap check: no fold candidate means no optimize task.
+    #[tokio::test]
+    async fn the_optimize_trigger_skips_a_mirror_that_needs_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        engine
+            .execute(&format!("INSERT INTO pt VALUES {};", plaid_rows(0, 200)))
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE INDEX ptidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pt", "ptidx").await.unwrap();
+        assert!(
+            !engine.needs_index_optimize(),
+            "one chunk is nothing to fold, the tick must not queue a pass"
+        );
+        assert!(!engine.submit_optimize_indexes(), "no processor, no task");
     }
 
     /// A checkpoint rewrites the whole C++ layout from its own read-back

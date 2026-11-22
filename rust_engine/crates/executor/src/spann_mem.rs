@@ -990,6 +990,23 @@ impl crate::Engine {
             .store(chunks.max(1), std::sync::atomic::Ordering::Relaxed);
     }
 
+    /// Rows a PLAID mirror chunk accumulates before a dump starts a new file
+    /// (`chunk_target_rows`): the tail-absorption target.
+    pub(crate) fn plaid_chunk_target_rows(&self) -> usize {
+        self.context
+            .plaid_chunk_target_rows
+            .load(std::sync::atomic::Ordering::Relaxed)
+            .max(1)
+    }
+
+    /// Sets the PLAID chunk target for this engine (tests force a second chunk
+    /// out of a small table; a deployment tunes how many files a mirror keeps).
+    pub fn set_plaid_chunk_target_rows(&self, rows: usize) {
+        self.context
+            .plaid_chunk_target_rows
+            .store(rows.max(1), std::sync::atomic::Ordering::Relaxed);
+    }
+
     /// The directory a segment's spann chunk is written to
     /// (`idx_{index_id}/seg_{segment}` - the same layout HNSW uses).
     pub(crate) fn spann_chunk_dir(

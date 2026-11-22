@@ -6941,10 +6941,6 @@ mod tests {
                 // Residual-free: nothing to map, and nothing on the heap either.
                 assert!(plaid.packed_residuals().is_empty());
             } else {
-                assert!(
-                    plaid.is_packed_mapped(),
-                    "the PLAID chunk was copied onto the heap instead of mapped"
-                );
                 assert!(!plaid.packed_residuals().is_empty());
             }
         }
@@ -6952,6 +6948,20 @@ mod tests {
         // 4. The optimize pass merges the chunks; the answers stay the same.
         engine.optimize_index_chunks().await.unwrap();
         assert_eq!(ids(&engine, &query(260, None).await).await, expected);
+        // 4b. A mirror of one chunk is **mapped**, not copied: the packed codes
+        // stay file-backed. The load-time merge of a chain has to materialize
+        // them (the reference searches each chunk instead of merging), which is
+        // why the optimize pass folding the mirror is what keeps a reload cheap.
+        let folded = engine.read_plaid_index_chunks(table, index).unwrap();
+        assert_eq!(folded.len(), 1, "optimize did not fold the mirror");
+        let reloaded = engine.read_plaid_index(table, index).unwrap();
+        assert_eq!(reloaded.doc_num() as usize, 260);
+        if !colbertsar {
+            assert!(
+                reloaded.is_packed_mapped(),
+                "a single PLAID chunk was copied onto the heap instead of mapped"
+            );
+        }
 
         // 5. A `filter=` is answered from the index bitmask.
         let filtered: std::collections::BTreeSet<i64> = (0..100).collect();
@@ -7060,6 +7070,349 @@ mod tests {
         );
     }
 
+    /// The build streams the column in bounded batches, flushing each into the
+    /// index (`PLAID_BUILD_BATCH_BYTES`). A flush is where the next batch's
+    /// document offsets start from, so a build with many flushes must hold
+    /// exactly the documents - and answer exactly the queries - of one that ran
+    /// in a single pass over the whole column.
+    #[tokio::test]
+    async fn a_batched_plaid_build_mirrors_the_same_documents() {
+        let query = "SELECT id FROM pb SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=5');";
+        let mut values = Vec::new();
+        for i in 0..300 {
+            let mut tokens = Vec::new();
+            for j in 0..4 {
+                let x = (i % 7) as f32 + j as f32 * 0.5;
+                tokens.push(format!("[{x},0.5,0.25,0.125]"));
+            }
+            values.push(format!("({i}, [{}])", tokens.join(",")));
+        }
+        let mut answers = Vec::new();
+        // `0` is the production batch; `256` bytes of token vectors is about 16
+        // tokens, i.e. four documents per flush at this width.
+        for batch in [0usize, 256] {
+            let dir = tempdir().unwrap();
+            crate::blocks::PLAID_BUILD_BATCH_BYTES_OVERRIDE
+                .store(batch, std::sync::atomic::Ordering::Relaxed);
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute("CREATE TABLE pb (id INT, t TENSOR(FLOAT,4));")
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO pb VALUES {};", values.join(",")))
+                .await
+                .unwrap();
+            e.execute("CREATE INDEX pbi ON pb (t) USING PLAID WITH (n_centroids = 4);")
+                .await
+                .unwrap();
+            let index = e.multivector_index_for("pb", "t", 4).await.unwrap();
+            let doc_num = index
+                .read()
+                .unwrap()
+                .plaid
+                .as_ref()
+                .map(|plaid| plaid.doc_num() as usize);
+            assert_eq!(doc_num, Some(300), "a flush lost documents (batch {batch})");
+            answers.push(rows(&e, query).await);
+            e.close().await.unwrap();
+        }
+        crate::blocks::PLAID_BUILD_BATCH_BYTES_OVERRIDE
+            .store(0, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(answers[0].len(), 5);
+        assert_eq!(answers[0], answers[1], "batching changed the answer");
+    }
+
+    /// Documents in [`plaid_query_throughput`]: enough that the filter mask -
+    /// one hash probe per document per exclusion set - shows up against a
+    /// search that visits a few thousand candidates.
+    const PLAID_BENCH_DOCS: usize = 200_000;
+
+    /// Query-side timing for the multi-vector path (`SEARCH MATCH TENSOR`):
+    ///
+    /// ```text
+    /// cargo test --release -p executor --lib plaid_query_throughput -- --ignored --nocapture
+    /// ```
+    ///
+    /// Prices the pieces separately, because they move independently: the SQL
+    /// path end to end, the filter mask (a pass over every mirrored document
+    /// with two hash probes before this change), the search that mask feeds,
+    /// what a naive post-filter returns, and what a reopen costs.
+    #[tokio::test]
+    #[ignore = "bench: timing"]
+    async fn plaid_query_throughput() {
+        use std::collections::HashSet;
+        use std::time::Instant;
+        let (docs, tokens, dim) = (PLAID_BENCH_DOCS, 4usize, 32usize);
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(&format!("CREATE TABLE qb (id INT, v TENSOR(FLOAT,{dim}));"))
+            .await
+            .unwrap();
+        let insert_started = std::time::Instant::now();
+        for start in (0..docs).step_by(2_000) {
+            let end = (start + 2_000).min(docs);
+            let values: Vec<String> = (start..end)
+                .map(|i| {
+                    let toks: Vec<String> = (0..tokens)
+                        .map(|j| {
+                            let row: Vec<String> = (0..dim)
+                                .map(|c| {
+                                    format!("{:.3}", ((i * 31 + j * 7 + c * 13) % 97) as f32 / 97.0)
+                                })
+                                .collect();
+                            format!("[{}]", row.join(","))
+                        })
+                        .collect();
+                    format!("({i}, [{}])", toks.join(","))
+                })
+                .collect();
+            e.execute(&format!("INSERT INTO qb VALUES {};", values.join(",")))
+                .await
+                .unwrap();
+        }
+        let insert_time = insert_started.elapsed();
+        let build_started = std::time::Instant::now();
+        e.execute("CREATE INDEX qbi ON qb (v) USING PLAID WITH (n_centroids = 16);")
+            .await
+            .unwrap();
+        let build_time = build_started.elapsed();
+        // Steady state: the rows are in blocks, so the columnar filter can read
+        // them (an append-buffer table falls back to the row path).
+        e.flush().await.unwrap();
+        let query_vec: Vec<String> = (0..dim).map(|_| "0.500".to_string()).collect();
+        let query_vec = query_vec.join(",");
+        let query = format!(
+            "SELECT id FROM qb SEARCH MATCH TENSOR (v, [[{query_vec}]], 'float', 'maxsim', 'topn=10');"
+        );
+        assert_eq!(rows(&e, &query).await.len(), 10);
+
+        let rounds = 20;
+        // End to end: parse, plan, PLAID search, output.
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let _ = rows(&e, &query).await;
+        }
+        let plain = t0.elapsed() / rounds;
+
+        // The same query with a predicate over a fraction of the table.
+        let mut filtered = Vec::new();
+        for pct in [1u64, 10, 60] {
+            let q = format!(
+                "SELECT id FROM qb SEARCH MATCH TENSOR (v, [[{query_vec}]], 'float', \
+                 'maxsim', 'topn=10;filter=id < {}');",
+                docs as u64 * pct / 100
+            );
+            let t0 = Instant::now();
+            let mut hits = 0;
+            for _ in 0..rounds {
+                hits = rows(&e, &q).await.len();
+            }
+            filtered.push((pct, t0.elapsed() / rounds, hits));
+        }
+
+        // The mask and the search it feeds, without the SQL layer.
+        let index = e.multivector_index_for("qb", "v", dim).await.unwrap();
+        let (n_docs, seqs, plaid_size) = {
+            let guard = index.read().unwrap();
+            let plaid = guard.plaid.as_ref().expect("PLAID was not built");
+            (
+                plaid.doc_num() as usize,
+                guard.plaid_seqs.clone(),
+                plaid.calc_size(),
+            )
+        };
+        let allowed: HashSet<u64> = (0..(docs as u64 / 100)).collect();
+        let nothing = HashSet::new();
+        let flat: Vec<f32> = vec![0.5; dim];
+
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            // The pre-change mask: every document, two hash probes each.
+            let mut mask = index::plaid::Bitmask::new(n_docs);
+            for (doc, seq) in seqs.iter().enumerate() {
+                if !nothing.contains(seq) && Some(&allowed).is_none_or(|s| s.contains(seq)) {
+                    mask.set(doc as u32);
+                }
+            }
+            std::hint::black_box(&mask);
+        }
+        let mask_old = t0.elapsed() / rounds;
+
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let guard = index.read().unwrap();
+            let mask = guard.plaid_filter_mask(n_docs, &nothing, None);
+            std::hint::black_box(&mask);
+        }
+        let mask_new_unfiltered = t0.elapsed() / rounds;
+
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let guard = index.read().unwrap();
+            let mask = guard.plaid_filter_mask(n_docs, &nothing, Some(&allowed));
+            std::hint::black_box(&mask);
+        }
+        let mask_new_selective = t0.elapsed() / rounds;
+
+        let mut search = Vec::new();
+        for (label, mask) in [
+            ("all", index::plaid::Bitmask::new_all_true(n_docs)),
+            (
+                "1pct",
+                index
+                    .read()
+                    .unwrap()
+                    .plaid_filter_mask(n_docs, &nothing, Some(&allowed)),
+            ),
+        ] {
+            let t0 = Instant::now();
+            for _ in 0..rounds {
+                let guard = index.read().unwrap();
+                let plaid = guard.plaid.as_ref().unwrap();
+                let _ = plaid.search_with_bitmask(&flat, 1, 10, &mask, 8, 0.0, 10, 10);
+            }
+            search.push((label, t0.elapsed() / rounds));
+        }
+
+        // The pieces the statement executor pays on top of `search`.
+        let dead = e.tombstone_set("qb").unwrap();
+        let plaid_opts = crate::engine::state::plaid_search_options(|_: &str| None::<String>, 10);
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let _ = e.multivector_index_for("qb", "v", dim).await;
+        }
+        let index_lookup = t0.elapsed() / rounds;
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let _ = e.tombstone_set("qb").unwrap();
+        }
+        let tombstones = t0.elapsed() / rounds;
+        let t0 = Instant::now();
+        for _ in 0..rounds {
+            let hits =
+                index
+                    .read()
+                    .unwrap()
+                    .search(&[vec![0.5; dim]], 10, &dead, None, &plaid_opts, None);
+            std::hint::black_box(hits.len());
+        }
+        let pipeline = t0.elapsed() / rounds;
+
+        // The naive form this change replaced: take `topn` from the whole table,
+        // then drop what the predicate excludes.
+        let short = {
+            let guard = index.read().unwrap();
+            let plaid = guard.plaid.as_ref().unwrap();
+            let everything = index::plaid::Bitmask::new_all_true(n_docs);
+            let got = plaid.search_with_bitmask(&flat, 1, 10, &everything, 8, 0.0, 10, 10);
+            got.ids
+                .iter()
+                .filter(|doc| {
+                    seqs.get(**doc as usize)
+                        .is_some_and(|s| allowed.contains(s))
+                })
+                .count()
+        };
+        drop(index);
+
+        // Incremental write: 2% more rows, one dump. What a delta costs.
+        let mut more = Vec::new();
+        for i in docs..(docs + docs / 50) {
+            let toks: Vec<String> = (0..tokens)
+                .map(|j| {
+                    let row: Vec<String> = (0..dim)
+                        .map(|c| format!("{:.3}", ((i * 31 + j * 7 + c * 13) % 97) as f32 / 97.0))
+                        .collect();
+                    format!("[{}]", row.join(","))
+                })
+                .collect();
+            more.push(format!("({i}, [{}])", toks.join(",")));
+        }
+        let delta_started = std::time::Instant::now();
+        e.execute(&format!("INSERT INTO qb VALUES {};", more.join(",")))
+            .await
+            .unwrap();
+        e.flush().await.unwrap();
+        let delta_rows = delta_started.elapsed();
+        let dump_started = std::time::Instant::now();
+        e.dump_index_transaction("qb", "qbi").await.unwrap();
+        let delta_dump = dump_started.elapsed();
+        let chunks_after = e.read_plaid_index_chunks("qb", "qbi").unwrap().len();
+
+        // A dump, then a reopen: what the mirror costs to write, and to load.
+        let chunk_bytes = {
+            let mirror = e.plaid_mirror("qb", "qbi").unwrap();
+            std::fs::read_dir(&mirror.dir)
+                .map(|rd| {
+                    rd.filter_map(|de| de.ok())
+                        .map(|de| de.metadata().map(|m| m.len()).unwrap_or(0))
+                        .sum()
+                })
+                .unwrap_or(0)
+        };
+        e.flush().await.unwrap();
+        e.dump_index_transaction("qb", "qbi").await.unwrap();
+        drop(e);
+        let t0 = Instant::now();
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let open = t0.elapsed();
+        let t0 = Instant::now();
+        let after = rows(&reopened, &query).await;
+        let first_query = t0.elapsed();
+        let reload = {
+            let t0 = Instant::now();
+            let built = reopened.read_plaid_index("qb", "qbi").unwrap();
+            (
+                t0.elapsed(),
+                built.doc_num(),
+                built.is_packed_mapped(),
+                built.calc_size(),
+            )
+        };
+
+        eprintln!(
+            "plaid_query docs={docs} tokens={tokens} dim={dim} \
+             plaid_size={plaid_size}B chunk={chunk_bytes}B\n  \
+             end-to-end       {plain:?}/query (topn=10)\n  \
+             filtered 1pct    {:?}/query, {} rows\n  \
+             filtered 10pct   {:?}/query, {} rows\n  \
+             filtered 60pct   {:?}/query, {} rows\n  \
+             mask old         {mask_old:?} (every doc, 2 probes)\n  \
+             mask new (all)   {mask_new_unfiltered:?}\n  \
+             mask new (1pct)  {mask_new_selective:?}\n  \
+             search all       {:?}\n  \
+             search 1pct      {:?}\n  \
+             post-filtered    {short}/10 rows (topn taken before the filter)\n  \
+             index lookup     {index_lookup:?}, tombstones {tombstones:?}\n  \
+             mask+search      {pipeline:?} (what the statement pays)\n  \
+             open             {open:?}, first query {first_query:?}\n  \
+             read_plaid_index {reload:?} {} docs mapped={} size={}B\n  \
+             insert           {insert_time:?} ({:.0} rows/s), build {build_time:?}\n  \
+             delta insert     {delta_rows:?}, dump {delta_dump:?} ({} rows -> {chunks_after} chunks)\n  \
+             answers equal    {}",
+            filtered[0].1,
+            filtered[0].2,
+            filtered[1].1,
+            filtered[1].2,
+            filtered[2].1,
+            filtered[2].2,
+            search[0].1,
+            search[1].1,
+            reload.1,
+            reload.2,
+            reload.3,
+            docs as f64 / insert_time.as_secs_f64(),
+            docs / 50,
+            after.len() == 10,
+        );
+    }
+
     /// A `flush` writes the PLAID index out as C++ chunks; the first search
     /// after a reopen must load them instead of retraining over the whole table
     /// (that cost is what made a restart pay O(rows) before answering).
@@ -7105,9 +7458,11 @@ mod tests {
         let filtered = "SELECT id FROM pr SEARCH MATCH TENSOR \
                         (t, [[1.0,0.0,0.0,0.0]], 'float', 'maxsim', 'topn=3;filter=id < 5');";
         let filtered_hits = rows(&e, filtered).await;
-        assert!(
-            !filtered_hits.is_empty(),
-            "a filtered search lost its fallback"
+        assert_eq!(
+            filtered_hits.len(),
+            3,
+            "the filter ran after the top-k cut instead of inside the candidate \
+             search, so the answer came back short: {filtered_hits:?}"
         );
         assert!(
             filtered_hits

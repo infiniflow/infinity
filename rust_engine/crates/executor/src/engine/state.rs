@@ -3322,6 +3322,18 @@ pub(crate) struct MultiVectorIndex {
     pub(crate) plaid: Option<index::plaid::PlaidIndex>,
     /// Row id of each PLAID document id.
     pub(crate) plaid_seqs: Vec<u64>,
+    /// The inverse of `plaid_seqs`: which document a row id is.
+    ///
+    /// The filter mask (`CalculateFilterBitmask`) needs it per query. Building
+    /// the mask used to be a pass over every mirrored document with a hash
+    /// probe for the tombstone set and another for the statement's predicate -
+    /// tens of milliseconds on a large mirror, for a query whose search itself
+    /// is a few. With the inverse, the mask costs `|dead| + |allowed|` in the
+    /// common cases and nothing at all for an unfiltered scan.
+    ///
+    /// It must stay the exact inverse of `plaid_seqs`; `plaid_filter_mask`
+    /// checks the length before trusting it and falls back to the linear build.
+    pub(crate) plaid_seq_doc: std::collections::HashMap<u64, u32>,
     /// Rows this index has seen (parsed or not). `doc_count` only counts parsed
     /// documents, so a column holding a NULL/empty tensor could never look
     /// complete against the table's live rows and every search rebuilt the whole
@@ -3513,6 +3525,7 @@ impl MultiVectorIndex {
             plaid_config,
             plaid: None,
             plaid_seqs: Vec::new(),
+            plaid_seq_doc: std::collections::HashMap::new(),
             scanned_rows: 0,
             plaid_dropped: false,
             plaid_unavailable: false,
@@ -3530,6 +3543,19 @@ impl MultiVectorIndex {
                 .iter()
                 .map(|(r, _, _)| r.doc_count())
                 .sum::<usize>()
+    }
+
+    /// The rows still in the memory tail, in row order.
+    ///
+    /// A caller that replaces this index with one loaded from its chunks hands
+    /// these back through [`Self::insert`], which keeps them searchable and - now
+    /// that `plaid` covers every document of `plaid_seqs` - appends them to the
+    /// loaded PLAID index instead of dropping them.
+    pub(crate) fn tail_rows(&self) -> Vec<(u64, Vec<Vec<f32>>)> {
+        self.tail
+            .iter()
+            .map(|(seq, doc)| (*seq, doc.clone()))
+            .collect()
     }
 
     pub(crate) fn insert(&mut self, seq: u64, doc: Vec<Vec<f32>>) {
@@ -3560,9 +3586,12 @@ impl MultiVectorIndex {
                     .is_ok();
             if added {
                 self.plaid_seqs.push(seq);
+                self.plaid_seq_doc
+                    .insert(seq, (self.plaid_seqs.len() - 1) as u32);
             } else {
                 self.plaid = None;
                 self.plaid_seqs.clear();
+                self.plaid_seq_doc.clear();
                 self.plaid_dropped = true;
             }
         }
@@ -3598,6 +3627,7 @@ impl MultiVectorIndex {
             // hides dead rows, and a rewritten row needs a fresh build.
             self.plaid = None;
             self.plaid_seqs.clear();
+            self.plaid_seq_doc.clear();
             self.plaid_dropped = true;
             self.smve = None;
             self.smve_seqs.clear();
@@ -3697,6 +3727,11 @@ impl MultiVectorIndex {
             return;
         }
         self.plaid = Some(index);
+        self.plaid_seq_doc = seqs
+            .iter()
+            .enumerate()
+            .map(|(doc, seq)| (*seq, doc as u32))
+            .collect();
         self.plaid_seqs = seqs;
         self.plaid_dropped = false;
         self.plaid_unavailable = false;
@@ -3707,6 +3742,7 @@ impl MultiVectorIndex {
     fn degrade_plaid(&mut self, why: &str) {
         self.plaid = None;
         self.plaid_seqs.clear();
+        self.plaid_seq_doc.clear();
         self.plaid_dropped = true;
         self.plaid_unavailable = true;
         if std::env::var_os("INFINITY_DEBUG_PLAN").is_some() {
@@ -3992,14 +4028,9 @@ impl MultiVectorIndex {
         // excluded by the bitmask.
         if let Some(index) = &self.plaid {
             if index.doc_num() as usize == self.plaid_seqs.len() {
-                let mut mask = index::plaid::Bitmask::new(index.doc_num() as usize);
-                for (doc, seq) in self.plaid_seqs.iter().enumerate() {
-                    // `CalculateFilterBitmask` + the tombstone mask: only rows the
-                    // statement admits take part in the search.
-                    if !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)) {
-                        mask.set(doc as u32);
-                    }
-                }
+                // `CalculateFilterBitmask` + the tombstone mask: only rows the
+                // statement admits take part in the search.
+                let mask = self.plaid_filter_mask(index.doc_num() as usize, dead, allowed);
                 let flat: Vec<f32> = query.iter().flatten().copied().collect();
                 let topn = k.max(1);
                 let result = index.search_with_bitmask(
@@ -4022,7 +4053,13 @@ impl MultiVectorIndex {
                         self.plaid_seqs.get(*id as usize).map(|seq| (*seq, *score))
                     })
                     .collect();
-                if !hits.is_empty() {
+                // A short answer is a **probe** shortfall, not an empty table:
+                // IVF only visited `n_ivf_probe` centroids (and
+                // `centroid_score_threshold` may have dropped more), so rows
+                // outside them were never candidates. The exact scans below
+                // complete such a query; one the probe covers in full returns
+                // here and never pays for them.
+                if hits.len() >= k {
                     hits.sort_by(|a, b| {
                         b.1.partial_cmp(&a.1)
                             .unwrap_or(std::cmp::Ordering::Equal)
@@ -4055,7 +4092,10 @@ impl MultiVectorIndex {
                     })
                     .filter(|(seq, _)| !dead.contains(seq))
                     .collect();
-                if !hits.is_empty() {
+                // Same rule as the PLAID branch: a short answer means the BMP
+                // candidates did not cover the query, and the exact scans below
+                // are what makes `topn` mean `topn`.
+                if hits.len() >= k {
                     hits.sort_by(|a, b| {
                         b.1.partial_cmp(&a.1)
                             .unwrap_or(std::cmp::Ordering::Equal)
@@ -4067,20 +4107,26 @@ impl MultiVectorIndex {
             }
         }
         let mut hits: Vec<(u64, f32)> = Vec::new();
+        // The statement's filter, as the reference's bitmask: a document it
+        // rejects is never a candidate, so the cuts below count rows the query
+        // may actually return.
+        let keep = |seq: u64| !dead.contains(&seq) && allowed.is_none_or(|set| set.contains(&seq));
         for (reader, ids, pq) in &self.sealed {
             // The persisted residual codes rank the documents (EMVB stage 2);
             // the survivors are re-scored exactly from the raw tokens.
+            let admit = |doc: usize| ids.get(doc).copied().is_some_and(keep);
             let docs: Vec<usize> = match pq {
+                // `candidate_docs_filtered`: the filter is part of the prefilter,
+                // not a pass over its answer. Applied afterwards, a chunk of
+                // deleted rows used up the candidate budget and the query came
+                // back short of `k` while live rows were still there.
                 Some(pq) if reader.doc_count() > 256 => {
-                    pq.prefilter(query, (k * 4).max(64).min(reader.doc_count()))
+                    pq.prefilter_filtered(query, (k * 4).max(64).min(reader.doc_count()), &admit)
                 }
-                _ => (0..reader.doc_count()).collect(),
+                _ => (0..reader.doc_count()).filter(|doc| admit(*doc)).collect(),
             };
             for doc in docs {
                 let Some(seq) = ids.get(doc) else { continue };
-                if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
-                    continue;
-                }
                 hits.push((*seq, reader.maxsim(query, doc)));
             }
         }
@@ -4109,17 +4155,21 @@ impl MultiVectorIndex {
                 });
             }
             if let Some(tail) = guard.as_ref() {
-                for (doc, _) in tail.data.view().search(
+                // `keep` is the reference's bitmask, applied to the candidates:
+                // asking for `k` is enough because the cut only ever counts live
+                // rows (the old `k + dead.len()` over-fetch could still come
+                // back short whenever the statement's own predicate - not just a
+                // delete - excluded candidates).
+                let admit = |doc: usize| tail.seqs.get(doc).copied().is_some_and(keep);
+                for (doc, _) in tail.data.view().search_filtered(
                     query,
-                    (k + dead.len()).max(1),
+                    k.max(1),
                     index::emvb::EmvbSearchOptions::for_topk(k.max(1)),
+                    &admit,
                 ) {
                     let Some(seq) = tail.seqs.get(doc as usize) else {
                         continue;
                     };
-                    if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
-                        continue;
-                    }
                     if let Some(tokens) = self.tail.get(seq) {
                         hits.push((*seq, maxsim_tokens(query, tokens)));
                     }
@@ -4144,6 +4194,72 @@ impl MultiVectorIndex {
         });
         hits.truncate(k);
         hits
+    }
+
+    /// The bitmask one query hands to `PlaidIndex::SearchWithBitmask`.
+    ///
+    /// Built from the smaller side, like `CalculateFilterBitmask`:
+    ///
+    /// - nothing excluded (an unfiltered scan of a mirror with no tombstones):
+    ///   the mask is the whole table and **no document is touched**;
+    /// - a selective predicate: one lookup per admitted row;
+    /// - a wide predicate (over half the table): clearing row by row is cheaper
+    ///   than setting, which is the only form that visits every document.
+    ///
+    /// The previous form was the last case unconditionally - two hash probes per
+    /// mirrored document on every query, tens of milliseconds on a large mirror.
+    pub(crate) fn plaid_filter_mask(
+        &self,
+        docs: usize,
+        dead: &std::collections::HashSet<u64>,
+        allowed: Option<&std::collections::HashSet<u64>>,
+    ) -> index::plaid::Bitmask {
+        use index::plaid::Bitmask;
+        // The inverse map has to be the exact inverse of `plaid_seqs`. A missed
+        // update would silently mask the wrong document, so a length mismatch
+        // falls back to the linear build instead.
+        let inverse =
+            (self.plaid_seq_doc.len() == self.plaid_seqs.len()).then_some(&self.plaid_seq_doc);
+        let Some(inverse) = inverse else {
+            let mut mask = Bitmask::new(docs);
+            for (doc, seq) in self.plaid_seqs.iter().enumerate() {
+                if !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)) {
+                    mask.set(doc as u32);
+                }
+            }
+            return mask;
+        };
+        if dead.is_empty() && allowed.is_none() {
+            return Bitmask::new_all_true(docs);
+        }
+        if let Some(set) = allowed {
+            if set.len() <= docs / 2 {
+                let mut mask = Bitmask::new(docs);
+                for seq in set {
+                    if dead.contains(seq) {
+                        continue;
+                    }
+                    if let Some(doc) = inverse.get(seq) {
+                        mask.set(*doc);
+                    }
+                }
+                return mask;
+            }
+        }
+        let mut mask = Bitmask::new_all_true(docs);
+        for seq in dead {
+            if let Some(doc) = inverse.get(seq) {
+                mask.set_false(*doc);
+            }
+        }
+        if let Some(set) = allowed {
+            for (doc, seq) in self.plaid_seqs.iter().enumerate() {
+                if !set.contains(seq) {
+                    mask.set_false(doc as u32);
+                }
+            }
+        }
+        mask
     }
 }
 
@@ -5952,6 +6068,15 @@ pub(crate) struct Context {
     /// reference's default - a knob rather than a constant so a test can force a
     /// compaction with two dumps.
     pub(crate) max_open_chunks_per_index: std::sync::atomic::AtomicUsize,
+    /// Rows a PLAID mirror chunk accumulates before a dump starts a new file
+    /// (`blocks::index_chunk::PLAID_CHUNK_TARGET_ROWS` by default).
+    ///
+    /// A write-path knob, not an index option: it decides how many
+    /// `chunk_{n}.idx` files a mirror keeps and therefore what the loader has to
+    /// merge. Not part of the catalog record - that serialization is the
+    /// reference's - so it is process configuration, and a test sets it to force
+    /// a second chunk out of a small table.
+    pub(crate) plaid_chunk_target_rows: std::sync::atomic::AtomicUsize,
     /// Bytes of appended-but-unsealed rows the writer may hold before it
     /// checkpoints by itself (`TableEntry::pending_bytes`).
     ///
@@ -8816,6 +8941,30 @@ pub(crate) fn parse_tensor_leaves(text: &str) -> Vec<Vec<f64>> {
     }
     if !current.is_empty() {
         out.push(current);
+    }
+    out
+}
+
+/// The query vectors of a `SEARCH MATCH …` statement, flattened row-major.
+///
+/// The parser hands a nested literal over as **one string per outer group** -
+/// `[[1.0,0.0,0.0]]` arrives as `["[1.0,0.0,0.0]"]`, not as three numbers - so
+/// parsing each item as a single `f32` yields nothing. That is exactly how the
+/// multi-vector path came to be skipped on every query: the index was built,
+/// mirrored and never read, and the exhaustive scan answered instead (a second
+/// per query at 2e5 documents against a few milliseconds from the index).
+pub(crate) fn query_floats(items: &[String]) -> Vec<f32> {
+    let mut out: Vec<f32> = Vec::with_capacity(items.len());
+    for item in items {
+        let leaves = parse_tensor_leaves(item);
+        if leaves.is_empty() {
+            // A flat list reaches here as bare numbers, one item each.
+            if let Ok(v) = item.trim().parse::<f32>() {
+                out.push(v);
+            }
+        } else {
+            out.extend(leaves.iter().flatten().map(|v| *v as f32));
+        }
     }
     out
 }

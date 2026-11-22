@@ -152,7 +152,11 @@ async fn start_background_tasks_sets_processor() {
             std::time::Duration::ZERO,
         )
         .await;
-    assert!(engine.submit_optimize_indexes(), "no processor attached");
+    // `submit_cleanup` is the marker here, not `submit_optimize_indexes`: an
+    // optimize submission now refuses to queue a pass when no index has anything
+    // to fold (its cheap gate), so an empty catalog legitimately answers `false`
+    // whether or not a processor is attached.
+    assert!(engine.submit_cleanup(), "no processor attached");
     engine.drain_background_tasks().await;
     drop(engine);
 }

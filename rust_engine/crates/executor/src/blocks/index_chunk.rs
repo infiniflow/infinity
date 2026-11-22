@@ -130,6 +130,206 @@ pub(crate) struct IvfOptions {
     pub(crate) min_points: usize,
 }
 
+/// Rows a PLAID chunk grows to before a dump starts a new one.
+///
+/// The engine's segment holds `DEFAULT_SEGMENT_CAPACITY` = 8M rows
+/// (`common/default_values.cppm:69`) and a segment's mirror must stay loadable
+/// as a handful of chunks, so `8M / max_open_chunks_per_index` (8) is the size a
+/// chunk aims for. A chunk is a *dump accumulator*, not a segment: the segment
+/// is what seals, and a sealed segment's chunks never change again.
+pub(crate) const PLAID_CHUNK_TARGET_ROWS: usize = 1 << 20;
+
+/// Rows below which a chunk is always worth absorbing into.
+///
+/// One memory-index dump is at most `DEFAULT_MEMINDEX_CAPACITY` = 64k rows
+/// (`default_values.cppm:114`), so a chunk smaller than that is a single dump's
+/// worth: extending it costs one rewrite of a file that is smaller than the dump
+/// unit, which is cheaper than leaving a sibling the loader has to merge.
+pub(crate) const PLAID_CHUNK_MIN_ROWS: usize = 64 * 1024;
+
+/// How much bigger than the delta the tail chunk may be for an append to still
+/// be cheaper than a new chunk: `delta * RATIO >= tail`. At most `RATIO` bytes
+/// rewritten per byte written, the LSM size-tiered bound.
+pub(crate) const PLAID_ABSORB_RATIO: usize = 8;
+
+/// A chunk below `total / PLAID_SMALL_CHUNK_DIVISOR` is folded into its
+/// neighbour even when the chunk count is under the cap: eight chunks that are
+/// all tiny still make the loader copy the whole mirror.
+pub(crate) const PLAID_SMALL_CHUNK_DIVISOR: u32 = 16;
+
+/// Outliers buffered before the centroid set is expanded
+/// (`PlaidIndexInMem::Update`'s buffer, the reference's 100).
+pub(crate) const PLAID_OUTLIER_BUFFER: usize = 100;
+
+/// L2 distance above which a document counts as an outlier of the centroid set.
+pub(crate) const PLAID_OUTLIER_THRESHOLD: f32 = 0.1;
+
+/// Whether a dump's `delta` documents join the tail chunk instead of becoming a
+/// new one.
+///
+/// Two bounds hold the decision, and both are needed:
+///
+/// - **target**: the chunk would pass [`PLAID_CHUNK_TARGET_ROWS`], which is what
+///   keeps a segment's mirror at a handful of chunks;
+/// - **ratio**: extending a chunk rewrites it, so the delta has to be big enough
+///   to pay for that rewrite - otherwise a 10-row edit would rewrite a 1M-row
+///   chunk, which is the "every dump rewrites the whole index" behaviour this
+///   policy replaces. A chunk still below [`PLAID_CHUNK_MIN_ROWS`] is exempt: it
+///   is a single dump's worth, and absorbing it keeps a sibling out of the tree.
+pub(crate) fn plaid_should_absorb(
+    tail_docs: usize,
+    delta: usize,
+    target: usize,
+    min_rows: usize,
+) -> bool {
+    if delta == 0 || tail_docs + delta > target {
+        return false;
+    }
+    tail_docs < min_rows || delta.saturating_mul(PLAID_ABSORB_RATIO) >= tail_docs
+}
+
+/// Which chunks an optimize pass folds, from their document counts in chunk-id
+/// order: `Some(positions)` when the mirror needs work, `None` when it does not.
+///
+/// - over the cap: every chunk folds into one, because the loader would
+///   otherwise merge them all on every open;
+/// - under the cap but with a chunk below `total / 16`: that chunk and its
+///   neighbour fold together. Folding *all* of them for one small chunk would
+///   rewrite the mirror for nothing, which is the cost this rule exists to keep
+///   off the write path.
+pub(crate) fn plaid_fold_plan(doc_nums: &[u32], cap: usize) -> Option<Vec<usize>> {
+    if doc_nums.len() > cap {
+        return Some((0..doc_nums.len()).collect());
+    }
+    if doc_nums.len() < 2 {
+        return None;
+    }
+    let total: u64 = doc_nums.iter().map(|n| u64::from(*n)).sum();
+    let (smallest, &small_docs) = doc_nums.iter().enumerate().min_by_key(|(_, n)| **n)?;
+    if u64::from(small_docs) * u64::from(PLAID_SMALL_CHUNK_DIVISOR) >= total {
+        return None;
+    }
+    // Its neighbour: the previous chunk, so the pair covers a contiguous run of
+    // documents (`base_row_id` order is chunk-id order).
+    let neighbour = smallest.saturating_sub(1).min(doc_nums.len() - 2);
+    let mut plan = vec![neighbour, neighbour + 1];
+    plan.sort_unstable();
+    plan.dedup();
+    Some(plan)
+}
+
+/// Squared L2 distance beyond which a document is an outlier of `codec`.
+///
+/// The scale is the codec's own: the median squared distance between a centroid
+/// and its nearest neighbour, halved. A document farther from every centroid than
+/// half the spacing between them is served no better by the codec than by the
+/// neighbour, which is the case an expansion can fix.
+///
+/// An absolute constant cannot work here - a `TENSOR` column holds whatever
+/// floats the caller stored, normalized embeddings or not - and the reference
+/// never calls its own `PlaidIndex::ExpandCentroids`, so there is no default to
+/// inherit.
+pub(crate) fn plaid_outlier_threshold_sq(codec: &PlaidIndex, dims: usize) -> f32 {
+    if dims == 0 || codec.n_centroids() < 2 {
+        return 0.0;
+    }
+    // At most 256 centroids: the estimate is a median over pairs, and a full
+    // codec's k^2 x dims is more than a buffering heuristic is worth.
+    let stride = (codec.n_centroids() as usize / 256).max(1);
+    let picked: Vec<usize> = (0..codec.n_centroids() as usize).step_by(stride).collect();
+    let data = codec.centroids_data();
+    let mut spacing: Vec<f32> = Vec::with_capacity(picked.len());
+    for (i, a) in picked.iter().enumerate() {
+        let mut best = f32::MAX;
+        for (j, b) in picked.iter().enumerate() {
+            if i == j {
+                continue;
+            }
+            let mut d = 0.0f32;
+            for k in 0..dims {
+                let diff = data[a * dims + k] - data[b * dims + k];
+                d += diff * diff;
+            }
+            best = best.min(d);
+        }
+        if best.is_finite() {
+            spacing.push(best);
+        }
+    }
+    if spacing.is_empty() {
+        return 0.0;
+    }
+    spacing.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+    spacing[spacing.len() / 2] / 2.0
+}
+
+/// The merge a mirror last performed: its source chunk ids, the chunk it wrote,
+/// and the `(len, mtime)` of each source.
+///
+/// A merge whose deprecation did not land leaves the sources listed beside the
+/// chunk that already contains them. Merging that set again would count those
+/// documents twice, so the manifest is what makes the retry a no-op instead.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(crate) struct PlaidMergeManifest {
+    pub(crate) sources: Vec<u64>,
+    pub(crate) stamps: Vec<(u64, u64)>,
+    pub(crate) merged: u64,
+}
+
+impl PlaidMergeManifest {
+    pub(crate) const FILE: &'static str = "merge.manifest";
+
+    pub(crate) fn read(dir: &std::path::Path) -> Option<Self> {
+        let text = std::fs::read_to_string(dir.join(Self::FILE)).ok()?;
+        let mut manifest = PlaidMergeManifest::default();
+        for line in text.lines() {
+            let (key, value) = line.split_once('=')?;
+            match key.trim() {
+                "sources" => {
+                    manifest.sources = value
+                        .split(',')
+                        .filter_map(|v| v.trim().parse().ok())
+                        .collect();
+                }
+                "stamps" => {
+                    manifest.stamps = value
+                        .split(',')
+                        .filter_map(|v| {
+                            let (len, mtime) = v.trim().split_once(':')?;
+                            Some((len.parse().ok()?, mtime.parse().ok()?))
+                        })
+                        .collect();
+                }
+                "merged" => manifest.merged = value.trim().parse().unwrap_or(0),
+                _ => {}
+            }
+        }
+        (!manifest.sources.is_empty()).then_some(manifest)
+    }
+
+    pub(crate) fn write(&self, dir: &std::path::Path) -> std::io::Result<()> {
+        let sources: Vec<String> = self.sources.iter().map(|id| id.to_string()).collect();
+        let stamps: Vec<String> = self
+            .stamps
+            .iter()
+            .map(|(len, mtime)| format!("{len}:{mtime}"))
+            .collect();
+        let text = format!(
+            "sources={}\nstamps={}\nmerged={}\n",
+            sources.join(","),
+            stamps.join(","),
+            self.merged
+        );
+        storage::definition::format::write_synced(&dir.join(Self::FILE), text.as_bytes())
+    }
+
+    /// Whether `ids` is exactly the set this manifest merged (with the same
+    /// bytes), i.e. the chunk it wrote already covers them.
+    pub(crate) fn covers(&self, ids: &[u64], stamps: &[(u64, u64)]) -> bool {
+        !self.sources.is_empty() && self.sources == ids && self.stamps == stamps
+    }
+}
+
 /// Where a table's PLAID mirror lives and what it indexes.
 pub(crate) struct PlaidMirror {
     pub(crate) dir: PathBuf,
@@ -142,7 +342,24 @@ pub(crate) struct PlaidMirror {
 /// One `chunk_{id}.idx` of a PLAID mirror.
 pub(crate) struct PlaidChunkFile {
     pub(crate) id: u64,
+    /// First row id the chunk covers, from its catalog record. Chunks are read
+    /// in `base_row_id` order: a fold of a subset writes a newer id for an
+    /// earlier row range, and document order is what maps a chunk's documents to
+    /// row ids.
+    pub(crate) base_row_id: u64,
     pub(crate) index: PlaidIndex,
+}
+
+/// What an optimize pass should do with a PLAID mirror, decided from chunk
+/// headers and the merge manifest alone.
+pub(crate) struct PlaidFoldCandidates {
+    /// The chunk ids this pass folds into one, in row order. Empty when the
+    /// mirror is fine.
+    pub(crate) plan: Vec<u64>,
+    /// Chunk ids a previous merge already folded but that are still listed (its
+    /// deprecation did not land). Their rows are inside `plan`'s successor and
+    /// must not be counted again.
+    pub(crate) folded: Vec<u64>,
 }
 
 /// Whether the newest chunk of a mirror already holds every document the older
@@ -181,6 +398,33 @@ pub(crate) fn plaid_chunk_doc_num(path: &std::path::Path) -> Option<u32> {
     let head = map.get(..24)?;
     Some(u32::from_le_bytes(head[20..24].try_into().ok()?))
 }
+
+/// Bytes of token vectors one PLAID build batch materializes.
+///
+/// The batch is what bounds a build: `add_multiple_docs_embeddings` holds the
+/// batch's vectors, their residuals and their packed codes at once, so a whole
+/// table handed to it in one call cost GBs (`docs` + `flat` + residuals +
+/// packed + the serialized image were five full-size buffers). Sized in bytes
+/// rather than tokens because a ColBERT column is 128d and a tensor search
+/// column is often 1536d - `32 MiB` is 65k tokens at one and 5.4k at the other.
+pub(crate) const PLAID_BUILD_BATCH_BYTES: usize = 32 << 20;
+
+/// Bytes of token vectors the centroid/quantizer training samples.
+///
+/// `PlaidIndex::Train` wants at least `32 * n_centroids` embeddings and samples
+/// at most `256 * n_centroids`; on a large corpus that bound is gigabytes, so
+/// the sample is capped here and drawn uniformly from the whole stream.
+pub(crate) const PLAID_TRAIN_SAMPLE_BYTES: usize = 64 << 20;
+
+/// Test-only override of [`PLAID_BUILD_BATCH_BYTES`] (`0` = use the constant).
+///
+/// A unit-sized table never crosses 32 MiB of token vectors, so the flush path
+/// that makes the build bounded would otherwise be untested - the batch would
+/// only ever be flushed once, at the end. A test sets this to a few hundred
+/// bytes and gets a build with many flushes over the same data.
+#[cfg(test)]
+pub(crate) static PLAID_BUILD_BATCH_BYTES_OVERRIDE: std::sync::atomic::AtomicUsize =
+    std::sync::atomic::AtomicUsize::new(0);
 
 /// PLAID index parameters from `WITH (nbits=…, n_centroids=…)`.
 #[derive(Debug, Clone, Copy)]
