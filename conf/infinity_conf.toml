@@ -54,16 +54,14 @@ result_cache             = "off"
 memindex_memory_quota    = "1GB"
 # Periodic reclaim of memory that is not on disk yet (buffer + index tails):
 # tables nobody writes any more would otherwise hold it until the process ends.
-# One cadence serves both goals: every interval the loop reads the byte ledger
-# once and either drains down to the soft waterline or sweeps tables idle past
-# `unsealed_idle_age`.
-# unsealed_reclaim_interval: the loop's period; "0s" disables the whole path.
-# unsealed_idle_age:        how long a table must be idle to count as stale;
-#                           "0s" means "no age threshold" (everything is stale).
-#                           Also the base of the failure backoff.
-# unsealed_max_tables_per_round: how many tables one round may dump; 0 = no limit.
+# A round sorts every such table by fused size/age ranks and dumps until the
+# ledger is back under HALF of memindex_memory_quota. `memindex_memory_quota = 0`
+# turns the whole mechanism off; it is the real switch, since the target is
+# derived from it.
+# unsealed_reclaim_interval:      the loop's period; "0s" stops the scheduler
+#                                 (a direct call still drains).
+# unsealed_max_tables_per_round:  how many tables one round may dump; 0 = no limit.
 unsealed_reclaim_interval     = "30s"
-unsealed_idle_age             = "600s"
 unsealed_max_tables_per_round = 100
 
 [wal]

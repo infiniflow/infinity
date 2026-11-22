@@ -6075,10 +6075,6 @@ pub(crate) struct Context {
     /// `[buffer] unsealed_reclaim_interval` in milliseconds: how often the
     /// staleness sweep runs. `0` disables that path.
     pub(crate) unsealed_reclaim_interval: std::sync::atomic::AtomicU64,
-    /// `[buffer] unsealed_idle_age` in milliseconds: the age at which the
-    /// staleness sweep considers a table reclaimable, and the base of the
-    /// failure backoff. `0` means "no age threshold".
-    pub(crate) unsealed_idle_age: std::sync::atomic::AtomicU64,
     /// `[buffer] unsealed_max_tables_per_round`: how many tables one round may
     /// dump. `0` means unlimited.
     pub(crate) unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize,

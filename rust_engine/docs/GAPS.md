@@ -46,13 +46,13 @@
 
 ### 1.2 未落盘内存的周期回收（有意的设计偏离）
 
-**重写版有一条参考没有的周期回收路径**：每 tick 检查一次内存水位，另按 `unsealed_reclaim_interval` 做一次陈旧度扫描，
-以**表**为单位把 append buffer 与索引 tail 落盘（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的配额与按批容量触发，
-所以一张写完就没人动的表会一直占着内存。
+**重写版有一条参考没有的周期回收路径**：每 `unsealed_reclaim_interval` 检查一次，以**表**为单位把 append buffer
+与索引 tail 落盘，直到引擎总量回到 `memindex_memory_quota` 的一半（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的
+配额与按批容量触发，所以一张写完就没人动的表会一直占着内存。
 
 | | 参考 | 重写版 |
 |---|---|---|
-| 触发 | 写路径的 `MemIndexTracer` 配额、`MemIndexCapacity` 行数 | 同左，**外加**每 tick 的水位检查与按间隔的陈旧度扫描 |
+| 触发 | 写路径的 `MemIndexTracer` 配额、`MemIndexCapacity` 行数 | 同左，**外加**按 `unsealed_reclaim_interval` 的周期扫描（目标：配额的一半） |
 | 单位 | 单个 `MemIndex`（`SegmentIndexMeta`） | **整表**：一次选中就排空该表所有索引 tail 与 append buffer |
 | 选表排序 | 无跨表排序（每次 breach 只处理写入表） | 尺寸与年龄两路名次做 RRF（`K = 3`，年龄优先），平局按年龄、字节、表名 |
 | 单轮上限 | 无（一次 breach 一个索引） | `unsealed_max_tables_per_round`（默认 100，`0` = 不限） |
@@ -61,8 +61,8 @@
 可能与参考不同**——跨引擎字节门禁里凡是比较「chunk 数 / chunk 边界」的用例，若把配额设得很小并让服务端跑过 30 秒，
 就会看到差异。行数据本身不受影响（内存里的行本就在块文件和 WAL 里）。
 
-配置：`[buffer] unsealed_reclaim_interval`（`0` 关闭陈旧路径）、`unsealed_idle_age`（`0` = 不设年龄门槛）、
-`unsealed_max_tables_per_round`。
+配置：`[buffer] unsealed_reclaim_interval`（`0` 停止调度）、`unsealed_max_tables_per_round`（`0` = 不限）；
+`memindex_memory_quota = 0` 关掉整个机制，因为目标由它派生。
 
 ## 2 未实现 / 未接线
 

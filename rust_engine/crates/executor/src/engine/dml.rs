@@ -3142,16 +3142,6 @@ impl Engine {
         );
     }
 
-    /// Sets `[buffer] unsealed_idle_age` (seconds): the age at which a table
-    /// counts as stale. `0` means "no threshold", i.e. every table with
-    /// unsealed data is stale.
-    pub fn set_unsealed_idle_age(&self, secs: u64) {
-        self.context.unsealed_idle_age.store(
-            secs.saturating_mul(1000),
-            std::sync::atomic::Ordering::Relaxed,
-        );
-    }
-
     /// Sets `[buffer] unsealed_max_tables_per_round`. `0` means unlimited.
     pub fn set_unsealed_max_tables_per_round(&self, tables: usize) {
         self.context
@@ -3165,13 +3155,6 @@ impl Engine {
     pub fn unsealed_reclaim_interval_ms(&self) -> u64 {
         self.context
             .unsealed_reclaim_interval
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
-    /// `[buffer] unsealed_idle_age` in milliseconds, for the sweep's target.
-    pub(crate) fn unsealed_idle_age(&self) -> u64 {
-        self.context
-            .unsealed_idle_age
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 

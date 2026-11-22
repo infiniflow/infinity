@@ -520,7 +520,6 @@ impl Engine {
                 watermarks: std::sync::Mutex::new(Watermarks::new(0)),
                 unsealed_backoff_until: std::sync::atomic::AtomicU64::new(0),
                 unsealed_reclaim_interval: std::sync::atomic::AtomicU64::new(30_000),
-                unsealed_idle_age: std::sync::atomic::AtomicU64::new(600_000),
                 unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize::new(100),
                 recall: std::sync::Mutex::new(std::collections::HashMap::new()),
                 object_store: Mutex::new(None),

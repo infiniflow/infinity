@@ -306,17 +306,14 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
     let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
     let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
-    // `[buffer] unsealed_*`: the sweep that reclaims memory from tables nobody
+    // `[buffer] unsealed_*`: the loop that reclaims memory from tables nobody
     // writes any more (`docs/MEMORY_RECLAIM.md` §5). An absent key keeps the
     // engine's default, so "not configured" must not become `0` - that value
-    // means "path disabled" for the interval and "no age threshold" for the age.
-    let unsealed =
-        |key: &str| -> Option<u64> { toml_value(&text, key).map(|v| parse_interval_secs(&v)) };
-    if let Some(secs) = unsealed("unsealed_reclaim_interval") {
+    // means "scheduler off" for the interval.
+    if let Some(secs) =
+        toml_value(&text, "unsealed_reclaim_interval").map(|v| parse_interval_secs(&v))
+    {
         engine.set_unsealed_reclaim_interval(secs);
-    }
-    if let Some(secs) = unsealed("unsealed_idle_age") {
-        engine.set_unsealed_idle_age(secs);
     }
     if let Some(n) = toml_value(&text, "unsealed_max_tables_per_round") {
         if let Ok(tables) = n.trim().parse::<usize>() {

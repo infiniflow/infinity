@@ -88,8 +88,9 @@ impl Watermarks {
         self.budget
     }
 
-    /// The lower two waterlines. `soft` is read by the periodic reclaim loop
-    /// to name its byte target, so it is not test-only.
+    /// The lower waterline. Production reads it through [`Self::level`]; the
+    /// tests pin it directly.
+    #[cfg(test)]
     pub(crate) fn soft(&self) -> u64 {
         self.soft
     }
@@ -99,19 +100,6 @@ impl Watermarks {
     #[cfg(test)]
     pub(crate) fn hard(&self) -> u64 {
         self.hard
-    }
-
-    /// The level `pending` bytes sit at, **without** retuning the waterlines.
-    ///
-    /// The write path uses [`Self::level`] through `Engine::seal_pressure`,
-    /// which calls [`Self::retune`] first: the AIMD halving is driven by writes,
-    /// so its frequency is the write frequency. The periodic loop runs every
-    /// second, and calling `retune` there would halve `soft` once a second while
-    /// the engine stayed above 80% with no writes at all - 64 MiB down to one
-    /// byte in about six seconds, after which the byte target would demand
-    /// draining the whole pool. A read-only level check is what a timer may do.
-    pub(crate) fn pressure(&self, pending: u64) -> Pressure {
-        self.level(pending)
     }
 
     /// The level `pending` bytes sit at.

@@ -20,32 +20,22 @@
 //! memory until the process ended. This module adds the sweep that closes that
 //! gap.
 //!
-//! The unit is a **table**, not an index. A table's footprint is its buffered
-//! rows plus its index tails, and one round sorts every table by two dimensions
-//! (size and idleness), fuses the ranks ([`rrf_order`]), and dumps tables in
-//! that order until the round's target is met.
+//! The unit is a **table**, not an index. One round sorts every table that holds
+//! unsealed memory by two dimensions (size and idleness), fuses the ranks
+//! ([`rrf_order`]), and dumps tables in that order until the ledger is back under
+//! **half the quota**.
 //!
-//! Two targets, one loop, **one cadence** (`unsealed_reclaim_interval`): every
-//! slot reads the ledger once and picks one of these, pressure first.
-//!
-//! * `Target::Bytes(soft)`: the engine is over a waterline, so drain until
-//!   `budget_bytes()` is below the soft line again.
-//! * `Target::Stale(idle_age)`: drain tables whose last write is older than the
-//!   threshold, however much memory the engine is using.
+//! There is deliberately **one** goal. An earlier version had two - "over a
+//! waterline" and "older than an age" - but both asked the same question ("which
+//! table should give memory back first?") and answered it with the same ranking;
+//! only the stopping rule differed. One goal is simpler to reason about and one
+//! rule to tune: the loop starts when the ledger passes half the quota and stops
+//! once it is back under.
 
 use std::sync::atomic::Ordering;
 
-use super::maintain::{rrf_order, Pressure, ReclaimCandidate};
+use super::maintain::{rrf_order, ReclaimCandidate};
 use crate::engine::state::Engine;
-
-/// What one round is trying to achieve.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Target {
-    /// Drain until the engine-wide byte ledger is at or below this line.
-    Bytes(u64),
-    /// Drain every candidate whose age is at least this many milliseconds.
-    Stale(u64),
-}
 
 /// A table as the round's first pass sees it.
 struct TableStat {
@@ -55,8 +45,9 @@ struct TableStat {
     footprint: u64,
     /// When the table was last written, or the process start if never.
     last_write_ms: u64,
-    /// When the loop last tried and failed, so a failing table's age is measured
-    /// from the attempt rather than from the write (the pressure target only).
+    /// When the loop last tried and failed. The age the ranking uses is measured
+    /// from `max(last_write_ms, last_attempt_ms)`, so a table that keeps failing
+    /// drifts to the back instead of sitting at the front for ever.
     last_attempt_ms: u64,
     dump_failures: u32,
 }
@@ -66,7 +57,18 @@ impl Engine {
     ///
     /// `now_ms` is the caller's monotonic clock reading, passed in so tests can
     /// drive ageing without sleeping. See `docs/MEMORY_RECLAIM.md` §4.
-    pub(crate) async fn reclaim_unsealed(&self, now_ms: u64, target: Target) -> usize {
+    ///
+    /// The round runs only while the ledger is **over half the quota** and stops
+    /// the moment it is back under. `budget_bytes()` is re-read before every
+    /// dump: a dump may release nothing (an import in flight, another path got
+    /// there first) and concurrent writes can push the total back up, so an
+    /// incremental count would drift.
+    pub(crate) async fn reclaim_unsealed(&self, now_ms: u64) -> usize {
+        // `memindex_quota == 0` disables the byte quota (and, with it, this
+        // loop): a zero target would otherwise read as "drain everything".
+        if self.context.memindex_quota.load(Ordering::Relaxed) == 0 {
+            return 0;
+        }
         if self.context.unsealed_backoff_until.load(Ordering::Relaxed) > now_ms {
             return 0;
         }
@@ -74,16 +76,18 @@ impl Engine {
             .context
             .unsealed_max_tables_per_round
             .load(Ordering::Relaxed);
-        let idle_age = self.context.unsealed_idle_age.load(Ordering::Relaxed);
-        // The backoff base: `idle_age == 0` means "no age threshold", and a zero
-        // base would make `base * 2^n` zero and disable the backoff entirely, so
-        // the interval is the floor. Both are intervals, so `max` is the honest
-        // "how long to wait before retrying".
-        let base = idle_age.max(
-            self.context
-                .unsealed_reclaim_interval
-                .load(Ordering::Relaxed),
-        );
+        // The backoff base is the interval: `idle_age` is gone, and a zero base
+        // would make `base * 2^n` zero and disable the backoff entirely.
+        let base = self
+            .context
+            .unsealed_reclaim_interval
+            .load(Ordering::Relaxed)
+            .max(1);
+
+        let target = self.reclaim_target();
+        if self.reclaim_target_met(target) {
+            return 0;
+        }
 
         let stats = self.unsealed_table_stats();
         if stats.is_empty() {
@@ -91,14 +95,14 @@ impl Engine {
         }
         let candidates: Vec<ReclaimCandidate> = stats
             .iter()
-            .filter(|stat| self.reclaim_candidate_eligible(stat, now_ms, target, base))
+            .filter(|stat| self.reclaim_candidate_eligible(stat, now_ms, base))
             .map(|stat| ReclaimCandidate {
                 key: stat.key.clone(),
                 bytes: stat.footprint,
-                age_ms: now_ms.saturating_sub(match target {
-                    Target::Bytes(_) => stat.last_write_ms.max(stat.last_attempt_ms),
-                    Target::Stale(_) => stat.last_write_ms,
-                }),
+                // Age counts from the last write *or* the last attempt, so a
+                // table that keeps failing recedes instead of camping at the
+                // head of the order.
+                age_ms: now_ms.saturating_sub(stat.last_write_ms.max(stat.last_attempt_ms)),
             })
             .collect();
         if candidates.is_empty() {
@@ -110,7 +114,7 @@ impl Engine {
         let mut progressed = false;
         for at in order {
             let key = candidates[at].key.clone();
-            if self.reclaim_target_met(&target) {
+            if self.reclaim_target_met(target) {
                 break;
             }
             if self.dump_table(&key).await {
@@ -121,10 +125,9 @@ impl Engine {
                 }
             }
         }
-        // A round that released nothing must not be repeated on the next tick:
-        // every tick would then walk the same hopeless candidates and pay one
-        // `list_indexes()` per table. One timer covers both targets because
-        // "no progress" means the same thing to each.
+        // A round that released nothing must not be repeated on the next slot:
+        // it would walk the same hopeless candidates and pay one `list_indexes()`
+        // per table, for ever.
         if progressed {
             self.context
                 .unsealed_backoff_until
@@ -143,56 +146,46 @@ impl Engine {
         dumped
     }
 
+    /// The ledger level this round drains to: **half the quota**.
+    ///
+    /// One number, not two. "Over the soft waterline" and "older than an age"
+    /// both meant "give memory back now", and the ranking already decided which
+    /// table pays; a second threshold only added a way for the two to disagree.
+    /// Half the quota is comfortably below the write path's own `soft` line, so a
+    /// round leaves headroom instead of immediately tripping the quota again.
+    ///
+    /// `memindex_quota == 0` disables the byte quota mechanism entirely, and with
+    /// it this loop.
+    pub(crate) fn reclaim_target(&self) -> u64 {
+        self.context.memindex_quota.load(Ordering::Relaxed) / 2
+    }
+
+    /// Whether the round's goal is reached.
+    fn reclaim_target_met(&self, target: u64) -> bool {
+        self.budget_bytes() as u64 <= target
+    }
+
     /// Whether a table should enter this round's candidate set.
-    fn reclaim_candidate_eligible(
-        &self,
-        stat: &TableStat,
-        now_ms: u64,
-        target: Target,
-        base: u64,
-    ) -> bool {
-        // A table an `IMPORT` is still staging into is not "idle"; dropping it
-        // from the set is better than letting `dump_table` return `false` every
-        // round and spending the round's budget on it.
+    fn reclaim_candidate_eligible(&self, stat: &TableStat, now_ms: u64, base: u64) -> bool {
+        // A table an `IMPORT` is still staging into is not reclaimable: its rows
+        // are not committed, so a dump would publish a chunk over rows the table
+        // may never have. Dropping it from the set is better than letting
+        // `dump_table` return `false` every round and spending the round on it.
         if self.import_in_flight(&stat.key) {
             return false;
         }
         if !self.table_has_unsealed(&stat.key) {
             return false;
         }
-        match target {
-            // Only tables that are actually old enough; a write resets the age,
-            // so a table being written right now is naturally excluded.
-            Target::Stale(idle) => now_ms.saturating_sub(stat.last_write_ms) >= idle,
-            // The pressure path wants any table with data, including the one
-            // that just caused the breach. Only a table that has failed before
-            // waits, and it waits exponentially.
-            Target::Bytes(_) => {
-                if stat.dump_failures == 0 {
-                    return true;
-                }
-                // Exponential backoff from the same `sort_base` the ranking
-                // uses: a table that keeps failing must not hold a slot in every
-                // round. The cap at 2^6 keeps the wait finite (about 10.7 h at
-                // the defaults) instead of overflowing.
-                let wait = base.saturating_mul(1u64 << stat.dump_failures.min(6));
-                let since = now_ms.saturating_sub(stat.last_write_ms.max(stat.last_attempt_ms));
-                since >= wait
-            }
+        if stat.dump_failures == 0 {
+            return true;
         }
-    }
-
-    /// Whether the round's goal is reached.
-    fn reclaim_target_met(&self, target: &Target) -> bool {
-        match target {
-            // Re-read the ledger: a dump may have released nothing (an import in
-            // flight, another path got there first) and concurrent writes can
-            // push it back up, so an incremental count would drift.
-            Target::Bytes(soft) => (self.budget_bytes() as u64) <= *soft,
-            // The staleness sweep is a single ordered pass over the candidates it
-            // selected by age; there is nothing left to satisfy.
-            Target::Stale(_) => false,
-        }
+        // Exponential backoff from the same `sort_base` the ranking uses: a table
+        // that keeps failing must not hold a slot in every round. The cap at 2^6
+        // keeps the wait finite instead of overflowing.
+        let wait = base.saturating_mul(1u64 << stat.dump_failures.min(6));
+        let since = now_ms.saturating_sub(stat.last_write_ms.max(stat.last_attempt_ms));
+        since >= wait
     }
 
     /// One table's unsealed footprint snapshot, for every table.
@@ -261,9 +254,9 @@ impl Engine {
     /// without an error. `dump_under_pressure` is already two-phase for this
     /// reason.
     ///
-    /// The progress signal is [`crate::engine::state::TableEntry::unsealed_live`]
-    /// before and after: buffered rows plus the index bytes computed now. Neither
-    /// is a cache, which matters because `memindex_bytes` is never refreshed by
+    /// The progress signal is [`Self::unsealed_live_of`] before and after:
+    /// buffered rows plus the index bytes computed now. Neither is a cache,
+    /// which matters because `memindex_bytes` is never refreshed by
     /// `CREATE INDEX` and would report "nothing released" for a table it just
     /// emptied.
     async fn dump_table(&self, key: &str) -> bool {
@@ -318,17 +311,5 @@ impl Engine {
             tables.get(key).map(|e| e.unsealed_bytes()).unwrap_or(0)
         };
         buffered + self.memindex_bytes_of(key)
-    }
-
-    /// The soft waterline, read without retuning it.
-    ///
-    /// `seal_pressure()` calls `retune` first, which halves `soft` while the
-    /// engine is above 80% of its budget. That is driven by writes and belongs
-    /// there; a once-a-second timer that did the same would take 64 MiB to one
-    /// byte in about six seconds and then demand draining the whole pool.
-    pub(crate) fn unsealed_pressure(&self) -> (Pressure, u64) {
-        let budget = self.budget_bytes() as u64;
-        let marks = self.context.watermarks.lock().unwrap();
-        (marks.pressure(budget), marks.soft())
     }
 }

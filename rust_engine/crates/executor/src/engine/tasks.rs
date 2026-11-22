@@ -14,48 +14,6 @@
 
 use super::*;
 
-/// What one reclaim slot does, given the ledger and the two configured numbers.
-///
-/// Split out of [`trigger_loop`] so the priority rule is a value a test can
-/// assert instead of a control-flow shape hidden in an async loop.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum ReclaimTick {
-    /// The interval has not elapsed, or it is disabled (`0`).
-    Skip,
-    /// Over a waterline: drain until the ledger is back below `soft`.
-    Pressure(u64),
-    /// Under every waterline but a sweep is due: drain tables idle past `age`.
-    Stale(u64),
-}
-
-/// The reclaim decision for one slot.
-///
-/// **Pressure wins, and both targets share the one cadence.** The write path
-/// checks the quota on every statement, so the slot only has to catch what
-/// writes cannot see: a table that stopped being written while holding memory.
-/// That is the staleness sweep - but a slot that finds the engine over a
-/// waterline must drain bytes first, because that is the case the operator can
-/// feel, and it may have been reached with no writes at all (rows replayed, a
-/// long import that just ended).
-///
-/// `due` is the caller's interval check; `pressure` is the ledger's level,
-/// which must come from the read-only `Watermarks::pressure` (a timer may not
-/// retune the waterlines).
-pub(crate) fn reclaim_tick(
-    due: bool,
-    pressure: crate::engine::maintain::Pressure,
-    soft: u64,
-    idle_age: u64,
-) -> ReclaimTick {
-    if !due {
-        return ReclaimTick::Skip;
-    }
-    match pressure {
-        crate::engine::maintain::Pressure::Normal => ReclaimTick::Stale(idle_age),
-        _ => ReclaimTick::Pressure(soft),
-    }
-}
-
 /// Background `DumpMemIndexTask` (`src/storage/bg_task/bg_task.cppm`).
 ///
 /// Submitted by [`Engine`] when the in-memory quota is exceeded while a
@@ -187,30 +145,14 @@ pub(crate) async fn trigger_loop(
                 engine.submit_cleanup();
             }
             // Periodic reclaim of unsealed memory (`docs/MEMORY_RECLAIM.md`
-            // §4.7). **One cadence for both targets.** The write path already
-            // checks the byte quota on every statement, so the tick's job was
-            // only ever the case "nobody is writing and memory stays held" -
-            // which is the staleness sweep. Merging them means the sweep's
-            // interval also bounds how long an over-waterline engine can go
-            // unnoticed, and the per-tick `budget_bytes()` walk disappears.
+            // §4.7). The write path already checks the byte quota on every
+            // statement, so this slot only has to catch what writes cannot see:
+            // a table that stopped being written while still holding memory. A
+            // round is a no-op unless the ledger is over half the quota, so an
+            // idle engine pays one atomic load here.
             if !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval {
                 last_reclaim = std::time::Instant::now();
-                let now_ms = crate::memory::now_millis();
-                let (pressure, soft) = engine.unsealed_pressure();
-                let idle_age = engine.unsealed_idle_age();
-                match reclaim_tick(true, pressure, soft, idle_age) {
-                    ReclaimTick::Skip => {}
-                    ReclaimTick::Pressure(soft) => {
-                        let _ = engine
-                            .reclaim_unsealed(now_ms, crate::engine::reclaim::Target::Bytes(soft))
-                            .await;
-                    }
-                    ReclaimTick::Stale(age) => {
-                        let _ = engine
-                            .reclaim_unsealed(now_ms, crate::engine::reclaim::Target::Stale(age))
-                            .await;
-                    }
-                }
+                let _ = engine.reclaim_unsealed(crate::memory::now_millis()).await;
             }
             // The insert path takes a couple of queued splits per row and
             // leaves the rest of a bulk load's backlog behind it; this is the
@@ -229,50 +171,5 @@ pub(crate) async fn trigger_loop(
             }
         }
         tokio::time::sleep(TICK).await;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::engine::maintain::Pressure;
-
-    /// The interval is the only cadence: a slot that is not due does nothing,
-    /// whatever the ledger says.
-    #[test]
-    fn a_slot_that_is_not_due_does_nothing() {
-        for pressure in [Pressure::Normal, Pressure::Soft, Pressure::Hard] {
-            assert_eq!(reclaim_tick(false, pressure, 1024, 600), ReclaimTick::Skip);
-        }
-    }
-
-    /// Over a waterline the slot drains bytes; under it, the slot is the
-    /// staleness sweep. `soft` and `idle_age` are passed through unchanged, so
-    /// the loop names the same number the ledger was judged by.
-    #[test]
-    fn pressure_takes_priority_over_the_staleness_sweep() {
-        assert_eq!(
-            reclaim_tick(true, Pressure::Soft, 4096, 600),
-            ReclaimTick::Pressure(4096)
-        );
-        assert_eq!(
-            reclaim_tick(true, Pressure::Hard, 4096, 600),
-            ReclaimTick::Pressure(4096)
-        );
-        assert_eq!(
-            reclaim_tick(true, Pressure::Normal, 4096, 600),
-            ReclaimTick::Stale(600)
-        );
-    }
-
-    /// `idle_age = 0` is still a sweep: "no age threshold" means every table
-    /// with unsealed data is a candidate, not that the sweep is off. Disabling
-    /// is the interval's job (`0`), which `due` already encodes.
-    #[test]
-    fn a_zero_idle_age_is_a_sweep_not_a_skip() {
-        assert_eq!(
-            reclaim_tick(true, Pressure::Normal, 4096, 0),
-            ReclaimTick::Stale(0)
-        );
     }
 }
