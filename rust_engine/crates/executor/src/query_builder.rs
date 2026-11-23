@@ -39,6 +39,7 @@ pub enum DocIteratorType {
     AndNotIterator,
     OrIterator,
     BmwIterator,
+    MinimumShouldMatchIterator,
 }
 
 /// A posting iterator. `next(doc_id)` advances to the first document whose id
@@ -287,6 +288,20 @@ impl QueryNode {
         }
     }
 
+    /// `QueryNode::LeafCount`: the number of positive leaves. A
+    /// `minimum_should_match` percentage is a share of this count
+    /// (`GetMinimumShouldMatchParameter`), and an `AND_NOT` counts its positive
+    /// side only.
+    pub fn leaf_count(&self) -> usize {
+        match self {
+            QueryNode::Term(_) | QueryNode::Phrase(_) => 1,
+            QueryNode::And(children) | QueryNode::Or(children) | QueryNode::Not(children) => {
+                children.iter().map(QueryNode::leaf_count).sum()
+            }
+            QueryNode::AndNot(children) => children.first().map_or(0, QueryNode::leaf_count),
+        }
+    }
+
     /// Builds the iterator tree from an optimized node. A missing term makes an
     /// `AND` / `AND_NOT` uninhabited, while an `OR` simply drops that branch.
     fn create_search(&self, lookup: &dyn TermLookup) -> Option<Box<dyn DocIterator>> {
@@ -359,6 +374,10 @@ pub struct FullTextQueryContext {
     /// Result size for early termination; `0` disables it.
     pub topn: usize,
     pub early_term_algo: EarlyTermAlgo,
+    /// The `minimum_should_match` spec, unresolved: its percentage is a share of
+    /// the **optimized** tree's leaf count (`GetMinimumShouldMatchParameter`),
+    /// which only [`QueryBuilder::create_search`] can see.
+    pub minimum_should_match: Option<String>,
 }
 
 impl FullTextQueryContext {
@@ -367,6 +386,7 @@ impl FullTextQueryContext {
             query_tree,
             topn: 0,
             early_term_algo: EarlyTermAlgo::Naive,
+            minimum_should_match: None,
         }
     }
 
@@ -377,6 +397,11 @@ impl FullTextQueryContext {
 
     pub fn with_early_term(mut self, early_term_algo: EarlyTermAlgo) -> Self {
         self.early_term_algo = early_term_algo;
+        self
+    }
+
+    pub fn with_minimum_should_match(mut self, spec: Option<&str>) -> Self {
+        self.minimum_should_match = spec.map(str::to_string);
         self
     }
 }
@@ -396,6 +421,54 @@ impl<'a> QueryBuilder<'a> {
         context: FullTextQueryContext,
     ) -> Result<Option<Box<dyn DocIterator>>, QueryError> {
         let optimized = context.query_tree.optimize()?;
+        // `minimum_should_match` is a count of matched *clauses*, and the only
+        // node with optional clauses is the root: the reference passes
+        // `CreateSearchParams::RemoveMSM()` to every child, so a nested group is
+        // never filtered by it. `OrQueryNode::CreateSearch` turns the count into
+        // an `AndIterator` once it reaches the child count, counts children below
+        // that, and reports an uninhabited node when the count exceeds them.
+        let minimum_should_match = context
+            .minimum_should_match
+            .as_deref()
+            .map(|spec| crate::engine::state::minimum_should_match(spec, optimized.leaf_count()))
+            .unwrap_or(0);
+        if minimum_should_match > 1 {
+            match &optimized {
+                QueryNode::Or(children) => {
+                    let mut iterators = Vec::with_capacity(children.len());
+                    for child in children {
+                        if let Some(iterator) = child.create_search(self.lookup) {
+                            iterators.push(iterator);
+                        }
+                    }
+                    return Ok(minimum_should_match_search(iterators, minimum_should_match));
+                }
+                QueryNode::And(children) => {
+                    let mut iterators = Vec::with_capacity(children.len());
+                    for child in children {
+                        // An `AND` with a missing term is uninhabited.
+                        let Some(iterator) = child.create_search(self.lookup) else {
+                            return Ok(None);
+                        };
+                        iterators.push(iterator);
+                    }
+                    // Every child already has to match, so a count above them
+                    // can never be satisfied (the reference's null iterator).
+                    if minimum_should_match > iterators.len() {
+                        return Ok(None);
+                    }
+                    return Ok(match iterators.len() {
+                        0 => None,
+                        _ => Some(Box::new(AndIterator::new(iterators))),
+                    });
+                }
+                // A single leaf carries no optional clause of its own.
+                QueryNode::Term(_)
+                | QueryNode::Phrase(_)
+                | QueryNode::AndNot(_)
+                | QueryNode::Not(_) => {}
+            }
+        }
         // `OrQueryNode::CreateSearch`: a top-level OR whose children are all
         // term leaves may use block-max WAND when a result size is known.
         if context.early_term_algo == EarlyTermAlgo::Bmw && context.topn > 0 {
@@ -429,6 +502,114 @@ impl<'a> QueryBuilder<'a> {
         }
         let hits = self.lookup.bmw_search(column?, &terms, topn)?;
         Some(Box::new(BmwIterator::new(hits)))
+    }
+}
+
+/// `OrQueryNode::CreateSearch` under a `minimum_should_match` clause count: a
+/// count at or above the child count means every child must match, a count above
+/// it can never be satisfied (the reference's null iterator), and anything in
+/// between counts matched children.
+fn minimum_should_match_search(
+    iterators: Vec<Box<dyn DocIterator>>,
+    minimum: usize,
+) -> Option<Box<dyn DocIterator>> {
+    let children = iterators.len();
+    if children == 0 || minimum > children {
+        return None;
+    }
+    if minimum >= children {
+        return Some(Box::new(AndIterator::new(iterators)));
+    }
+    Some(Box::new(MinimumShouldMatchIterator::new(
+        iterators, minimum,
+    )))
+}
+
+/// `MinimumShouldMatchIterator` (`minimum_should_match_iterator_impl.cpp`): a
+/// document survives only when at least `minimum_should_match` children contain
+/// it, and scores as the sum of the matching children's scores.
+///
+/// The children are drained up front because the tree path already materialises
+/// every leaf's posting list (`TextTermLookup::lookup`), so counting eagerly
+/// needs no more memory than the leaves themselves.
+pub struct MinimumShouldMatchIterator {
+    /// `(doc id, score)`, ascending by doc id; only documents matched by at
+    /// least `minimum_should_match` children are present.
+    hits: Vec<(u64, f64)>,
+    index: usize,
+    doc_id: u64,
+}
+
+impl MinimumShouldMatchIterator {
+    pub fn new(children: Vec<Box<dyn DocIterator>>, minimum_should_match: usize) -> Self {
+        debug_assert!(minimum_should_match > 1);
+        let mut matched: std::collections::BTreeMap<u64, (usize, f64)> =
+            std::collections::BTreeMap::new();
+        for mut child in children {
+            let mut target = 0u64;
+            while child.next(target) {
+                let doc = child.doc_id();
+                if doc == INVALID_DOC_ID {
+                    break;
+                }
+                target = doc + 1;
+                let entry = matched.entry(doc).or_insert((0, 0.0));
+                entry.0 += 1;
+                entry.1 += child.score();
+            }
+        }
+        let hits = matched
+            .into_iter()
+            .filter(|(_, (count, _))| *count >= minimum_should_match)
+            .map(|(doc, (_, score))| (doc, score))
+            .collect();
+        Self {
+            hits,
+            index: 0,
+            doc_id: INVALID_DOC_ID,
+        }
+    }
+
+    pub fn hits(&self) -> &[(u64, f64)] {
+        &self.hits
+    }
+}
+
+impl DocIterator for MinimumShouldMatchIterator {
+    fn next(&mut self, doc_id: u64) -> bool {
+        while self.index < self.hits.len() && self.hits[self.index].0 < doc_id {
+            self.index += 1;
+        }
+        match self.hits.get(self.index) {
+            Some(hit) => {
+                self.doc_id = hit.0;
+                true
+            }
+            None => {
+                self.doc_id = INVALID_DOC_ID;
+                false
+            }
+        }
+    }
+
+    fn doc_id(&self) -> u64 {
+        self.doc_id
+    }
+
+    fn iterator_type(&self) -> DocIteratorType {
+        DocIteratorType::MinimumShouldMatchIterator
+    }
+
+    fn score(&mut self) -> f64 {
+        self.hits
+            .get(self.index)
+            .filter(|hit| hit.0 == self.doc_id)
+            .map(|hit| hit.1)
+            .unwrap_or(0.0)
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 

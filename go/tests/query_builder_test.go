@@ -526,6 +526,42 @@ func TestQueryBuilderMatchTensor(t *testing.T) {
 	}
 }
 
+// TestMatchTensorKeepsEveryToken guards a multi-vector query's shape.
+//
+// `[][]float32` carries one row per token, and the engine splits the flattened
+// buffer by the column's dimension, so every row has to reach `EmbeddingData`.
+// Writing only `tensorData[0]` turned a multi-token query into a single-token
+// one; MaxSim then summed one row, every document was ranked by a one-token
+// match, and the loss showed up as a recall collapse rather than an error.
+func TestMatchTensorKeepsEveryToken(t *testing.T) {
+	tokens := [][]float32{
+		{0.1, 0.2, 0.3},
+		{0.4, 0.5, 0.6},
+		{0.7, 0.8, 0.9},
+	}
+	qb := infinity.NewQueryBuilder()
+	if _, err := qb.MatchTensor("tensor_col", tokens, "float", 10, nil); err != nil {
+		t.Fatalf("MatchTensor failed: %v", err)
+	}
+
+	expr := qb.GetSearch().MatchExprs[0].MatchTensorExpr
+	if expr == nil || expr.EmbeddingData == nil {
+		t.Fatal("MatchTensorExpr / EmbeddingData should not be nil")
+	}
+	want := len(tokens) * len(tokens[0])
+	if got := len(expr.EmbeddingData.F64ArrayValue); got != want {
+		t.Fatalf("embedding data holds %d values, want %d (one row per token)", got, want)
+	}
+	for i, token := range tokens {
+		for j, value := range token {
+			got := expr.EmbeddingData.F64ArrayValue[i*len(token)+j]
+			if got != float64(value) {
+				t.Fatalf("value[%d][%d] = %v, want %v", i, j, got, value)
+			}
+		}
+	}
+}
+
 // TestQueryBuilderFusion tests the Fusion method
 func TestQueryBuilderFusion(t *testing.T) {
 	qb := infinity.NewQueryBuilder()

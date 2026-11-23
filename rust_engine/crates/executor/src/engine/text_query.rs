@@ -180,6 +180,32 @@ impl TermLookup for TextTermLookup {
     // tree query is not a flat OR of term leaves.
 }
 
+/// `rank_features=<col>^<tag>^<weight>`: each listed tag's per-row index
+/// payload, decoded with `SmallFloat::UInt16ToFloat122` and multiplied by the
+/// tag's weight (`RankFeatureDocIterator`). The tree path adds the sum to the
+/// document score, exactly as the WAND path does.
+pub struct RankFeatureScores {
+    tags: Vec<(f64, std::collections::BTreeMap<u64, u16>)>,
+}
+
+impl RankFeatureScores {
+    pub fn new(tags: Vec<(f64, std::collections::BTreeMap<u64, u16>)>) -> Self {
+        Self { tags }
+    }
+
+    /// The score a document gains from every listed tag.
+    pub fn bonus(&self, doc: u64) -> f64 {
+        self.tags
+            .iter()
+            .map(|(weight, rows)| {
+                rows.get(&doc)
+                    .map(|payload| f64::from(analyzer::uint16_to_float122(*payload)) * weight)
+                    .unwrap_or(0.0)
+            })
+            .sum()
+    }
+}
+
 /// Runs a parsed query tree and returns the top `topn` `(row, score)` pairs,
 /// ordered by score descending and row ascending (the reference's
 /// `ScoreResultHeap` order).
@@ -201,14 +227,20 @@ pub(crate) fn run_query_tree(
     // `threshold=` is a strict lower bound and is applied before the truncation
     // for the same reason: a rejected row must not occupy a `topn` slot.
     threshold: Option<f64>,
+    // `minimum_should_match=<spec>`; resolved against the optimized tree's leaf
+    // count inside `QueryBuilder::create_search`.
+    minimum_should_match: Option<&str>,
+    rank_features: Option<&RankFeatureScores>,
     delta_term: f64,
     delta_phrase: f64,
     bm25: (f64, f64),
 ) -> Option<Vec<(u64, f64)>> {
     let lookup = TextTermLookup::new(indexes, delta_term, delta_phrase, bm25);
-    let mut iterator = match QueryBuilder::new(&lookup)
-        .create_search(FullTextQueryContext::new(root).with_topn(topn))
-    {
+    let mut iterator = match QueryBuilder::new(&lookup).create_search(
+        FullTextQueryContext::new(root)
+            .with_topn(topn)
+            .with_minimum_should_match(minimum_should_match),
+    ) {
         Ok(Some(iterator)) => iterator,
         // A tree that built but produced no iterator matches nothing.
         Ok(None) => return Some(Vec::new()),
@@ -229,7 +261,7 @@ pub(crate) fn run_query_tree(
         if allowed.is_some_and(|rows| !rows.contains(doc)) {
             continue;
         }
-        let score = iterator.score();
+        let score = iterator.score() + rank_features.map_or(0.0, |rank| rank.bonus(doc));
         if threshold.is_some_and(|t| score <= t) {
             continue;
         }

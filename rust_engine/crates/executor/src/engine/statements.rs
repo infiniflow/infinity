@@ -355,6 +355,10 @@ type BoxedMatch<'a> = std::pin::Pin<
     Box<dyn std::future::Future<Output = Result<(Vec<Vec<Value>>, Vec<String>)>> + Send + 'a>,
 >;
 
+/// The groups `rank_features=<col>^<tag>^<weight>,…` names: the scoring
+/// column's position in the schema, and the `(tag, weight)` pairs listed for it.
+type RankFeatureGroups = Vec<(usize, Vec<(String, f64)>)>;
+
 impl Engine {
     /// Opens without a WAL: catalog writes are buffered behind an undo journal
     /// and survive a reopen only if a checkpoint ran after they committed.
@@ -2334,6 +2338,7 @@ impl Engine {
     /// The analyzer recorded for the index named `index_name` on `table`, i.e.
     /// the analyzer of the column that index covers.
     pub(crate) fn analyzer_of_index(&self, table: &str, index_name: &str) -> Option<String> {
+        self.hydrate_analyzers(table);
         let key = self.table_key(table);
         if let Some(a) = self
             .tables
@@ -2370,6 +2375,7 @@ impl Engine {
         table: &str,
         index_name: &str,
     ) -> Option<String> {
+        self.hydrate_analyzers(table);
         let key = self.table_key(table);
         self.tables
             .lock()
@@ -8528,36 +8534,25 @@ impl Engine {
         // analysed into terms instead of being parsed. `TO BE OR NOT` with
         // `operator=and` is four ANDed terms, not a boolean expression.
         if !has_operator_opt && super::text_query::has_query_syntax(&query) {
-            // The tree path scores each leaf on its own: it has no BooleanWeight,
-            // batch-OR or rank-feature channel. Options only the WAND path
-            // implements are rejected instead of being silently dropped -
-            // answering a different question than the one asked is worse than an
-            // error.
-            let given = |name: &str| -> bool {
-                params
-                    .split(';')
-                    .filter_map(|p| p.split_once('='))
-                    .any(|(k, _)| k.trim().eq_ignore_ascii_case(name))
-            };
-            let unsupported = |name: &str| -> Error {
-                Error::Invalid(format!(
-                    "{name} is not supported with the query-string grammar \
-                     (a AND b / a OR b / column:term)"
-                ))
-            };
+            // `similarity=boolean` has no definition on the tree path (it scores
+            // each field separately and counts matched terms, which is the WAND
+            // path's channel), so it stays an error instead of being silently
+            // dropped.
             if boolean {
-                return Err(unsupported("similarity=boolean"));
+                return Err(Error::Invalid(
+                    "similarity=boolean is not supported with the query-string grammar \
+                     (a AND b / a OR b / column:term)"
+                        .into(),
+                ));
             }
-            // `block_max` is not in this set: it only picks an early-termination
-            // algorithm (`EarlyTermAlgo`, `bound_select_statement_impl.cpp:169-190`)
-            // and every value yields the same result set. The tree path scores
-            // every candidate, which is `batch`/`false`; accepting the option
-            // keeps `compare` and the BMW spellings usable on a parsed query.
-            for name in ["minimum_should_match", "rank_features"] {
-                if given(name) {
-                    return Err(unsupported(name));
-                }
-            }
+            // `minimum_should_match` is a count of matched root clauses, which
+            // `MinimumShouldMatchIterator` answers over the query tree
+            // (`minimum_should_match_iterator_impl.cpp`); `rank_features` is
+            // added to each hit's score from the tag payloads, as the WAND path
+            // does. `block_max` only picks an early-termination algorithm
+            // (`bound_select_statement_impl.cpp:169-190`), so every value
+            // yields the same rows; the tree path scores every candidate.
+            let rank_features = self.parse_rank_features(table, &schema, &params)?;
             // The predicate / `filter=` / `IN (…)` narrow the candidates before
             // the tree ranks and truncates, exactly like the WAND path.
             let dead = self.tombstone_set(table)?;
@@ -8575,6 +8570,8 @@ impl Engine {
                     threshold,
                     (bm25_k1, bm25_b),
                     allowed.as_ref(),
+                    super::state::search_option(&params, "minimum_should_match").as_deref(),
+                    &rank_features,
                 )
                 .await?
             {
@@ -8597,52 +8594,8 @@ impl Engine {
                 return Ok((out, hidden.to_vec()));
             }
         }
-        // `rank_features=<col>^<tag>^<weight>,…`: each document's `<col>` value is
-        // a JSON array of `{"<tag>": <number>}` objects (its index uses the
-        // `rankfeatures` analyzer), and the score gains `number * weight` for
-        // every listed tag.
-        let rank_features: Vec<(usize, Vec<(String, f64)>)> = {
-            let spec = params
-                .split(';')
-                .filter_map(|p| p.split_once('='))
-                .find(|(k, _)| k.trim().eq_ignore_ascii_case("rank_features"))
-                .map(|(_, v)| v.to_string());
-            let mut groups: Vec<(usize, Vec<(String, f64)>)> = Vec::new();
-            if let Some(spec) = spec {
-                for item in spec.split(',') {
-                    let parts: Vec<&str> = item.split('^').map(str::trim).collect();
-                    let (Some(col), Some(tag)) = (parts.first(), parts.get(1)) else {
-                        continue;
-                    };
-                    // The scoring column needs a `rankfeatures` full-text index.
-                    let tkey = self.table_key(table);
-                    let analyzer = self
-                        .tables
-                        .lock()
-                        .unwrap()
-                        .get(&tkey)
-                        .and_then(|e| e.analyzers.get(*col).cloned())
-                        .unwrap_or_default();
-                    if !analyzer.eq_ignore_ascii_case("rankfeatures") {
-                        if std::env::var_os("INF_DEBUG_SQL").is_some() {
-                            eprintln!("[RANKF] table={table} col={col} analyzer={analyzer:?}");
-                        }
-                        return Err(Error::Invalid(format!(
-                            "rank_features requires a rankfeatures index on '{col}'"
-                        )));
-                    }
-                    let Some(ci) = schema.iter().position(|c| c == col) else {
-                        continue;
-                    };
-                    let weight = parts.get(2).and_then(|w| w.parse().ok()).unwrap_or(1.0);
-                    match groups.iter_mut().find(|(c, _)| *c == ci) {
-                        Some((_, list)) => list.push(((*tag).to_string(), weight)),
-                        None => groups.push((ci, vec![((*tag).to_string(), weight)])),
-                    }
-                }
-            }
-            groups
-        };
+        // `rank_features`: the WAND loop below adds the per-document bonus.
+        let rank_features = self.parse_rank_features(table, &schema, &params)?;
         // Block-max WAND: an OR query over one or more fields never needs a
         // row's token vectors — the posting lists alone answer it. Filters
         // become a dead set, and `minimum_should_match` / `delta_term` /
@@ -9216,6 +9169,81 @@ impl Engine {
         Ok((out, hidden.to_vec()))
     }
 
+    /// `rank_features=<col>^<tag>^<weight>,…`: each document's `<col>` value is a
+    /// JSON array of `{"<tag>": <number>}` objects (its index uses the
+    /// `rankfeatures` analyzer), and the score gains `number * weight` for every
+    /// listed tag. Returns one group per column with its `(tag, weight)` list.
+    fn parse_rank_features(
+        &self,
+        table: &str,
+        schema: &[String],
+        params: &str,
+    ) -> Result<RankFeatureGroups> {
+        let mut groups: RankFeatureGroups = Vec::new();
+        let Some(spec) = super::state::search_option(params, "rank_features") else {
+            return Ok(groups);
+        };
+        for item in spec.split(',') {
+            let parts: Vec<&str> = item.split('^').map(str::trim).collect();
+            let (Some(col), Some(tag)) = (parts.first(), parts.get(1)) else {
+                continue;
+            };
+            // The scoring column needs a `rankfeatures` full-text index. The
+            // record comes from the catalog: the in-memory analyzer maps are only
+            // filled once the table's indexes are open, so a cold process (the
+            // CLI, a restarted server) would otherwise reject a valid column.
+            let rankfeatures_index = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .any(|im| {
+                    im.column == *col
+                        && im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                        && im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("analyzer")
+                                && value.eq_ignore_ascii_case("rankfeatures")
+                        })
+                });
+            if !rankfeatures_index {
+                return Err(Error::Invalid(format!(
+                    "rank_features requires a rankfeatures index on '{col}'"
+                )));
+            }
+            let Some(ci) = schema.iter().position(|c| c == col) else {
+                continue;
+            };
+            let weight = parts.get(2).and_then(|w| w.parse().ok()).unwrap_or(1.0);
+            match groups.iter_mut().find(|(c, _)| *c == ci) {
+                Some((_, list)) => list.push(((*tag).to_string(), weight)),
+                None => groups.push((ci, vec![((*tag).to_string(), weight)])),
+            }
+        }
+        Ok(groups)
+    }
+
+    /// The per-row `rank_features` bonus: every listed tag's index payload,
+    /// decoded with `SmallFloat::UInt16ToFloat122` and multiplied by its weight.
+    async fn rank_feature_scores(
+        &self,
+        table: &str,
+        schema: &[String],
+        rank_features: &[(usize, Vec<(String, f64)>)],
+    ) -> Result<super::text_query::RankFeatureScores> {
+        let mut tags = Vec::new();
+        for (ci, per_tag) in rank_features {
+            let name = schema[*ci].clone();
+            let tokenizer = self.index_tokenizer(table, &name);
+            let index = self.text_index_for(table, &name, tokenizer).await?;
+            let guard = index.read().await;
+            for (tag, weight) in per_tag {
+                tags.push((*weight, guard.doc_payloads(tag)));
+            }
+        }
+        Ok(super::text_query::RankFeatureScores::new(tags))
+    }
+
     /// Scores a column-less `MATCH TEXT ('', '(doc:…)^w …')` clause. With
     /// `similarity=boolean` each group multiplies its boost by the sum of its
     /// fields' boolean scores (a `keyword`/`whitespace` field counts once, a
@@ -9243,6 +9271,12 @@ impl Engine {
         // Rows the predicate / `filter=` / `IN (…)` admit, applied before the
         // tree ranks and truncates - the WAND path's rule.
         allowed: Option<&crate::engine::wand::DocFilter>,
+        // `minimum_should_match=<spec>`: a share of the parsed tree's leaf count
+        // (`GetMinimumShouldMatchParameter`), enforced over the root's clauses.
+        minimum_should_match: Option<&str>,
+        // `rank_features` groups (`schema index, [(tag, weight)]`), added to each
+        // hit's score from the tag payloads.
+        rank_features: &[(usize, Vec<(String, f64)>)],
     ) -> Result<Option<Vec<(u64, f64)>>> {
         use crate::invertedindex::search::query_builder::SearchDriver;
         let tkey = self.table_key(table);
@@ -9343,6 +9377,10 @@ impl Engine {
             return Ok(None);
         };
         let dead = self.tombstone_set(table)?;
+        let schema = self.table_schema(table)?;
+        let rank_scores = self
+            .rank_feature_scores(table, &schema, rank_features)
+            .await?;
         let Some(hits) = super::text_query::run_query_tree(
             tree,
             lookup,
@@ -9350,6 +9388,8 @@ impl Engine {
             &dead,
             allowed,
             threshold,
+            minimum_should_match,
+            Some(&rank_scores),
             delta_term,
             delta_phrase,
             bm25,

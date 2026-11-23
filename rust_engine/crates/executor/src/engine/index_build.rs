@@ -1379,9 +1379,7 @@ impl Engine {
             else {
                 return false;
             };
-            self.tensor_row_ids(table, ci)
-                .map(|ids| ids.len() as u64)
-                .unwrap_or(0)
+            self.tensor_doc_count(table, ci)
         } else {
             // IVF: the writer's coverage is `column_vectors`, which skips a
             // NULL or unparseable cell. Comparing against the table's row count
@@ -4216,7 +4214,16 @@ impl Engine {
             .get(&key)
             .and_then(|e| e.mv.get(&index_id).cloned());
         if let Some(shared) = shared {
-            shared.write().unwrap().seal();
+            let mut guard = shared.write().unwrap();
+            // An SMVE column keeps its codes in memory only, so the tail is the
+            // only place they can come from. Building them here - before `seal`
+            // takes the tail - is also what keeps `wants_emvb_chunk`
+            // (`plaid.is_none() && smve.is_none()`) false: without this, a
+            // checkpoint paid a full EMVB prefilter build over every token of
+            // the column (measured: >25 min of one core on 62 k units) for an
+            // index the SMVE search never consults.
+            guard.build_smve();
+            guard.seal();
         }
     }
 
@@ -4568,6 +4575,67 @@ impl Engine {
         }
     }
 
+    /// Fills a table's analyzer maps from the catalog's index records.
+    ///
+    /// `CREATE INDEX … WITH (analyzer=…)` is the only writer of `analyzers`,
+    /// `analyzers_by_index` and `column_index_analyzers`, so a reopened process
+    /// starts with all three empty: `index_tokenizer` then fell back to the
+    /// default analyzer, and an index rebuilt from the persisted rows
+    /// re-tokenised every row with it. That silently changed the answer of a
+    /// `ngram`/`ik`/`rag-chinese` column and dropped the doc payload of a
+    /// `rankfeatures` one. Each `FULLTEXT` record keeps its analyzer in its
+    /// catalog `options`, so the maps are rebuilt from there once per table.
+    pub(crate) fn hydrate_analyzers(&self, table: &str) {
+        let key = self.table_key(table);
+        let loaded = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .is_some_and(|entry| entry.analyzers_loaded);
+        if loaded {
+            return;
+        }
+        let metas = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .unwrap_or_default();
+        let mut tables = self.tables.lock().unwrap();
+        let entry = tables.entry(key).or_default();
+        if entry.analyzers_loaded {
+            return;
+        }
+        entry.analyzers_loaded = true;
+        for meta in metas {
+            if !meta.index_type.eq_ignore_ascii_case("FULLTEXT") {
+                continue;
+            }
+            let Some(analyzer_name) = meta
+                .options
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case("analyzer"))
+                .map(|(_, value)| value.clone())
+            else {
+                continue;
+            };
+            entry
+                .analyzers_by_index
+                .entry(meta.name.clone())
+                .or_insert_with(|| analyzer_name.clone());
+            entry
+                .column_index_analyzers
+                .entry(meta.column.clone())
+                .or_default()
+                .entry(meta.name.clone())
+                .or_insert_with(|| analyzer_name.clone());
+            entry
+                .analyzers
+                .entry(meta.column.clone())
+                .or_insert_with(|| analyzer_name);
+        }
+    }
+
     /// The analyzer a query written against `column` is tokenised with.
     ///
     /// C++ `SearchDriver::GetAnalyzerName`: a query that names no `@index`
@@ -4576,6 +4644,7 @@ impl Engine {
     /// column has both; only a column whose indexes are all sparse-gram falls
     /// back to one of those.
     pub(crate) fn column_analyzer_name(&self, table: &str, column: &str) -> Option<String> {
+        self.hydrate_analyzers(table);
         let key = self.table_key(table);
         let guard = self.tables.lock().unwrap();
         let entry = guard.get(&key)?;
