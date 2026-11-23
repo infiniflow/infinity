@@ -355,6 +355,10 @@ type BoxedMatch<'a> = std::pin::Pin<
     Box<dyn std::future::Future<Output = Result<(Vec<Vec<Value>>, Vec<String>)>> + Send + 'a>,
 >;
 
+/// The groups `rank_features=<col>^<tag>^<weight>,…` names: the scoring
+/// column's position in the schema, and the `(tag, weight)` pairs listed for it.
+type RankFeatureGroups = Vec<(usize, Vec<(String, f64)>)>;
+
 impl Engine {
     /// Opens without a WAL: catalog writes are buffered behind an undo journal
     /// and survive a reopen only if a checkpoint ran after they committed.
@@ -9133,8 +9137,8 @@ impl Engine {
         table: &str,
         schema: &[String],
         params: &str,
-    ) -> Result<Vec<(usize, Vec<(String, f64)>)>> {
-        let mut groups: Vec<(usize, Vec<(String, f64)>)> = Vec::new();
+    ) -> Result<RankFeatureGroups> {
+        let mut groups: RankFeatureGroups = Vec::new();
         let Some(spec) = super::state::search_option(params, "rank_features") else {
             return Ok(groups);
         };
