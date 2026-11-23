@@ -116,6 +116,13 @@ fn json_escape(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
+            // RFC 8259 forbids a raw U+0000..=U+001F in a string, and a `/query`
+            // answer can carry one: `SELECT '\u{1}'` returns the control
+            // character in a cell. Writing it through produced a body no client
+            // could parse.
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
             _ => out.push(c),
         }
     }
@@ -3671,6 +3678,35 @@ mod tests {
         );
         // A truncated escape is not an escape either.
         assert!(parse_json("{\"body\":\"\\ud83\"}").is_none(), "short hex");
+    }
+
+    /// `rows_json` must emit valid JSON for any cell, including the control
+    /// characters a `SELECT` can hand back. A raw U+0001 in a string makes the
+    /// whole response unparseable.
+    #[test]
+    fn json_escape_covers_the_control_characters() {
+        let cell = "a\u{1}b\u{1f}c\td".to_string();
+        let body = rows_json(&["c".to_string()], &[vec![cell.clone()]]);
+        assert!(
+            !body.contains('\u{1}') && !body.contains('\u{1f}'),
+            "a raw control character reached the body"
+        );
+        // The reader rejects a raw control character, so parsing the answer is
+        // the check that the escaping is complete.
+        let parsed = parse_json(&body).expect("the answer is valid JSON");
+        let row = match &parsed {
+            Json::Obj(fields) => fields
+                .iter()
+                .find(|(k, _)| k == "rows")
+                .map(|(_, v)| v.clone())
+                .expect("rows"),
+            _ => panic!("object"),
+        };
+        assert_eq!(
+            row,
+            Json::Arr(vec![Json::Arr(vec![Json::Str(cell)])]),
+            "the cell survives the round trip"
+        );
     }
 
     #[tokio::test]
