@@ -992,6 +992,8 @@ impl PlaidIndex {
         total_tokens_in_c_scores: usize,
         luts: &[f32],
     ) -> f32 {
+        let dim = self.embedding_dimension as usize;
+        let centroids = self.centroids_data();
         let doc_len = self.doc_lens[doc_id as usize] as usize;
         let packed_dim = self.packed_dim() as usize;
         let quantizer = self.quantizer.as_ref().expect("PLAID mode has a quantizer");
@@ -1004,7 +1006,13 @@ impl PlaidIndex {
                 let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
                 let centroid_part =
                     c_scores[q * total_tokens_in_c_scores + doc_start_in_c_scores + d];
-                max_score = max_score.max(centroid_part + r);
+                let cid = self.centroid_ids[emb] as usize;
+                let scale = quantizer.reconstruction_scale(
+                    emb,
+                    &centroids[cid * dim..(cid + 1) * dim],
+                    self.packed(),
+                );
+                max_score = max_score.max((centroid_part + r) * scale);
             }
             if max_score > f32::MIN {
                 total += max_score;
@@ -1106,12 +1114,12 @@ impl PlaidIndex {
                     let lut = &luts[q * packed_dim * 256..(q + 1) * packed_dim * 256];
                     let mut max_score = f32::MIN;
                     for d in 0..doc_len {
-                        let r = quantizer.single_ip_distance_from_lut(
-                            doc_offset + d,
-                            lut,
-                            self.packed(),
-                        );
-                        max_score = max_score.max(c_scores[q * total_tokens + start + d] + r);
+                        let emb = doc_offset + d;
+                        let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
+                        let cent = &gathered[(start + d) * dim..(start + d + 1) * dim];
+                        let scale = quantizer.reconstruction_scale(emb, cent, self.packed());
+                        max_score =
+                            max_score.max((c_scores[q * total_tokens + start + d] + r) * scale);
                     }
                     if max_score > f32::MIN {
                         total += max_score;

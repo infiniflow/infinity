@@ -1092,10 +1092,23 @@ func makeMatchTensorExpr(
 	columnExpr.ColumnName = []string{vectorColumnName}
 	columnExpr.Star = false
 
-	// Create embedding data - flatten tensor to array for storage
+	// Create embedding data - flatten the tensor into one array. `tensorData`
+	// holds one row per token for the multi-vector shapes, and the engine
+	// splits the buffer by the column's dimension, so every token has to be
+	// present: writing only `tensorData[0]` silently reduced a multi-token
+	// query to its first token, and MaxSim then summed a single row and ranked
+	// every document by a one-token match.
 	data := thriftapi.NewEmbeddingData()
 	if len(tensorData) > 0 {
-		data.F64ArrayValue = tensorData[0]
+		if len(tensorData) == 1 {
+			data.F64ArrayValue = tensorData[0]
+		} else {
+			flat := make([]float64, 0, len(tensorData)*len(tensorData[0]))
+			for _, row := range tensorData {
+				flat = append(flat, row...)
+			}
+			data.F64ArrayValue = flat
+		}
 	}
 
 	matchTensorExpr := thriftapi.NewMatchTensorExpr()

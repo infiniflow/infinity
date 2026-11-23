@@ -16,22 +16,31 @@
 //!
 //! A local client (rgrep's daemon) does not want a server to install, a port to
 //! pick or a supervisor to keep the two in step. It wants one process whose
-//! lifetime is its own. This crate is that: `inf_embedded_start` opens the
-//! engine on a directory, serves the ordinary thrift front end on a **unix
-//! socket** inside that directory, and `inf_embedded_stop` closes both.
+//! lifetime is its own. This crate is that: an entry point opens the engine on a
+//! directory, serves the ordinary thrift front end on an endpoint inside that
+//! directory (or on a loopback port), and the matching stop closes both.
+//!
+//! Two entry points, because a socket path is not portable:
+//!
+//! * [`inf_embedded_start`] binds a unix socket (`cfg(unix)` only). rgrep's
+//!   daemon uses it.
+//! * [`inf_embedded_start_tcp`] binds `127.0.0.1:0` and reports the assigned
+//!   port. It is the cross-platform entry point: Windows has no usable
+//!   `tokio::net::UnixListener`, and a loopback port also lets a host whose
+//!   unix-socket path budget is small (`sun_path` is 104 bytes on macOS) avoid
+//!   the limit entirely.
 //!
 //! Why a socket rather than a direct call: everything above the transport -
 //! thrift framing, the session table, every statement arm, the panic boundary -
-//! already exists in `server`, and a client that speaks thrift over a unix
-//! socket is the *same* client code as one that speaks it over TCP (the Go SDK
-//! only swaps its dialer). A function-call ABI would have meant a second
-//! statement path to keep in step with the first.
+//! already exists in `server`, and a client that speaks thrift over a socket is
+//! the *same* client code as one that speaks it over TCP (the Go SDK only swaps
+//! its dialer). A function-call ABI would have meant a second statement path to
+//! keep in step with the first.
 //!
-//! Ownership: the handle returned by `inf_embedded_start` owns the runtime
-//! thread and the socket file; `inf_embedded_stop` joins that thread, removes
-//! the file and releases the engine, after which the data directory can be
-//! reopened. Every entry point catches panics - a panic must never unwind
-//! across the FFI boundary.
+//! Ownership: the handle returned by a start owns the runtime thread and the
+//! socket file; the stop joins that thread, removes the file and releases the
+//! engine, after which the data directory can be reopened. Every entry point
+//! catches panics - a panic must never unwind across the FFI boundary.
 
 #![allow(non_camel_case_types)]
 
@@ -39,16 +48,18 @@ use std::ffi::{c_char, c_int, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use executor::Engine;
 use server::Server;
 
-/// A running engine plus the thread serving its socket.
+/// A running engine plus the thread serving its endpoint.
 pub struct InfEmbedded {
-    /// The socket path, kept as a `CString` so `inf_embedded_addr` can hand out
-    /// a pointer that lives as long as the handle.
-    socket: CString,
+    /// The endpoint, kept as a `CString` so `inf_embedded_addr` can hand out a
+    /// pointer that lives as long as the handle: a socket path for the unix
+    /// entry point, `host:port` for the TCP one.
+    addr: CString,
     stop: Option<tokio::sync::oneshot::Sender<()>>,
     join: Option<std::thread::JoinHandle<()>>,
 }
@@ -89,7 +100,113 @@ unsafe fn c_str<'a>(p: *const c_char, what: &str) -> Result<&'a str, String> {
         .map_err(|_| format!("{what} is not valid UTF-8"))
 }
 
-/// Opens `data_dir` and serves the thrift API on `socket_path`.
+/// Opens the engine and serves it on whatever `bind` returns.
+///
+/// `socket_cleanup` is the path the serving thread unlinks on its way out; the
+/// TCP entry point passes none. `bind` runs inside the runtime's context, which
+/// `install_engine_handle` requires.
+fn boot(
+    data_dir: &str,
+    socket_cleanup: Option<std::path::PathBuf>,
+    bind: impl FnOnce(Arc<Engine>) -> Result<(Server, String), String>,
+) -> Result<InfEmbedded, String> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .thread_name("infinity-embedded")
+        .build()
+        .map_err(|e| format!("runtime: {e}"))?;
+
+    let engine = Arc::new(
+        runtime
+            .block_on(Engine::open_async(data_dir, Default::default()))
+            .map_err(|e| format!("open {data_dir}: {e}"))?,
+    );
+
+    // `[buffer] memindex_memory_quota`, which the CLI sets and this host did
+    // not: `0` disables the dump trigger, so a tail was never sealed and
+    // every query rebuilt the index from the rows instead of mapping a
+    // chunk. A multi-vector row is ~48 KB, so a 62 k-unit table kept 3 GiB
+    // of vectors resident and one query peaked at 8.2 GiB and still had to
+    // brute-force its way through, because the structure that would have
+    // pruned it is what the dump builds.
+    //
+    // 1 GiB is a laptop's answer, not the reference's 4 GiB default: it
+    // bounds the tail at ~20 k units and pays the same build work the query
+    // would have paid, once per dump, during the import instead of on the
+    // first search. The chunks it writes are what later opens and queries
+    // map.
+    engine.set_memindex_quota(1 << 30);
+    // `install_engine_handle` records the running runtime, so the bind has
+    // to happen inside its context.
+    let bound = {
+        let _guard = runtime.enter();
+        let bound = bind(engine.clone())?;
+        drop(_guard);
+        bound
+    };
+    let (bound, addr) = bound;
+    let addr = CString::new(addr).map_err(|_| "address contains a NUL byte".to_string())?;
+
+    let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
+    let (ready_tx, ready_rx) = mpsc::channel::<()>();
+    let join = std::thread::Builder::new()
+        .name("infinity-embedded-serve".into())
+        .spawn(move || {
+            let _ = ready_tx.send(());
+            runtime.block_on(async move {
+                tokio::select! {
+                    _ = bound.serve() => {}
+                    _ = stop_rx => {}
+                }
+                if engine.has_work_since_checkpoint().await {
+                    // Seal the tails the checkpoint leaves in memory, now that
+                    // they are bounded: this host sets a memory quota, so what
+                    // is left is at most one watermark (~64 MiB of vectors,
+                    // seconds to dump) instead of the whole table. Without the
+                    // seal the rows written since the last quota dump have no
+                    // chunk, and the next query rebuilds the multi-vector index
+                    // from the rows rather than mapping the chunks.
+                    engine.set_flush_dumps_mem_index(true);
+                    if let Err(e) = engine.flush().await {
+                        eprintln!("embedded engine: final checkpoint failed: {e}");
+                    }
+                }
+                // The secondary tails, always: a dump is a key-to-rows map
+                // (no row is read to write it) and sealing it is what lets
+                // the next open skip a scan of the whole table.
+                engine.dump_secondary_indexes().await;
+                // `WalManager::Cleanup` is the only path that removes a
+                // sealed segment, and it is the background trigger that
+                // normally runs it. This host has none, so the stop does
+                // it: without that step the log keeps every segment it
+                // ever wrote, which is the disk half of the same
+                // problem the replay half had.
+                if let Err(e) = engine.cleanup().await {
+                    eprintln!("embedded engine: final cleanup failed: {e}");
+                }
+            });
+            // The select drops `serve` mid-listen; the unix socket file is
+            // ours either way (the normal path removes it too).
+            if let Some(path) = socket_cleanup {
+                let _ = std::fs::remove_file(path);
+            }
+            runtime.shutdown_timeout(Duration::from_millis(500));
+        })
+        .map_err(|e| format!("spawn: {e}"))?;
+    // Not a synchronisation point for readiness - the socket/port is already
+    // bound - but it keeps the thread from being created lazily under the
+    // first client's connect.
+    let _ = ready_rx.recv_timeout(Duration::from_secs(5));
+
+    Ok(InfEmbedded {
+        addr,
+        stop: Some(stop_tx),
+        join: Some(join),
+    })
+}
+
+/// Opens `data_dir` and serves the thrift API on a unix socket.
 ///
 /// Returns a handle, or null with `*err` set. The socket file exists when this
 /// returns, so a caller may connect immediately; the accept loop starts on the
@@ -98,6 +215,7 @@ unsafe fn c_str<'a>(p: *const c_char, what: &str) -> Result<&'a str, String> {
 /// # Safety
 /// `data_dir` and `socket_path` must be NUL-terminated strings; `err` must be
 /// null or point at a writable `char*`.
+#[cfg(unix)]
 #[no_mangle]
 pub unsafe extern "C" fn inf_embedded_start(
     data_dir: *const c_char,
@@ -110,121 +228,66 @@ pub unsafe extern "C" fn inf_embedded_start(
         if socket_path.is_empty() {
             return Err("socket_path is empty".to_string());
         }
-
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .thread_name("infinity-embedded")
-            .build()
-            .map_err(|e| format!("runtime: {e}"))?;
-
-        let engine = std::sync::Arc::new(
-            runtime
-                .block_on(Engine::open_async(&data_dir, Default::default()))
-                .map_err(|e| format!("open {data_dir}: {e}"))?,
-        );
-        // `[buffer] memindex_memory_quota`, which the CLI sets and this host did
-        // not: `0` disables the dump trigger, so a tail was never sealed and
-        // every query rebuilt the index from the rows instead of mapping a
-        // chunk. A multi-vector row is ~48 KB, so a 62 k-unit table kept 3 GiB
-        // of vectors resident and one query peaked at 8.2 GiB and still had to
-        // brute-force its way through, because the structure that would have
-        // pruned it is what the dump builds.
-        //
-        // 1 GiB is a laptop's answer, not the reference's 4 GiB default: it
-        // bounds the tail at ~20 k units and pays the same build work the query
-        // would have paid, once per dump, during the import instead of on the
-        // first search. The chunks it writes are what later opens and queries
-        // map.
-        engine.set_memindex_quota(1 << 30);
-        // `install_engine_handle` records the running runtime, so the bind has
-        // to happen inside its context.
-        let _guard = runtime.enter();
-        let bound = Server::bind_unix_with_engine(&socket_path, engine.clone())
-            .map_err(|e| format!("bind {socket_path}: {e}"))?;
-        drop(_guard);
-
-        let (stop_tx, stop_rx) = tokio::sync::oneshot::channel::<()>();
-        let socket = CString::new(socket_path.clone())
-            .map_err(|_| "socket_path contains a NUL byte".to_string())?;
-        let cleanup = socket_path.clone();
-        let (ready_tx, ready_rx) = mpsc::channel::<()>();
-        let join = std::thread::Builder::new()
-            .name("infinity-embedded-serve".into())
-            .spawn(move || {
-                let _ = ready_tx.send(());
-                runtime.block_on(async move {
-                    tokio::select! {
-                        _ = bound.serve() => {}
-                        _ = stop_rx => {}
-                    }
-                    // The last chance to checkpoint. Without it the host's data
-                    // directory opens by replaying every record the log holds
-                    // beyond the newest frame - and the replay reads each
-                    // segment whole, so the log's whole history paid for every
-                    // open. Skipped when the session wrote nothing, so a
-                    // read-only host does not rewrite the block mirror on its
-                    // way out. The checkpoint also reclaims the segments it
-                    // seals (`flush_storage`), which is what keeps the log at
-                    // the size of one checkpoint.
-                    if engine.has_work_since_checkpoint().await {
-                        // Seal the tails the checkpoint leaves in memory, now that
-                        // they are bounded: this host sets a memory quota, so what
-                        // is left is at most one watermark (~64 MiB of vectors,
-                        // seconds to dump) instead of the whole table. Without the
-                        // seal the rows written since the last quota dump have no
-                        // chunk, and the next query rebuilds the multi-vector index
-                        // from the rows rather than mapping the chunks - 248 s for
-                        // 62 k units against milliseconds once they are all there.
-                        engine.set_flush_dumps_mem_index(true);
-                        if let Err(e) = engine.flush().await {
-                            eprintln!("embedded engine: final checkpoint failed: {e}");
-                        }
-                    }
-                    // The secondary tails, always: a dump is a key-to-rows map
-                    // (no row is read to write it) and sealing it is what lets
-                    // the next open skip a scan of the whole table - measured
-                    // at 94.5 s of a 102 s open for 62 k units with one
-                    // `path` index and nothing sealed. Not gated on the
-                    // checkpoint flag: a checkpoint the append budget already
-                    // ran leaves those tails unsealed, and an empty one is
-                    // skipped inside `dump_index_transaction`.
-                    //
-                    // The vector tails are the other trade and stay put:
-                    // sealing one rebuilds that index from the rows, ~64 ms per
-                    // unit, against the ~1-2 ms per unit `RecoverMemIndex`
-                    // spends rebuilding the same rows on the next open.
-                    engine.dump_secondary_indexes().await;
-                    // `WalManager::Cleanup` is the only path that removes a
-                    // sealed segment, and it is the background trigger that
-                    // normally runs it. This host has none, so the stop does
-                    // it: without that step the log keeps every segment it
-                    // ever wrote, which is the disk half of the same
-                    // problem the replay half had.
-                    if let Err(e) = engine.cleanup().await {
-                        eprintln!("embedded engine: final cleanup failed: {e}");
-                    }
-                });
-                // The select drops `serve` mid-listen; the socket file is ours
-                // either way (the normal path removes it too).
-                let _ = std::fs::remove_file(&cleanup);
-                runtime.shutdown_timeout(Duration::from_millis(500));
-            })
-            .map_err(|e| format!("spawn: {e}"))?;
-        // Not a synchronisation point for readiness - the socket is already
-        // bound - but it keeps the thread from being created lazily under the
-        // first client's connect.
-        let _ = ready_rx.recv_timeout(Duration::from_secs(5));
-
-        Ok(Box::into_raw(Box::new(InfEmbedded {
-            socket,
-            stop: Some(stop_tx),
-            join: Some(join),
-        })))
+        let cleanup = std::path::PathBuf::from(&socket_path);
+        boot(&data_dir, Some(cleanup), |engine| {
+            let bound = Server::bind_unix_with_engine(&socket_path, engine)
+                .map_err(|e| format!("bind {socket_path}: {e}"))?;
+            Ok((bound, socket_path.clone()))
+        })
     }));
-
     match result {
-        Ok(Ok(handle)) => handle,
+        Ok(Ok(handle)) => Box::into_raw(Box::new(handle)),
+        Ok(Err(message)) => {
+            set_err(err, message);
+            ptr::null_mut()
+        }
+        Err(payload) => {
+            set_err(err, format!("panic: {}", panic_message(payload)));
+            ptr::null_mut()
+        }
+    }
+}
+
+/// Opens `data_dir` and serves the thrift API on a loopback TCP port.
+///
+/// `host` may be null or empty, which means `127.0.0.1`; the port is always
+/// chosen by the OS and reported by [`inf_embedded_addr`] as `host:port`. This
+/// is the portable entry point: it works on every platform the crate builds
+/// for, unlike a unix socket path.
+///
+/// # Safety
+/// `data_dir` and `host` must be NUL-terminated strings (or `host` null); `err`
+/// must be null or point at a writable `char*`.
+#[no_mangle]
+pub unsafe extern "C" fn inf_embedded_start_tcp(
+    data_dir: *const c_char,
+    host: *const c_char,
+    err: *mut *mut c_char,
+) -> *mut InfEmbedded {
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let data_dir = c_str(data_dir, "data_dir")?.to_string();
+        let host = if host.is_null() {
+            "127.0.0.1".to_string()
+        } else {
+            let host = c_str(host, "host")?.to_string();
+            if host.is_empty() {
+                "127.0.0.1".to_string()
+            } else {
+                host
+            }
+        };
+        boot(&data_dir, None, |engine| {
+            let listen = format!("{host}:0");
+            let bound = Server::bind_with_engine(&listen, engine)
+                .map_err(|e| format!("bind {listen}: {e}"))?;
+            let addr = bound
+                .local_addr()
+                .map_err(|e| format!("local_addr {listen}: {e}"))?;
+            Ok((bound, addr))
+        })
+    }));
+    match result {
+        Ok(Ok(handle)) => Box::into_raw(Box::new(handle)),
         Ok(Err(message)) => {
             set_err(err, message);
             ptr::null_mut()
@@ -243,7 +306,7 @@ pub unsafe extern "C" fn inf_embedded_start(
 /// `start` succeeded).
 ///
 /// # Safety
-/// `handle` must come from [`inf_embedded_start`] and must not have been
+/// `handle` must come from one of the start entry points and must not have been
 /// stopped already.
 #[no_mangle]
 pub unsafe extern "C" fn inf_embedded_stop(handle: *mut InfEmbedded) -> c_int {
@@ -264,14 +327,15 @@ pub unsafe extern "C" fn inf_embedded_stop(handle: *mut InfEmbedded) -> c_int {
     0
 }
 
-/// The socket path this handle serves, borrowed from the handle.
+/// The endpoint this handle serves, borrowed from the handle: a socket path or
+/// `host:port`, matching the entry point that created it.
 ///
 /// # Safety
-/// `handle` must come from [`inf_embedded_start`] and be alive.
+/// `handle` must come from a start entry point and be alive.
 #[no_mangle]
 pub unsafe extern "C" fn inf_embedded_addr(handle: *const InfEmbedded) -> *const c_char {
     match handle.as_ref() {
-        Some(h) => h.socket.as_ptr(),
+        Some(h) => h.addr.as_ptr(),
         None => ptr::null(),
     }
 }
@@ -289,11 +353,9 @@ pub unsafe extern "C" fn inf_embedded_free(s: *mut c_char) {
 }
 
 fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
-    match payload.downcast_ref::<&str>() {
-        Some(s) => (*s).to_string(),
-        None => match payload.downcast_ref::<String>() {
-            Some(s) => s.clone(),
-            None => "unknown panic".to_string(),
-        },
-    }
+    payload
+        .downcast_ref::<&str>()
+        .map(|s| (*s).to_string())
+        .or_else(|| payload.downcast_ref::<String>().cloned())
+        .unwrap_or_else(|| "unknown panic".to_string())
 }

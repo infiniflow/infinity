@@ -4053,6 +4053,15 @@ impl MultiVectorIndex {
         // per dumped chunk. `PhysicalMatchTensorScan` does the same: one
         // `SearchWithBitmask` per `chunk_index_meta`, every hit added to the
         // same top-k, and no merge of the chunks on the read path.
+        if std::env::var_os("INFINITY_DEBUG_MV").is_some() {
+            eprintln!(
+                "DEBUG mv search plaid={} chunks={} exact={} k={}",
+                self.plaid.is_some(),
+                self.plaid_chunks.len(),
+                exact.is_some(),
+                k
+            );
+        }
         let flat: Vec<f32> = query.iter().flatten().copied().collect();
         let topn = k.max(1);
         let n_doc = plaid.n_doc_to_score.max(topn);
@@ -4110,6 +4119,25 @@ impl MultiVectorIndex {
             );
         }
         if indexed {
+            // The residual codes rank the shortlist; the column holds the
+            // float32 tokens. `ExactScorer` re-scores the rows the probe
+            // returned the way the SMVE branch does, which removes the code's
+            // quantization error from the score the caller sees. It costs one
+            // batch over `topn` rows (200 by default), and without it the
+            // ranking carries `±0.1` per token at a coarse centroid budget:
+            // an unrelated unit whose codes under-reconstruct their magnitude
+            // wins the MaxSim outright.
+            if let Some(rank) = exact.as_mut() {
+                let rank: ExactScorer<'_> = &mut **rank;
+                let seqs: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                let scored: std::collections::HashMap<u64, f32> = rank(&seqs).into_iter().collect();
+                for (seq, score) in hits.iter_mut() {
+                    if let Some(exact) = scored.get(seq) {
+                        *score = *exact;
+                    }
+                }
+            }
+
             // A short answer is the probe's answer, not a missing table: IVF
             // visited `n_ivf_probe` centroids and `centroid_score_threshold` may
             // have dropped more, which is what the reference returns as well -

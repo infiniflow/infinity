@@ -1379,9 +1379,7 @@ impl Engine {
             else {
                 return false;
             };
-            self.tensor_row_ids(table, ci)
-                .map(|ids| ids.len() as u64)
-                .unwrap_or(0)
+            self.tensor_doc_count(table, ci)
         } else {
             // IVF: the writer's coverage is `column_vectors`, which skips a
             // NULL or unparseable cell. Comparing against the table's row count
@@ -4216,7 +4214,16 @@ impl Engine {
             .get(&key)
             .and_then(|e| e.mv.get(&index_id).cloned());
         if let Some(shared) = shared {
-            shared.write().unwrap().seal();
+            let mut guard = shared.write().unwrap();
+            // An SMVE column keeps its codes in memory only, so the tail is the
+            // only place they can come from. Building them here - before `seal`
+            // takes the tail - is also what keeps `wants_emvb_chunk`
+            // (`plaid.is_none() && smve.is_none()`) false: without this, a
+            // checkpoint paid a full EMVB prefilter build over every token of
+            // the column (measured: >25 min of one core on 62 k units) for an
+            // index the SMVE search never consults.
+            guard.build_smve();
+            guard.seal();
         }
     }
 
