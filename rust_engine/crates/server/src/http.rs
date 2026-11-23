@@ -225,8 +225,12 @@ impl Json {
 }
 
 fn parse_json(text: &str) -> Option<Json> {
+    /// RFC 8259 whitespace: space, tab, line feed, carriage return. Not
+    /// `char::is_whitespace`, which also accepts vertical tab and form feed -
+    /// those are not JSON whitespace, so a body ending with `\x0b` would have
+    /// passed the end-of-input check.
     fn skip(s: &[u8], i: &mut usize) {
-        while *i < s.len() && (s[*i] as char).is_whitespace() {
+        while *i < s.len() && matches!(s[*i], b' ' | b'\t' | b'\n' | b'\r') {
             *i += 1;
         }
     }
@@ -3517,6 +3521,16 @@ mod tests {
         assert!(
             parse_json("{\"body\":\"x\"}  \n\t").is_some(),
             "trailing whitespace is still a valid body"
+        );
+        // Only RFC 8259 whitespace counts: vertical tab and form feed are not
+        // JSON whitespace, so they are trailing content and must be rejected.
+        assert!(
+            parse_json("{\"body\":\"x\"}\u{0b}").is_none(),
+            "vertical tab is not JSON whitespace"
+        );
+        assert!(
+            parse_json("{\"body\":\"x\"}\u{0c}").is_none(),
+            "form feed is not JSON whitespace"
         );
 
         // The route tells the two faults apart: a body `parse_json` rejects is

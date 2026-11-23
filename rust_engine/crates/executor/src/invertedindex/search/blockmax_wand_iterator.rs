@@ -779,13 +779,24 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
             // (1) FindPivotOptimized: the pivot is the first prefix whose upper
             // bound reaches the threshold, plus everything tied on its document.
-            let mut sum: f32 = 0.0;
+            //
+            // The running sum is widened by the same `n * EPSILON` factor as the
+            // termination bar, because this loop adds the bounds in **document**
+            // order while `score_prefix` adds the same numbers in **creation**
+            // order; the two orders round differently, and a partial sum that
+            // reads below the bar here can still be a score above it. Stopping
+            // the pivot too early is what loses the document: no pivot means the
+            // round ends and that candidate is never scored.
+            let mut sum: f64 = 0.0;
+            let mut taken = 0usize;
             let mut pivot = None;
             while let Some(Reverse((doc, i))) = self.heap.pop() {
                 self.heap_ops += 1;
-                sum += self.cursors[i].upper_bound;
+                sum += f64::from(self.cursors[i].upper_bound);
+                taken += 1;
                 self.prefix.push(i);
-                if sum >= self.threshold {
+                let widened = sum * (1.0 + taken as f64 * f64::from(f32::EPSILON));
+                if widened >= f64::from(self.threshold) {
                     pivot = Some(doc);
                     break;
                 }
@@ -838,7 +849,18 @@ impl<'a> BlockMaxWandIterator<'a> {
             // (3) Decision, the same shape as the reference's: score only when
             // every prefix cursor is parked on the candidate, and only return a
             // document whose exact score beats the k-th.
-            if sum_at_doc > self.threshold {
+            //
+            // `sum_at_doc` adds the bounds in document order; the exact score
+            // `score_prefix` produces adds the same numbers in creation order.
+            // Those two orders round differently in `f32`, so a candidate whose
+            // score clears the bar can still read below it here, and acting on
+            // that (returning false, or skipping the document) loses it. The
+            // comparison is widened by `n * EPSILON` for the same reason as the
+            // termination bar; the bounds themselves are exact `f32` values.
+            let parked = self.prefix.len();
+            let widened_at_doc =
+                f64::from(sum_at_doc) * (1.0 + parked as f64 * f64::from(f32::EPSILON));
+            if widened_at_doc > f64::from(self.threshold) {
                 if self
                     .prefix
                     .iter()
@@ -995,7 +1017,8 @@ impl<'a> BlockMaxWandIterator<'a> {
         // block ends first forward by one block.
         let mut next_doc = start;
         loop {
-            let mut sum_range: f32 = 0.0;
+            let mut sum_range: f64 = 0.0;
+            let mut live_range = 0usize;
             let mut min_last = u64::MAX;
             let mut earliest = None;
             for k in 0..self.prefix.len() {
@@ -1008,7 +1031,8 @@ impl<'a> BlockMaxWandIterator<'a> {
                     // Its block ends before the range: it contributes nothing.
                     continue;
                 }
-                sum_range += self.cursors[i].block_max(self.mode);
+                sum_range += f64::from(self.cursors[i].block_max(self.mode));
+                live_range += 1;
                 if last < min_last {
                     min_last = last;
                     earliest = Some(i);
@@ -1017,7 +1041,15 @@ impl<'a> BlockMaxWandIterator<'a> {
             let Some(i) = earliest else { break };
             // '>' like the reference: a range that can only tie cannot produce a
             // document that beats the k-th (ties never win on a larger doc id).
-            if sum_range > self.threshold {
+            //
+            // Widened by `n * EPSILON` for the same reason as the termination
+            // bar: this sum is in document order, the score it protects is
+            // summed in creation order, and skipping a range whose real score
+            // clears the threshold drops the documents in it. The bounds here
+            // are exact `f32` values, so a `f64` sum plus the accumulation
+            // allowance covers every order.
+            let widened = sum_range * (1.0 + live_range as f64 * f64::from(f32::EPSILON));
+            if widened > f64::from(self.threshold) {
                 break;
             }
             let skip_to = match up_to {
@@ -1242,6 +1274,55 @@ mod tests {
             "the ledger stopped a document whose f32 score clears the threshold"
         );
         assert_eq!(pruned.len(), 1, "document 0 qualifies");
+    }
+
+    /// The pivot sum has to be as conservative as the score it stands in for.
+    ///
+    /// `score_prefix` sums the prefix in *creation* order, but the pivot loop
+    /// sums the cursors the heap hands it, which is *document* order, and it
+    /// stops at the first partial sum that reaches the bar. Two orders of the
+    /// same addends give different `f32` totals, so a prefix the pivot never
+    /// completes can still score above the threshold when the document is
+    /// finally scored - and then no pivot is found and the document is lost.
+    ///
+    /// Eight boolean fields, weights `[1, s, s, s, s, s, s, s]` with
+    /// `s = 3 * 2^-25`: the first field matches only row 1, the rest match rows
+    /// 0 and 1, row 0 is deleted. The document-order partial sum reaches only
+    /// `1 + 5 * 2^-23` where creation order gives `1 + 7 * 2^-23`, so a bar of
+    /// `1 + 6 * 2^-23` is cleared by the score and missed by the pivot.
+    #[test]
+    fn the_pivot_bound_covers_the_scoring_order() {
+        let doc_len: Vec<(u64, u32)> = vec![(0, 10), (1, 10)];
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let s = 3.0f32 * 2f32.powi(-25);
+        // Field 0 (weight 1) hits only row 1; the rest (weight s) hit both rows.
+        let only_1: &[(u64, u32)] = &[(1, 1)];
+        let both: &[(u64, u32)] = &[(0, 1), (1, 1)];
+        let make = || {
+            let mut fields = vec![field(&[("t", only_1)], &doc_len, 2, vec![1.0])];
+            for _ in 0..7 {
+                fields.push(field(&[("t", both)], &doc_len, 2, vec![s]));
+            }
+            fields
+        };
+        let threshold = 1.0f32 + 6.0 * 2f32.powi(-23);
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the pivot sum missed a document the score clears the bar for"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 qualifies");
+        assert_eq!(pruned[0].0, 1);
     }
 
     /// A rounded threshold must not make the pruning switch change the answer.
