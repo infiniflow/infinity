@@ -8698,8 +8698,13 @@ impl Engine {
                     // Boolean similarity ignores per-term boosts (one point per
                     // matched unit, weighted by the field boost).
                     // `weight_` is a `float` on every iterator
-                    // (`term_doc_iterator_impl.cpp:106`).
-                    let weight = if boolean { *boost } else { boost * uboost } as f32;
+                    // (`term_doc_iterator_impl.cpp:106`), so both arms are
+                    // rounded rather than just the one the `as` binds to.
+                    let weight: f32 = if boolean {
+                        *boost as f32
+                    } else {
+                        (boost * uboost) as f32
+                    };
                     if boolean {
                         // `similarity=boolean` counts matched *terms*, not units:
                         // a phrase contributes one cursor per term, and the
@@ -9134,7 +9139,7 @@ impl Engine {
                                     .sum();
                                 let norm = (bm25_k1 + 1.0) * freq
                                     / (freq + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
-                                score += idf_sum * (norm + delta_phrase) * boost * uboost as f32;
+                                score += idf_sum * (norm + delta_phrase) * (boost * uboost as f32);
                                 continue;
                             }
                             for term in unit {
@@ -9149,7 +9154,7 @@ impl Engine {
                                 let tf = tf as f32;
                                 let norm = (bm25_k1 + 1.0) * tf
                                     / (tf + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
-                                score += idf * (norm + delta_term) * boost * uboost as f32;
+                                score += idf * (norm + delta_term) * (boost * uboost as f32);
                             }
                         }
                     }
