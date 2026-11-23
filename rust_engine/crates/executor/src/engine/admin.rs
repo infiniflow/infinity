@@ -1329,8 +1329,8 @@ impl Engine {
         // (`recover_mem_index`).
         //
         // The memory indexes still need a bound on a long import; that is the
-        // quota (`enforce_memindex_quota`) and the per-batch capacity dumps, not
-        // this function.
+        // quota (the reclaim round, `reclaim_unsealed`) and the per-batch
+        // capacity dumps, not this function.
         // `INFINITY_PROFILE_OPEN=1` also times the checkpoint's phases: a
         // checkpoint that crosses a client's RPC timeout is invisible otherwise,
         // and it is the write path's one long step.

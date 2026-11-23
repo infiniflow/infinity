@@ -44,6 +44,35 @@
 门禁：`test_cross_engine_bytes_20_table`（各索引 chunk 数）、`_30_segments`（配额驱动的 dump 与 tiling）、
 `_45_ddl`（9 阶段，含 create/drop index）、`_50_mutations`（重启/崩溃后的索引覆盖）。
 
+### 1.2 未落盘内存的周期回收（有意的设计偏离）
+
+**重写版有一条参考没有的回收路径**：写路径越过 `unsealed_memory_quota` 时只置一个标志，真正排水与周期扫描都发生在
+trigger loop 的 tick 上，以**表**为单位把 append buffer 与索引 tail 落盘，直到引擎总量回到配额的一半
+（`docs/MEMORY_RECLAIM.md`）。参考只有写路径上的配额触发且**立即**排水，所以：一张写完就没人动的表在参考里会一直
+占着内存（重写版会回收它），而一次突发写入在参考里按批次各排一次、在重写版里合并成一次 tick 的扫描（chunk 划分因此
+可能不同）。
+
+| | 参考 | 重写版 |
+|---|---|---|
+| 触发 | 写路径的 `MemIndexTracer` 配额，**立即**排水 | 同左判断，但只置标志；排水在 trigger loop 的 tick 上（定时或标志），目标为配额的一半 |
+| 单位 | 单个 `MemIndex`（`SegmentIndexMeta`） | **整表**：一次选中就排空该表所有索引 tail 与 append buffer |
+| 选表排序 | 无跨表排序（每次 breach 只处理写入表） | 尺寸与年龄两路名次做 RRF（`K = 3`，年龄优先），平局按年龄、字节、表名 |
+| 单轮上限 | 无（一次 breach 一个索引） | `unsealed_max_tables_per_round`（默认 100，`0` = 不限） |
+
+**影响**：内存回收的时机与参考不同，且比参考更早（闲置表也会被回收）。因此**服务端模式下的 dump 记录数与 chunk 划分
+可能与参考不同**——跨引擎字节门禁里凡是比较「chunk 数 / chunk 边界」的用例，若把配额设得很小并让服务端跑过 30 秒，
+就会看到差异。行数据本身不受影响（内存里的行本就在块文件和 WAL 里）。
+
+**门禁影响**：`python/restart_test/test_memidx.py::TestMemIdx::test_optimize_from_different_database` 断言
+「同一索引的两次 insert 各留一个 chunk，重启后 optimize 再合并成第三个」。它依赖参考「一次 breach 立即排一次、按批
+划分 chunk」的行为；重写版合并成一次 tick 的扫描、且该用例配置未设 `unsealed_reclaim_interval`（默认 30 s），
+30 秒内引不出第二个 chunk。行数据与合并后的结果不受影响，因此该 node 在 `rust_engine.yml` 的 `RUST_DESELECT`
+里取消选择（该 workflow 只跑 Rust 版，C++ 参考版 workflow 不受影响）；缺口关闭（例如回收改为按批排水）后再删掉这一行。
+
+配置：`[buffer] unsealed_reclaim_interval`（`0` 只停周期扫描，写路径置的标志仍会触发一次排水）、
+`unsealed_max_tables_per_round`（`0` = 不限，按**尝试**计数而非成功数）；`unsealed_memory_quota = 0`
+才是整个机制的开关，因为目标由它派生。配置值非法（`"512MiB"`、`"250ms"`、`-1`）在启动时报错并指明字段，不再静默变成 0。
+
 ## 2 未实现 / 未接线
 
 **本节没有未接线项**（`CREATE INDEX` 的 HNSW/全文封存时机见 §2.9）。这一层的现状：
@@ -58,9 +87,9 @@
 - **块格式表达不了的列类型**（DDL 拒绝之外的类型）：没有块可写，也没有行日志可写，这类表的行只活在 append buffer 里（进程内可见，重启即失）。现有 DDL 支持的列类型全部有块布局，所以这条路径目前不可达。
 - **列投影的并发守卫**：块文件就是行集，不需要「本进程写过镜像」的快照，快照只做并发守卫（`try_projection`）。
 
-崩溃恢复的口径：**compaction 在自己的提交里写它合并出的段**（`write_blocks_bounded`，块与 `catalog|seg|…` 记录一起落盘），否则崩溃时 `drop|seg|…` 标记已经 durable、新段却还没有块，表会读成空；**WAL 回放除表名外还比表 id**（`ReplayedAppend::table_id`），快照恢复把表换成了新 id，旧 id 的 append 帧不会再叠到恢复出来的行上；**checkpoint 的 segment 清理保留被提交上界裁掉的段**，否则一个先于某次提交开始的 checkpoint 会删掉那次提交刚写好的块目录。
+崩溃恢复的口径：**compaction 在自己的提交里写它合并出的段**（`write_blocks_bounded`，块与 `catalog|seg|…` 记录一起落盘），否则崩溃时 `drop|seg|…` 标记已经 durable、新段却还没有块，表会读成空；**WAL 回放除表名外还比表 id**（`ReplayedAppend::table_id`），快照恢复把表换成了新 id，旧 id 的 append 帧不会再叠到恢复出来的行上；**checkpoint 的 segment 清理保留被提交上界裁掉的段**，否则一个先于某次提交开始的 checkpoint 会删掉那次提交刚写好的块目录；**WAL 段的跳过要有两个下界**——`checkpoint_ts`（KV/SST 覆盖到哪）与块文件的 `block_floor`（行落块到哪），两者独立推进，只按前者跳过会把「在 checkpoint 读块之后、写帧之前提交」的那一批整段丢掉（`test_insert_checkpoint` 每次重启少 8192 行）。
 
-回归覆盖：`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 464 passed / 5 ignored、txn 30，全绿。
+回归覆盖：`txn::tests::a_segment_is_skipped_only_when_both_floors_cover_it`、`tests::concurrent_appends_survive_a_checkpoint_and_reopen`、`blocks::tests::a_checkpoint_writes_only_the_committed_prefix`、`tests::a_multivector_table_round_trips_through_its_blocks`、门禁 30 / 40。当前规模：executor 704 passed / 29 ignored、catalog 54、storage 464 passed / 5 ignored、txn 30，全绿。
 
 
 **导入在自己的提交里封段、落块**：`commit_import_chunk` 提交后按段容量（8,388,608 行）回绕、记录导入 extent（它决定段是否「封存」，也就是块和段要不要写 fast rough filter），再 `write_blocks_bounded` 把这一批行写进块；`copy_from` 的 `FORMAT FVECS` 分支同样。所以 `COPY` 结束就能看到磁盘上的真实分块：8,388,608 行 → 1 段 1024 块，8,388,609 行 → 2 段（1024 + 1 块）。

@@ -3981,7 +3981,7 @@ impl MultiVectorIndex {
         &self,
         query: &[Vec<f32>],
         k: usize,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
         exact: Option<&dyn Fn(u64) -> Option<f32>>,
         plaid: &PlaidSearchOptions,
         allowed: Option<&std::collections::HashSet<u64>>,
@@ -3996,7 +3996,7 @@ impl MultiVectorIndex {
                 for (doc, seq) in self.plaid_seqs.iter().enumerate() {
                     // `CalculateFilterBitmask` + the tombstone mask: only rows the
                     // statement admits take part in the search.
-                    if !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)) {
+                    if !dead.contains(*seq) && allowed.is_none_or(|set| set.contains(seq)) {
                         mask.set(doc as u32);
                     }
                 }
@@ -4041,7 +4041,7 @@ impl MultiVectorIndex {
                 let permitted: Vec<bool> = self
                     .smve_seqs
                     .iter()
-                    .map(|seq| !dead.contains(seq) && allowed.is_none_or(|set| set.contains(seq)))
+                    .map(|seq| !dead.contains(*seq) && allowed.is_none_or(|set| set.contains(seq)))
                     .collect();
                 let (scores, docs) = index.search(query, k.max(1), 5, Some(&permitted));
                 let mut hits: Vec<(u64, f32)> = docs
@@ -4053,7 +4053,7 @@ impl MultiVectorIndex {
                             (*seq, rank)
                         })
                     })
-                    .filter(|(seq, _)| !dead.contains(seq))
+                    .filter(|(seq, _)| !dead.contains(*seq))
                     .collect();
                 if !hits.is_empty() {
                     hits.sort_by(|a, b| {
@@ -4078,7 +4078,7 @@ impl MultiVectorIndex {
             };
             for doc in docs {
                 let Some(seq) = ids.get(doc) else { continue };
-                if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
+                if dead.contains(*seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                     continue;
                 }
                 hits.push((*seq, reader.maxsim(query, doc)));
@@ -4111,13 +4111,13 @@ impl MultiVectorIndex {
             if let Some(tail) = guard.as_ref() {
                 for (doc, _) in tail.data.view().search(
                     query,
-                    (k + dead.len()).max(1),
+                    (k + dead.len() as usize).max(1),
                     index::emvb::EmvbSearchOptions::for_topk(k.max(1)),
                 ) {
                     let Some(seq) = tail.seqs.get(doc as usize) else {
                         continue;
                     };
-                    if dead.contains(seq) || allowed.is_some_and(|set| !set.contains(seq)) {
+                    if dead.contains(*seq) || allowed.is_some_and(|set| !set.contains(seq)) {
                         continue;
                     }
                     if let Some(tokens) = self.tail.get(seq) {
@@ -4128,7 +4128,7 @@ impl MultiVectorIndex {
             drop(guard);
         } else {
             for (seq, doc) in &self.tail {
-                if dead.contains(seq)
+                if dead.contains(*seq)
                     || doc.is_empty()
                     || allowed.is_some_and(|set| !set.contains(seq))
                 {
@@ -4421,7 +4421,7 @@ impl SparseIndex {
         &self,
         query: &[(i32, f32)],
         k: usize,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
         options: index::sparse::BmpSearchOptions,
     ) -> Vec<(u64, f32)> {
         let mut hits: Vec<(u64, f32)> = Vec::new();
@@ -4430,9 +4430,9 @@ impl SparseIndex {
             // top-k; `search` clamps to the chunk's document count. The on-disk
             // reader runs the same `BMPAlgBase::SearchKnn` (`alpha`, `beta`,
             // `use_tail`) as the in-memory one.
-            for (row, score) in reader.search(query, k + dead.len(), options) {
+            for (row, score) in reader.search(query, k + dead.len() as usize, options) {
                 let seq = (segment << 32) | u64::from(row as u32);
-                if !dead.contains(&seq) {
+                if !dead.contains(seq) {
                     hits.push((seq, score));
                 }
             }
@@ -4464,9 +4464,9 @@ impl SparseIndex {
             // The memory index is a `BMPAlg` too, so `use_tail`/`beta` apply to
             // its own unsealed tail exactly as `bmp_search` does in the
             // reference.
-            for (doc, score) in tail.alg.search_knn(&qv, k + dead.len(), options) {
+            for (doc, score) in tail.alg.search_knn(&qv, k + dead.len() as usize, options) {
                 if let Some(seq) = tail.seqs.get(doc) {
-                    if !dead.contains(seq) {
+                    if !dead.contains(*seq) {
                         hits.push((*seq, score));
                     }
                 }
@@ -4630,32 +4630,6 @@ impl DropScope<'_> {
     }
 }
 
-/// The quota's proposed dumps: one per table, `drain_all` when the proposal
-/// asked for every tail.
-///
-/// A second breach for a table already listed merges into the pending entry
-/// instead of queueing a second task (`MemIndexTracer::proposed_dump_`'s
-/// coalescing); a breach for a different table still gets its own task.
-#[derive(Default)]
-pub(crate) struct MemIndexPending {
-    /// How many breaches each table has reported since its dump was proposed,
-    /// with [`ALL_TABLES`] standing for "every tail". A dump serves one, so a
-    /// count above 1 means another one is owed.
-    ///
-    /// The reference's `proposed_dump_` skips an **index** that already has a
-    /// dump in flight, but the breach it would have served is not lost: the
-    /// next `IncreaseMemoryUsage` sees the freed memory and only re-proposes if
-    /// it is still over. Counting here is the port's equivalent - a proposal
-    /// that arrives while a dump is queued is served by the dump that follows
-    /// it, not dropped.
-    pub(crate) pending: std::collections::HashMap<String, usize>,
-    /// The `drain_all` a queued task was asked for, per key.
-    pub(crate) drain_all: std::collections::HashSet<String>,
-}
-
-/// The marker [`MemIndexPending::tables`] uses for an "every tail" proposal.
-pub(crate) const ALL_TABLES: &str = "*";
-
 /// Secondary-index registry of one table (the reference's index metas under
 /// `src/storage/catalog/meta/` plus the sealed chunk readers), keyed by
 /// **index id**.
@@ -4700,6 +4674,66 @@ pub(crate) struct SecondaryIndexes {
     /// window would see neither copy, so the dump keeps the frozen entries here
     /// and readers merge them until the chunk is registered.
     pub(crate) sealing: HashMap<u64, Vec<std::sync::Arc<index::SealedTail>>>,
+}
+
+/// Same as `#[derive(Default)]` except for the reclaim clock: a table this
+/// process has not written yet is age **0**, not age "since the epoch".
+///
+/// `last_write_ms` starts at the process's monotonic start so the staleness
+/// sweep measures idleness from when the engine opened - a table loaded from
+/// disk with rows still in memory reads as freshly touched rather than infinitely
+/// old, which would put every table at the head of the first sweep.
+impl Default for TableEntry {
+    fn default() -> Self {
+        Self {
+            write_batches: 0,
+            importing: 0,
+            block_rows: None,
+            pending_rows: Default::default(),
+            staged_import_blocks: Default::default(),
+            pending_bytes: 0,
+            memindex_bytes: 0,
+            unsealed_marks: Default::default(),
+            last_attempt_ts: 0,
+            dump_failures: 0,
+            row_counter: None,
+            append_totals: None,
+            append_ts: None,
+            append_copy: None,
+            deleted_ids: None,
+            deleted_set: None,
+            delete_ts: None,
+            segments: Default::default(),
+            analyzers: Default::default(),
+            imports: None,
+            analyzers_by_index: Default::default(),
+            column_index_analyzers: Default::default(),
+            comments: Default::default(),
+            hnsw_mem: Default::default(),
+            hnsw_options: Default::default(),
+            index_pending_bytes: Default::default(),
+            hnsw_probed: false,
+            hnsw_topup: false,
+            sparse: Default::default(),
+            mv: Default::default(),
+            text: Default::default(),
+            text_epoch: 0,
+            text_built: Default::default(),
+            text_min_ts: 0,
+            secondary: Default::default(),
+            vector: Default::default(),
+            ivf: Default::default(),
+            ivf_mem: Default::default(),
+            spann: Default::default(),
+            spann_mem: Default::default(),
+            block_index: None,
+            live_rows: None,
+            mirror_dirty: false,
+            mirror_epoch: 0,
+            mirror_rows: None,
+            row_cache: None,
+        }
+    }
 }
 
 impl TableEntry {
@@ -4868,6 +4902,53 @@ impl TableEntry {
         self.pending_bytes + self.pending_rows.column_count() * std::mem::size_of::<Vec<Value>>()
     }
 
+    /// Records that this table's rows changed.
+    ///
+    /// Every site that advanced [`Self::mirror_epoch`] goes through here: they
+    /// answer the same question ("the files are behind the rows"), so splitting
+    /// them would let the two disagree. The age the reclaim loop ranks on is
+    /// **not** stamped here - it is the table's newest append commit ts, which
+    /// the append log already records (`append_ts`) and which therefore survives
+    /// a restart.
+    pub(crate) fn note_write(&mut self) {
+        self.mirror_dirty = true;
+        self.mirror_epoch += 1;
+        // A write means the table has something new to dump, so a backoff from
+        // an earlier failure no longer applies.
+        self.dump_failures = 0;
+    }
+
+    /// Whether every unsealed mark is zero - the table has nothing to dump.
+    pub(crate) fn unsealed_marks_are_empty(&self) -> bool {
+        self.unsealed_marks
+            .values()
+            .all(|mark| mark.load(std::sync::atomic::Ordering::Relaxed) == 0)
+    }
+
+    /// The mark for `index_id`, created on first use so a write hook never has
+    /// to know whether a dump already registered it.
+    pub(crate) fn unsealed_mark(&mut self, index_id: u64) -> &Arc<std::sync::atomic::AtomicU64> {
+        self.unsealed_marks
+            .entry(index_id)
+            .or_insert_with(|| Arc::new(std::sync::atomic::AtomicU64::new(0)))
+    }
+
+    /// Adds `rows` to one index's unsealed count. Saturating: the mark is
+    /// allowed to over-report, never to wrap.
+    pub(crate) fn bump_unsealed(&mut self, index_id: u64, rows: u64) {
+        self.unsealed_mark(index_id)
+            .fetch_add(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Zeroes one index's unsealed count. Called by **every** dump branch: a
+    /// branch that forgets leaves the table in the candidate set forever, and
+    /// the reclaim loop then spends one attempt per round on it.
+    pub(crate) fn clear_unsealed(&mut self, index_id: u64) {
+        if let Some(mark) = self.unsealed_marks.get(&index_id) {
+            mark.store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
     /// The buffered row `seq` in the **caller's** column order.
     ///
     /// The buffer is columnar, so this **materialises** the row: the cells live
@@ -4900,7 +4981,6 @@ impl TableEntry {
 /// `src/storage/common/block_index.cppm`). Upstream removed the older
 /// `TableEntry` / `SegmentEntry` / `BlockManager` classes (PR #2722), so this
 /// type stands in for their catalog-level successors, not for a single class.
-#[derive(Default)]
 pub(crate) struct TableEntry {
     /// Number of write batches (`COPY`/`INSERT`) seen by this process.
     pub(crate) write_batches: usize,
@@ -4959,6 +5039,35 @@ pub(crate) struct TableEntry {
     /// Bytes this table's in-memory index forms held when the process-wide
     /// total was last updated for it (see `Context::memindex_total`).
     pub(crate) memindex_bytes: usize,
+    /// Per-index count of rows (or bytes) an in-memory index tail holds, so the
+    /// periodic reclaim loop can ask "does this table have anything to dump?"
+    /// without taking any index's own lock.
+    ///
+    /// Only `SecondaryIndex` (`row_count`/`approx_bytes`) and `ivf_mem` expose a
+    /// lock-free count. HNSW's rows sit behind an `Arc<tokio::sync::Mutex<…>>`,
+    /// the full-text tail behind a `tokio::RwLock`, and BMP / multi-vector /
+    /// SPANN tails behind `std::sync::RwLock`s whose blocking `read()` must not
+    /// run on a runtime worker (`AGENTS.md` §7.2). Probing them with `try_lock`
+    /// is worse still: it reports "no data" exactly while a query holds the
+    /// lock, which is the state a table that needs reclaiming is in.
+    ///
+    /// So every write hook bumps the entry and every dump branch zeroes it. The
+    /// value is allowed to over-report - a stale non-zero only costs one wasted
+    /// attempt, which the failure backoff absorbs - but under-reporting would
+    /// leave a table in memory forever.
+    pub(crate) unsealed_marks: HashMap<u64, Arc<std::sync::atomic::AtomicU64>>,
+    /// When the reclaim loop last *tried* this table and the attempt released
+    /// nothing, in **commit ts**. The ranking's age is measured from
+    /// `max(last append ts, this)`, so a failing table recedes to the tail
+    /// instead of camping at the head of the order.
+    pub(crate) last_attempt_ts: u64,
+    /// Consecutive failed attempts, reset by a success or a write.
+    ///
+    /// The backoff is exponential in this count. Refreshing `last_attempt_ms`
+    /// on every failure without the counter would pin the table's age at zero
+    /// and leave it at the tail forever - the starvation the counter exists to
+    /// avoid, only inverted.
+    pub(crate) dump_failures: u32,
     /// `(segment, offset, sealed)` of the row-id allocator.
     pub(crate) row_counter: Option<(u32, u32, bool)>,
     /// Cumulative row count after every append transaction of this table
@@ -4977,15 +5086,21 @@ pub(crate) struct TableEntry {
     /// Row ids deleted since the table was created (`dellog:{table}`), loaded
     /// on first use.
     pub(crate) deleted_ids: Option<Vec<u64>>,
-    /// [`Self::deleted_ids`] as a set, so a single row's tombstone is one hash
-    /// lookup instead of a linear scan of the journal.
+    /// [`Self::deleted_ids`] as a bitmap, so a single row's tombstone is one
+    /// container lookup instead of a linear scan of the journal.
     ///
     /// A bulk `DELETE`/`UPDATE` asks `is_deleted` once per row, and the scan
     /// made that quadratic in the journal's length (a 5k-row statement against
     /// a 50k-entry journal walked 250M entries). Built lazily on the first
     /// lookup, extended by `note_deleted_ids`, dropped whenever the journal is
     /// rebuilt (`ensure_journals`).
-    pub(crate) deleted_set: Option<Arc<std::collections::HashSet<u64>>>,
+    ///
+    /// A `RoaringTreemap` rather than a hash set: the reference expresses the
+    /// same information as a CRoaring bitmap (`Bitmask`, whose per-segment
+    /// universes a row id's high 32 bits map onto exactly), and a `DELETE …
+    /// WHERE id < n` marks a *run* - a few dozen bytes here against ~15 KB in a
+    /// `HashSet`, tested once per candidate row on every indexed query.
+    pub(crate) deleted_set: Option<Arc<common::RowBitmap>>,
     /// Commit timestamp of every delete, one entry per `deleted_ids` entry
     /// (`delete_ts:{table}`).
     pub(crate) delete_ts: Option<Vec<u64>>,
@@ -5902,23 +6017,26 @@ pub(crate) struct Context {
     /// `PhysicalFlush` only runs a checkpoint and the cross-engine byte gates
     /// compare directories after `flush_data()`.
     pub(crate) flush_dumps_mem_index: std::sync::atomic::AtomicBool,
-    /// The tables with a quota-proposed `DumpMemIndexTask` queued or running,
-    /// and the engine-wide count that gates the fast path.
+    /// Commit ts before which no reclaim round may start, because the last one
+    /// released nothing.
+    pub(crate) unsealed_backoff_until: std::sync::atomic::AtomicU64,
+    /// Set by the write path when a batch pushed the byte ledger over
+    /// `unsealed_memory_quota`.
     ///
-    /// The reference's `MemIndexTracer::proposed_dump_` records the indexes a
-    /// dump already covers and skips **those**; it does not refuse to propose
-    /// anything else. A single global flag did: while one table's dump was in
-    /// flight, another table's breach was dropped outright, so that table
-    /// never drained (two databases, one HNSW index each, in
-    /// `test_optimize_from_different_database`).
-    pub(crate) memindex_pending: Arc<std::sync::Mutex<MemIndexPending>>,
-    /// The three-level waterlines over the one byte ledger (`SPANN_DESIGN.md`
-    /// §9.5): `soft` proposes a seal, `hard` escalates it to every tail of the
-    /// table. Derived from `memindex_quota`, never set directly.
-    pub(crate) watermarks: std::sync::Mutex<crate::engine::maintain::Watermarks>,
-    /// The fair seal scheduler (§9.6): weights per database, one seal in flight
-    /// per tenant, and the `index_seal_starvation` counter.
-    pub(crate) seal_scheduler: std::sync::Mutex<crate::engine::maintain::SealScheduler>,
+    /// The write path **does not drain**. Draining there would have to take
+    /// other tables' bottom gates from inside its own table's bottom half - the
+    /// cross-table cycle the block drain documents - and it would put a block
+    /// write plus an index dump on the statement's latency. It only raises this
+    /// flag; the trigger loop's next tick runs the same `reclaim_unsealed` the
+    /// periodic sweep runs, so there is one drain and one place that performs
+    /// it.
+    pub(crate) unsealed_reclaim_requested: std::sync::atomic::AtomicBool,
+    /// `[buffer] unsealed_reclaim_interval` in milliseconds: how often the
+    /// staleness sweep runs. `0` disables that path.
+    pub(crate) unsealed_reclaim_interval: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_max_tables_per_round`: how many tables one round may
+    /// dump. `0` means unlimited.
+    pub(crate) unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize,
     /// Per-index recall monitors (§11.3 item 4), keyed by table **and** catalog
     /// index id: an id is unique within a table, not across the engine, so keying
     /// on it alone let two tables with an index of the same id share one target,
@@ -7229,7 +7347,7 @@ pub(crate) async fn seal_text_index_gated(shared: &SharedTextIndex) {
 /// stay outside it.
 pub(crate) async fn optimize_text_index_unlocked(
     shared: &SharedTextIndex,
-    deleted: &std::collections::HashSet<u64>,
+    deleted: &common::RowBitmap,
 ) -> crate::Result<usize> {
     // Async, so the index lock is taken the same way every other caller takes
     // it. The chunk rewrite and its fsyncs are CPU and I/O, which is what the
@@ -7274,7 +7392,7 @@ pub(crate) async fn optimize_text_index_unlocked(
 pub(crate) async fn merge_text_index_from_catalog(
     dir: &str,
     chunks: &[crate::engine::text_index::CatalogChunk],
-    deleted: &std::collections::HashSet<u64>,
+    deleted: &common::RowBitmap,
 ) -> crate::Result<(usize, Vec<crate::engine::text_index::HeldTextChunk>)> {
     let mut index = TextIndex::new(dir.to_string(), TextTokenizer::default());
     // Nothing is re-indexed: `load_sealed_scoped` maps the chunks the catalog
@@ -10231,61 +10349,6 @@ pub(crate) fn files_under(dir: &Path) -> Vec<PathBuf> {
     }
     out.sort();
     out
-}
-
-impl BgTask for DumpMemIndexTask {
-    fn name(&self) -> &str {
-        "DumpMemIndexTask"
-    }
-
-    fn run(self: Box<Self>) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
-        Box::pin(async move {
-            if let Some(engine) = self.engine.upgrade() {
-                // A dump sees a whole write batch: the dump transaction
-                // conflicts with an append or update that already took its
-                // commit ts on the same segment and is retried, as the
-                // reference's `DoDump` is. Every step inside is an `.await`;
-                // the segment files it seals are written on the blocking pool,
-                // leaf by leaf.
-                if self.drain_all {
-                    engine.dump_all_memory_indexes().await;
-                    engine.dump_all_sealed_blocks(None).await;
-                } else {
-                    engine.dump_under_pressure(self.table.as_deref()).await;
-                }
-            }
-            // This task served one breach for its table. A breach that
-            // arrived while it was queued is still counted, and the dump that
-            // follows it is what turns that insert into its own chunk.
-            let key = self.table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
-            let more = {
-                let mut pending = self.pending.lock().unwrap();
-                let left = pending.pending.get_mut(&key).map(|count| {
-                    *count = count.saturating_sub(1);
-                    *count
-                });
-                match left {
-                    Some(0) | None => {
-                        pending.pending.remove(&key);
-                        pending.drain_all.remove(&key);
-                        false
-                    }
-                    Some(_) => true,
-                }
-            };
-            if more {
-                // Submit the continuation **without** recording another breach:
-                // the count already holds the one this task serves.
-                if let Some(engine) = self.engine.upgrade() {
-                    let processor = engine.bg_processor.lock().unwrap().clone();
-                    if let Some(processor) = processor {
-                        let drain_all = self.pending.lock().unwrap().drain_all.contains(&key);
-                        engine.submit_dump_task(processor, drain_all, self.table.clone());
-                    }
-                }
-            }
-        })
-    }
 }
 
 impl BgTask for CleanupTask {

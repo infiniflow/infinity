@@ -119,7 +119,7 @@ pub(crate) struct KnnCandidateScan<'a> {
     /// filter, or its shape is not columnar-evaluable, and then a filtered
     /// query must not use the index at all (its candidates could all be
     /// rejected, leaving a short top-k).
-    pub allowed: Option<&'a HashSet<usize>>,
+    pub allowed: Option<&'a common::RowMask>,
     /// The search width the recall monitor wants (§11.3 item 4). `None` keeps
     /// the index's own `base_beam`.
     pub beam: Option<usize>,
@@ -238,13 +238,18 @@ impl Engine {
         let Some(allowed) = q.allowed else {
             return base;
         };
+        // `RowMask::len()` is the admitted count, and `None` for "everything"
+        // (no universe to subtract from), which has no selectivity to widen by.
+        let Some(admitted) = allowed.len() else {
+            return base;
+        };
         let len = q
             .live_count
             .or_else(|| q.live_rows.map(<[usize]>::len))
             .unwrap_or(0)
-            .max(allowed.len())
+            .max(admitted as usize)
             .max(1);
-        let selectivity = (allowed.len() as f64 / len as f64).max(1e-3);
+        let selectivity = (admitted as f64 / len as f64).max(1e-3);
         let widened = ((base as f64) / selectivity).ceil() as usize;
         // A candidate list longer than the table is pure work: no index can
         // return more rows than it holds.
@@ -368,11 +373,7 @@ impl Engine {
             // which is correct and costs the gap, not the table.
             if let Some(tail) = &tail {
                 let tail_hits = match q.allowed {
-                    Some(allowed) => {
-                        let ids: std::collections::HashSet<u64> =
-                            allowed.iter().map(|id| *id as u64).collect();
-                        tail.search_filtered(q.query, budget, None, &ids)
-                    }
+                    Some(allowed) => tail.search_filtered(q.query, budget, None, allowed),
                     None => tail.search(q.query, budget, None),
                 };
                 candidates.extend(tail_hits.into_iter().map(|(id, _)| id as usize));
@@ -429,14 +430,14 @@ impl Engine {
                 for offset in seg.offsets() {
                     covered.insert(offset as usize);
                 }
-                for offset in seg.candidates(q.query, budget, nprobe, q.metric) {
+                // The mask goes **into** the part scan (`IVF_Filter` in
+                // `ivf_index_search.cppm`): filtering the truncated list here
+                // instead left `topn * 4` slots filled with deleted rows, so a
+                // mostly-deleted segment answered an empty top-k.
+                for offset in seg.candidates_filtered(q.query, budget, nprobe, q.metric, q.allowed)
+                {
                     candidates.insert(offset as usize);
                 }
-            }
-            // IVF re-scores the probed centroids' rows, so the mask applies to
-            // the candidate list (`IVF_Filter` in `ivf_index_search.cppm`).
-            if let Some(allowed) = q.allowed {
-                candidates.retain(|seq| allowed.contains(seq));
             }
             // Rows written after the mirror are not covered; only those are
             // read by the exact scan, not the table.
@@ -516,7 +517,7 @@ impl Engine {
                         .search_index_filtered(q.query, seg_k, search_option, &|node| {
                             seg.labels
                                 .get(node)
-                                .is_some_and(|label| allowed.contains(&(*label as usize)))
+                                .is_some_and(|label| allowed.contains(u64::from(*label)))
                         })
                 }
                 None => seg.index.search_index(q.query, seg_k, search_option),
@@ -542,7 +543,7 @@ impl Engine {
                 let hits = match q.allowed {
                     Some(allowed) => {
                         mem.search_filtered_with_ef(q.query, k, q.options.ef, &|row| {
-                            allowed.contains(&(row as usize))
+                            allowed.contains(row)
                         })
                     }
                     None => mem.search_with_ef(q.query, k, q.options.ef),

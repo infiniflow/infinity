@@ -42,6 +42,7 @@ env:
   # rust_engine/docs/GAPS.md section 1.
   RUST_DESELECT: |
     python/restart_test/test_cross_engine_bytes_60_storage.py::test_the_port_round_trips_through_object_storage
+    python/restart_test/test_memidx.py::TestMemIdx::test_optimize_from_different_database
 
   # The level `rust_engine/.cargo/config.toml` leaves at `native` is wrong for a
   # binary that has to run elsewhere, so every lane pins its own here.

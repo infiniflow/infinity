@@ -194,7 +194,7 @@ pub(crate) fn run_query_tree(
     root: QueryNode,
     indexes: HashMap<String, SharedTextIndex>,
     topn: usize,
-    dead: &HashSet<u64>,
+    dead: &common::RowBitmap,
     // Rows the predicate / `filter=` / `IN (…)` admit. Applied before the sort
     // and the truncation, so a rejected row never takes a `topn` slot.
     allowed: Option<&crate::engine::wand::DocFilter>,
@@ -223,7 +223,7 @@ pub(crate) fn run_query_tree(
             break;
         }
         target = doc + 1;
-        if dead.contains(&doc) {
+        if dead.contains(doc) {
             continue;
         }
         if allowed.is_some_and(|rows| !rows.contains(doc)) {

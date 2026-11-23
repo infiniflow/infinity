@@ -154,13 +154,11 @@ impl BGTaskProcessor {
     /// exists from `new` (see the field comment), so `false` only ever means
     /// "stopped" or "the queue is full".
     ///
-    /// The send is `try_send`, not `blocking_send`: `submit` is called from
-    /// `enforce_memindex_quota`, which already runs on a **runtime worker**
-    /// (its callers are all async: `run_bottom`, `insert_literals_inner`,
-    /// `copy_from_inner`), and blocking that worker on a full queue would park
+    /// The send is `try_send`, not `blocking_send`: `submit` can be called from
+    /// a **runtime worker**, and blocking that worker on a full queue would park
     /// the thread the rest of the statement needs. A full queue reports
-    /// `false` like a stopped one, so the caller takes its existing synchronous
-    /// dump path instead of waiting.
+    /// `false` like a stopped one, so the caller takes whatever synchronous
+    /// path it has instead of waiting.
     pub fn submit(&self, task: Box<dyn BgTask>) -> bool {
         let Some(sender) = self.jobs.lock().unwrap().clone() else {
             return false;

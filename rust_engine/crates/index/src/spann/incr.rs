@@ -55,6 +55,7 @@
 //! range.
 
 use crate::vector::l2_sq;
+use common::RowMask;
 
 use super::partition::{metric_score, Partition};
 use super::quantize::{self, Code, QueryCode, Rotation};
@@ -1260,7 +1261,7 @@ impl IncIndex {
         query: &[f32],
         k: usize,
         beam: usize,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         if self.parts.is_empty() || query.len() != self.dim {
             return Vec::new();
@@ -1314,13 +1315,7 @@ impl IncIndex {
         out.into_sorted()
     }
 
-    fn scan_leaf(
-        &self,
-        idx: usize,
-        query: &[f32],
-        out: &mut SearchSet,
-        allowed: Option<&std::collections::HashSet<u64>>,
-    ) {
+    fn scan_leaf(&self, idx: usize, query: &[f32], out: &mut SearchSet, allowed: Option<&RowMask>) {
         let part = &self.parts[idx];
         if let Some(raw) = part.raw.as_ref() {
             // The un-split root keeps the rows themselves, so it is measured
@@ -1334,7 +1329,7 @@ impl IncIndex {
                     continue;
                 };
                 if let Some(allowed) = allowed {
-                    if !allowed.contains(id) {
+                    if !allowed.contains(*id) {
                         continue;
                     }
                 }
@@ -1353,7 +1348,7 @@ impl IncIndex {
         let qc = quantize::make_query(&self.rot, part.rot_centroid(&self.rot), query);
         for member in part.members.iter().chain(part.pending.iter()) {
             if let Some(allowed) = allowed {
-                if !allowed.contains(&member.id) {
+                if !allowed.contains(member.id) {
                     continue;
                 }
             }
@@ -2168,12 +2163,12 @@ mod tests {
             idx.insert(*id, v).unwrap();
         }
         idx.run_fixups(None);
-        let allowed: std::collections::HashSet<u64> = (0..300u64).filter(|i| i % 5 == 0).collect();
+        let allowed = common::RowMask::from_rows((0..300u64).filter(|i| i % 5 == 0).collect());
         let q = &pts[3].1;
         let got = idx.search_masked(q, 10, 8, Some(&allowed));
         assert!(!got.is_empty());
         for (id, _) in got {
-            assert!(allowed.contains(&id), "row {id} is not allowed");
+            assert!(allowed.contains(id), "row {id} is not allowed");
         }
     }
 

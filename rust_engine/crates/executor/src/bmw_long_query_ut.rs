@@ -35,7 +35,7 @@
 //! per document). `INFINITY_BMW_IT_SCALE`, `INFINITY_BMW_IT_PERF` and
 //! `INFINITY_BMW_IT_RANDOM` gate the three opt-in cases like the reference does.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::invertedindex::search::blockmax_wand_iterator::{
     BlockMaxWandIterator, WandMode, WandStats,
@@ -223,7 +223,7 @@ async fn run(engine: &Engine, query: &str, config: RunConfig) -> RunResult {
         total_len: guard.corpus_len(),
         units,
     }];
-    let dead = HashSet::new();
+    let dead = common::RowBitmap::new();
     let k = config.topn.max(1);
     let mut iterator =
         BlockMaxWandIterator::new(fields, k, &dead, 0.0, config.min_should, WandMode::Bm25);
@@ -697,7 +697,7 @@ async fn long_query_stability() {
             total_len: guard.corpus_len(),
             units,
         }];
-        let dead = HashSet::new();
+        let dead = common::RowBitmap::new();
         let mut iterator = BlockMaxWandIterator::new(fields, 1, &dead, 0.0, 1, WandMode::Bm25);
         let mut cursor = 0usize;
         let mut probe = 0usize;
@@ -1063,7 +1063,7 @@ async fn long_query_randomized_differential() {
                 total_len: guard.corpus_len(),
                 units,
             }];
-            let dead = HashSet::new();
+            let dead = common::RowBitmap::new();
             let mut iterator =
                 BlockMaxWandIterator::new(fields, 10, &dead, 0.0, min_should, WandMode::Bm25);
             // `Next(target)` is **forward-only**: both paths return the current

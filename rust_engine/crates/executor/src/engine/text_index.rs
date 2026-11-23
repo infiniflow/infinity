@@ -1372,7 +1372,7 @@ pub(crate) struct MergePlan {
     runs: Vec<MergeRun>,
     /// Rows that were deleted: the merge drops their postings, which is the only
     /// point in a chunk's life where they can be reclaimed.
-    deleted: std::collections::HashSet<u64>,
+    deleted: common::RowBitmap,
 }
 
 pub(crate) struct SealJob {
@@ -2128,7 +2128,7 @@ impl TextIndex {
     /// which runs the I/O outside the lock.
     #[cfg(test)]
     pub(crate) fn optimize_chunks(&mut self) -> crate::Result<usize> {
-        self.optimize_chunks_with(&std::collections::HashSet::new())
+        self.optimize_chunks_with(&common::RowBitmap::new())
     }
 
     /// [`Self::optimize_chunks`] with the table's deleted rows, which is what
@@ -2136,7 +2136,7 @@ impl TextIndex {
     #[cfg(test)]
     pub(crate) fn optimize_chunks_with(
         &mut self,
-        deleted: &std::collections::HashSet<u64>,
+        deleted: &common::RowBitmap,
     ) -> crate::Result<usize> {
         let Some(plan) = self.plan_merge(deleted)? else {
             return Ok(0);
@@ -2168,7 +2168,7 @@ impl TextIndex {
     /// be made under the lock and executed outside it.
     pub(crate) fn plan_merge(
         &self,
-        deleted: &std::collections::HashSet<u64>,
+        deleted: &common::RowBitmap,
     ) -> crate::Result<Option<MergePlan>> {
         let segments = &self.reader.segments;
         if segments.len() < 2 {

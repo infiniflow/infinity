@@ -38,6 +38,7 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+pub mod bitmask;
 pub mod cast;
 pub mod datetime;
 pub mod error;
@@ -49,6 +50,7 @@ pub mod types;
 pub mod utility;
 pub mod varchar;
 
+pub use bitmask::{Bitmask, RowBitmap, RowMask, SharedRows};
 pub use cast::{
     bind_integer_cast, integer_try_cast_to_fixlen, integer_try_cast_to_varlen, CastError,
 };

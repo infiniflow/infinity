@@ -326,8 +326,7 @@ impl Engine {
             let entry = tables.entry(tkey.clone()).or_default();
             entry.append_totals = Some(totals.clone());
             entry.append_ts = Some(settled.clone());
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         // A hint for the mirror, not committed state: if the process dies
         // before the rows do, the mirror clips every total to the rows it
@@ -430,7 +429,7 @@ impl Engine {
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(tkey).or_default();
         entry.deleted_ids = Some(log);
-        // Keep the lazily built lookup in step with the journal it mirrors, or
+        // Keep the lazily built bitmap in step with the journal it mirrors, or
         // the rows this commit just deleted would read as live until the next
         // journal rebuild.
         if let Some(set) = entry.deleted_set.as_mut() {
@@ -450,8 +449,7 @@ impl Engine {
                 tail.forget(&gone);
             }
         }
-        entry.mirror_dirty = true;
-        entry.mirror_epoch += 1;
+        entry.note_write();
         drop(tables);
         first
     }
@@ -878,7 +876,7 @@ impl Engine {
         // before these rows join it.
         let gate = self.batch_gate(table);
         let phase = std::time::Instant::now();
-        self.note_index_insert(table, rows.len()).await;
+        self.note_index_insert(table, rows.len());
         // A scalar table's first batch in this process starts an empty decoded
         // row cache; the batch is appended after the commit.
         {
@@ -1153,7 +1151,7 @@ impl Engine {
         // the append buffer is bounded, and the next write to the table closes
         // it.
         if !self.has_index_declaration(table) {
-            self.enforce_quota_after_append(table).await;
+            self.enforce_quota_after_append(table);
         }
         // §9.2's row bound, not §9.5's byte watermarks: a spann mem index is the
         // query's candidate list, so one import can put a million rows into
@@ -1763,6 +1761,7 @@ impl Engine {
         seq: u64,
         schema: &[String],
     ) -> Vec<(
+        u64,
         String,
         Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
     )> {
@@ -1842,6 +1841,7 @@ impl Engine {
             .map(|im| (im.id, im.column))
             .collect();
         let mut out: Vec<(
+            u64,
             String,
             Arc<tokio::sync::Mutex<crate::hnsw_mem::HnswIndexInMem>>,
         )> = Vec::new();
@@ -1861,7 +1861,7 @@ impl Engine {
                     ),
                 ))
             });
-            out.push((column.clone(), std::sync::Arc::clone(&*mem)));
+            out.push((*id, column.clone(), std::sync::Arc::clone(&*mem)));
         }
         out
     }
@@ -1870,7 +1870,7 @@ impl Engine {
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (column, mem) in self.hnsw_graphs_for(table, seq, &schema).await {
+        for (index_id, column, mem) in self.hnsw_graphs_for(table, seq, &schema).await {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
@@ -1879,6 +1879,7 @@ impl Engine {
             let mut mem = mem.lock().await;
             if v.len() == mem.dims {
                 mem.insert(seq, &v).await;
+                self.note_unsealed(table, index_id, 1);
             }
         }
     }
@@ -1914,7 +1915,7 @@ impl Engine {
             if graphs.is_empty() {
                 return;
             }
-            for (column, mem) in graphs {
+            for (index_id, column, mem) in graphs {
                 let Some(ci) = schema.iter().position(|c| c == &column) else {
                     continue;
                 };
@@ -1937,6 +1938,7 @@ impl Engine {
                     self.hnsw_build_workers(),
                 )
                 .await;
+                self.note_unsealed(table, index_id, batch.len() as u64);
             }
         }
     }
@@ -1972,6 +1974,7 @@ impl Engine {
             return;
         };
         let by_id = self.index_column_map(table);
+        let mut grew: Vec<u64> = Vec::new();
         for (index_id, rows) in entry.ivf_mem.iter_mut() {
             let Some(column) = by_id.get(index_id) else {
                 continue;
@@ -1984,7 +1987,30 @@ impl Engine {
             let dims = types.get(ci).and_then(|t| type_dim(t)).unwrap_or(0);
             if !v.is_empty() && (dims == 0 || v.len() == dims) {
                 rows.push((seq, v));
+                grew.push(*index_id);
             }
+        }
+        // Outside the `ivf_mem` borrow: the same entry owns the marks map.
+        for index_id in grew {
+            entry.bump_unsealed(index_id, 1);
+        }
+    }
+
+    /// Records that an index's in-memory tail grew, for the periodic reclaim
+    /// loop's candidate test (`TableEntry::unsealed_marks`).
+    ///
+    /// A separate call rather than an inline `entry.bump_unsealed` because most
+    /// hooks take their `tables` guard in a different scope than the check
+    /// "did this row reach the tail". Over-reporting is safe (one wasted
+    /// attempt, absorbed by the failure backoff); under-reporting would keep a
+    /// table in memory forever, so a hook errs toward recording.
+    pub(crate) fn note_unsealed(&self, table: &str, index_id: u64, rows: u64) {
+        if rows == 0 {
+            return;
+        }
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            entry.bump_unsealed(index_id, rows);
         }
     }
 
@@ -2099,14 +2125,14 @@ impl Engine {
     ) {
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
             .tables
             .lock()
             .unwrap()
             .get(&tkey)
             .map(|e| {
                 e.mv.iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2119,7 +2145,7 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
@@ -2142,6 +2168,8 @@ impl Engine {
             if let Some(doc) = parse_multivector_doc(text, dims) {
                 index.insert(seq as u64, doc);
             }
+            drop(index);
+            self.note_unsealed(table, index_id, 1);
         }
     }
 
@@ -2149,7 +2177,7 @@ impl Engine {
     pub(crate) async fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let indexes: Vec<(String, Arc<std::sync::RwLock<SparseIndex>>)> = self
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<SparseIndex>>)> = self
             .tables
             .lock()
             .unwrap()
@@ -2157,7 +2185,7 @@ impl Engine {
             .map(|e| {
                 e.sparse
                     .iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2167,7 +2195,7 @@ impl Engine {
         let Ok(schema) = self.table_schema(table) else {
             return;
         };
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let column = &column;
             let Some(ci) = schema.iter().position(|c| c == column) else {
                 continue;
@@ -2189,6 +2217,8 @@ impl Engine {
                 .map(|(i, x)| (i as i32, x as f32))
                 .collect();
             index.insert(seq as u64, entries);
+            drop(index);
+            self.note_unsealed(table, index_id, 1);
         }
     }
 
@@ -2287,7 +2317,7 @@ impl Engine {
     ) {
         self.update_text_indexes_batch_inner(table, rows, schema, prepared)
             .await;
-        self.enforce_memindex_quota(Some(table)).await;
+        self.enforce_memindex_quota(Some(table));
     }
 
     /// The batch's work, without the quota check.
@@ -2310,7 +2340,7 @@ impl Engine {
         }
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
-        let mut indexes: Vec<(String, SharedTextIndex)> = self
+        let mut indexes: Vec<(u64, String, SharedTextIndex)> = self
             .tables
             .lock()
             .unwrap()
@@ -2318,7 +2348,7 @@ impl Engine {
             .map(|e| {
                 e.text
                     .iter()
-                    .filter_map(|(id, v)| Some((by_id.get(id)?.clone(), v.clone())))
+                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
                     .collect()
             })
             .unwrap_or_default();
@@ -2335,18 +2365,33 @@ impl Engine {
         // column, and only while the cache has no entry for it.
         if indexes.len() < by_id.len() {
             for column in self.fulltext_columns(table) {
-                if schema.iter().all(|c| c != &column)
-                    || indexes.iter().any(|(cached, _)| cached == &column)
-                {
+                if schema.iter().all(|c| c != &column) {
                     continue;
                 }
                 let tokenizer = self.index_tokenizer(table, &column);
-                if let Ok(shared) = self.text_index_for(table, &column, tokenizer).await {
-                    indexes.push((column, shared));
+                // One handle **per index id**, not one shared by every id on
+                // the column: each record owns its own `SharedTextIndex`
+                // (`text_index_build` keys the cache by id), so pairing one
+                // handle with two ids made the publish loop run the same
+                // documents into the same index twice - and the second pass
+                // deleted rows the first had just written.
+                let pending: Vec<u64> = self
+                    .index_ids_on_column_of_kind(table, &column, &["FULLTEXT"])
+                    .into_iter()
+                    .filter(|id| !indexes.iter().any(|(has, _, _)| has == id))
+                    .collect();
+                for id in pending {
+                    let Ok((shared, _)) = self
+                        .text_index_with_tokenizer_of_id(table, id, &column, tokenizer.clone())
+                        .await
+                    else {
+                        continue;
+                    };
+                    indexes.push((id, column.clone(), shared));
                 }
             }
         }
-        for (column, shared) in indexes {
+        for (index_id, column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
@@ -2439,6 +2484,12 @@ impl Engine {
                     index.finish_publish(first_row);
                     let seal = index.should_seal(capacity);
                     drop(index);
+                    // The chunk above may already have been sealed inside the
+                    // index, but the rows are unsealed from this loop's point of
+                    // view until a dump publishes their chunk; recording them
+                    // here is what lets the periodic loop find the table. A seal
+                    // that just happened only makes the mark conservative.
+                    self.note_unsealed(table, index_id, prepared.len() as u64);
                     if seal {
                         // The segment is written with the lock released: the
                         // tail moves to `TextIndex::inflight`, where queries keep
@@ -3071,18 +3122,25 @@ impl Engine {
             .store(dirty_bytes.max(1), std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Sets `[buffer] memindex_memory_quota` (bytes). A memory index is dumped
-    /// into a fresh C++ chunk once its buffered size reaches this quota; `0`
-    /// keeps every row in memory until a checkpoint.
+    /// Sets `[buffer] unsealed_memory_quota` (bytes).
+    ///
+    /// This is the budget for **everything not yet on disk**: the append buffer
+    /// plus every in-memory index tail. Crossing it drives two things that run
+    /// the same drain - the write path's quota check and the periodic loop - so
+    /// the two can never disagree about what "over" means. `0` turns the whole
+    /// mechanism off.
+    pub fn set_unsealed_memory_quota(&self, bytes: u64) {
+        self.set_memindex_quota(bytes)
+    }
+
+    /// The old name for [`Self::set_unsealed_memory_quota`].
+    ///
+    /// Kept because the field it writes (`Context::memindex_quota`) is still the
+    /// engine's one byte ledger; callers that predate the rename keep working.
     pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
             .memindex_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
-        // The waterlines are derived (`SPANN_DESIGN.md` §9.5), so a new budget
-        // has to reach them before the next check reads it.
-        if let Ok(mut marks) = self.context.watermarks.lock() {
-            marks.set_budget(bytes);
-        }
     }
 
     /// Sets `[storage] mem_index_capacity` (rows). The reference dumps an
@@ -3092,6 +3150,31 @@ impl Engine {
         self.context
             .memindex_capacity
             .store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Sets `[buffer] unsealed_reclaim_interval` (seconds): how often the
+    /// staleness sweep runs. `0` disables that path.
+    pub fn set_unsealed_reclaim_interval(&self, secs: u64) {
+        self.context.unsealed_reclaim_interval.store(
+            secs.saturating_mul(1000),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    /// Sets `[buffer] unsealed_max_tables_per_round`. `0` means unlimited.
+    pub fn set_unsealed_max_tables_per_round(&self, tables: usize) {
+        self.context
+            .unsealed_max_tables_per_round
+            .store(tables, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// `[buffer] unsealed_reclaim_interval` in milliseconds, read back by the
+    /// CLI so an absent key falls through to the engine default instead of
+    /// becoming `0` (which would disable the sweep).
+    pub fn unsealed_reclaim_interval_ms(&self) -> u64 {
+        self.context
+            .unsealed_reclaim_interval
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// `SET VARIABLE <name> <value>` at `scope`.
@@ -3158,11 +3241,22 @@ impl Engine {
     }
 
     /// Accounts `count` rows about to be inserted into `table` against each
-    /// HNSW memory index. The reference dumps an index when it reaches
-    /// `mem_index_capacity` rows (or, in this port, the buffered-size quota)
-    /// **before** taking the new rows, which is what this reproduces (one
-    /// `chunk_{n}.idx` per dump).
-    pub(crate) async fn note_index_insert(&self, table: &str, count: usize) {
+    /// HNSW memory index, and raises the reclaim flag when that crosses the
+    /// budget.
+    ///
+    /// The reference dumps an index when its tracer reports the memory limit
+    /// (`MemIndexTracer::IncreaseMemoryUsage`), and this port used to do the
+    /// same inline. It no longer does: a dump here is a chunk write plus an
+    /// index catalog scan **on the statement's latency**, and it can take
+    /// another table's bottom gate while this one holds its own. The decided
+    /// shape is one drain, on the trigger loop's tick (`reclaim_unsealed`), so
+    /// the write path only keeps the charge current and raises
+    /// [`Context::unsealed_reclaim_requested`].
+    ///
+    /// The separate **row-capacity** bound (`dump_hnsw_over_capacity`) is
+    /// untouched: it is a different question - how many rows one in-memory
+    /// graph may hold - and it is what keeps a long import's footprint flat.
+    pub(crate) fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
             .context
             .memindex_quota
@@ -3202,39 +3296,19 @@ impl Engine {
             // (`IncreaseMemoryUsage mem_inc 1008` for six rows).
             let bytes = (dim * 4 + 152) * count;
             let tkey = self.table_key(&im.table);
-            let dump = {
-                let mut tables = self.tables.lock().unwrap();
-                let entry = tables.entry(tkey.clone()).or_default();
-                let cur = entry.index_pending_bytes.entry(im.id).or_insert(0);
-                *cur += bytes;
-                // The reference dumps when the memory passes the quota and
-                // subtracts only what the dump released, so the rows above
-                // the limit stay accounted and the *next* batch is what
-                // crosses again (`MemIndexTracer::IncreaseMemoryUsage`).
-                if quota > 0 && *cur > quota {
-                    *cur -= quota;
-                    true
-                } else {
-                    false
-                }
-            };
-            if dump && self.dump_hnsw_index(&im.table, &im.name).await.is_ok() {
-                // The dumped segment leaves memory. The bytes above the
-                // quota were already left in the counter, so nothing else to
-                // do here but drop the graph the dump just sealed.
-                //
-                // **Before** the rows of this batch are written: a dump seals
-                // what the graph holds now, so each batch lands in its own
-                // chunk. Proposing it from the post-write quota check instead
-                // merged every batch into one chunk (`test_mem_bmp`,
-                // `test_optimize_from_different_database`).
-                let mut tables = self.tables.lock().unwrap();
-                if let Some(e) = tables.get_mut(&tkey) {
-                    e.hnsw_mem.retain(|(id, _), _| *id != im.id);
-                    e.index_pending_bytes.insert(im.id, 0);
-                    e.hnsw_topup = true;
-                }
+            // Only the charge moves. The reference subtracts what a dump
+            // released and leaves the rest accounted, so the counter is a
+            // running total; the scan recomputes it when it drains.
+            if let Some(entry) = self.tables.lock().unwrap().get_mut(&tkey) {
+                *entry.index_pending_bytes.entry(im.id).or_insert(0) += bytes;
             }
+        }
+        // One atomic read after the charge update, not per index: the scan's
+        // own check is authoritative, this only has to wake it up.
+        if (self.budget_bytes() as u64) > self.reclaim_target() {
+            self.context
+                .unsealed_reclaim_requested
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }

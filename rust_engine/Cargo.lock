@@ -558,6 +558,7 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "mimalloc",
+ "roaring",
  "thiserror 1.0.69",
 ]
 

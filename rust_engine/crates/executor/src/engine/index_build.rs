@@ -29,6 +29,29 @@ struct SecondarySnapshot {
     sealing: Vec<Arc<index::SealedTail>>,
 }
 
+/// What a probe of one index's in-memory tail found.
+///
+/// The third state exists because half the families keep their tail behind a
+/// lock a query may hold, and a `try_lock` cannot tell "empty" from "busy".
+/// Reading contention as empty is what silently cleared an unsealed mark and
+/// dropped an index-only table out of the reclaim candidate set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TailState {
+    HasRows,
+    Empty,
+    Unknown,
+}
+
+impl TailState {
+    fn of(has_rows: bool) -> Self {
+        if has_rows {
+            Self::HasRows
+        } else {
+            Self::Empty
+        }
+    }
+}
+
 impl Engine {
     /// Rebuilds all declared indexes from stored rows (called on open).
     pub(crate) fn rebuild_indexes(&self) -> Result<()> {
@@ -464,15 +487,16 @@ impl Engine {
                     }
                 }
                 if !recovered.is_empty() {
-                    self.tables
-                        .lock()
-                        .unwrap()
-                        .entry(self.table_key(&table))
-                        .or_default()
-                        .ivf_mem
-                        .entry(meta.id)
-                        .or_default()
-                        .extend(recovered);
+                    let recovered_rows = recovered.len() as u64;
+                    let mut tables = self.tables.lock().unwrap();
+                    let entry = tables.entry(self.table_key(&table)).or_default();
+                    // The recovered rows are an index tail with no write behind
+                    // them, so nothing else raises the mark. Without it the
+                    // sweep skips this table (empty append buffer, every mark
+                    // zero) and the rows stay in memory outside the quota until
+                    // the table is written again.
+                    entry.bump_unsealed(meta.id, recovered_rows);
+                    entry.ivf_mem.entry(meta.id).or_default().extend(recovered);
                 }
             }
         }
@@ -654,7 +678,9 @@ impl Engine {
                         .push((seq as u64 & 0xffff_ffff) as u32);
                 }
             }
-            let (readers, meta) =
+            // A build, not a seal: there is no frozen tail to retire, so the
+            // "every segment written" verdict has no caller here.
+            let (readers, meta, _) =
                 self.write_secondary_low_chunks(table, index_id, key_kind, grouped);
             let mut tables = self.tables.lock().unwrap();
             let entry = tables.entry(tkey.clone()).or_default();
@@ -1012,9 +1038,17 @@ impl Engine {
     /// `NewTxn::DumpMemIndex` skips before it opens a transaction when the
     /// memory index is empty, so an explicit dump of an index whose checkpoint
     /// already published everything spends no commit ts and writes no WAL
-    /// entry. A kind whose tail is not modelled here reports `true`, so the
-    /// dump keeps its old behaviour.
-    fn index_has_memory_tail(&self, table: &str, meta: &IndexMeta) -> bool {
+    /// entry.
+    ///
+    /// Three states, because the probe cannot always answer: HNSW's rows sit
+    /// behind a `tokio::sync::Mutex` and the full-text tail behind a
+    /// `tokio::RwLock`, and this runs on paths that must not park (a query may
+    /// hold either). A `try_lock` failure means **Unknown**, not "empty": a
+    /// query holding the lock is exactly the state a table that needs
+    /// reclaiming is in, so reading contention as "nothing to dump" would clear
+    /// the unsealed mark and drop the table out of the candidate set until its
+    /// next write.
+    pub(crate) fn index_has_memory_tail(&self, table: &str, meta: &IndexMeta) -> TailState {
         let key = self.table_key(table);
         let kind = meta.index_type.trim();
         // Every branch clones the handle out of `tables` and locks it only
@@ -1026,8 +1060,8 @@ impl Engine {
             return tables
                 .get(&key)
                 .and_then(|e| e.secondary.indexes.get(&meta.id))
-                .map(|i| i.approx_bytes() > 0)
-                .unwrap_or(false);
+                .map(|i| TailState::of(i.approx_bytes() > 0))
+                .unwrap_or(TailState::Empty);
         }
         if kind.eq_ignore_ascii_case("HNSW") {
             let mems: Vec<_> = {
@@ -1044,27 +1078,37 @@ impl Engine {
                     .unwrap_or_default()
             };
             // Any segment's memory form holding rows means this index still has
-            // something to dump.
-            return mems
-                .iter()
-                .any(|m| m.try_lock().ok().is_some_and(|g| !g.is_empty()));
+            // something to dump. A locked graph is unknown, not empty.
+            let mut state = TailState::Empty;
+            for m in &mems {
+                match m.try_lock() {
+                    Ok(g) if !g.is_empty() => return TailState::HasRows,
+                    Ok(_) => {}
+                    Err(_) => state = TailState::Unknown,
+                }
+            }
+            return state;
         }
         if kind.eq_ignore_ascii_case("IVF") {
             let tables = self.tables.lock().unwrap();
             return tables
                 .get(&key)
                 .and_then(|e| e.ivf_mem.get(&meta.id))
-                .map(|rows| !rows.is_empty())
-                .unwrap_or(false);
+                .map(|rows| TailState::of(!rows.is_empty()))
+                .unwrap_or(TailState::Empty);
         }
         if kind.eq_ignore_ascii_case("FULLTEXT") {
             let text = {
                 let tables = self.tables.lock().unwrap();
                 tables.get(&key).and_then(|e| e.text.get(&meta.id).cloned())
             };
-            return text
-                .and_then(|t| t.try_read().ok().map(|g| g.mem.pending_docs() > 0))
-                .unwrap_or(false);
+            return match text.as_ref().map(|t| t.try_read()) {
+                Some(Ok(g)) => TailState::of(g.mem.pending_docs() > 0),
+                // A writer holds the tail: its rows are not visible to us, so
+                // the honest answer is "unknown".
+                Some(Err(_)) => TailState::Unknown,
+                None => TailState::Empty,
+            };
         }
         if kind.eq_ignore_ascii_case("BMP") {
             let sparse = {
@@ -1080,13 +1124,13 @@ impl Engine {
             // see it - without this a second dump of the same index would find
             // nothing to do and the chunk the first seal froze would never be
             // written.
-            return sparse
-                .and_then(|s| {
-                    s.read()
-                        .ok()
-                        .map(|g| !g.tail.is_empty() || !g.sealed.is_empty())
-                })
-                .unwrap_or(false);
+            return match sparse.as_ref().map(|s| s.read()) {
+                Some(Ok(g)) => TailState::of(!g.tail.is_empty() || !g.sealed.is_empty()),
+                // A blocked `std::sync::RwLock` here is a writer mid-insert:
+                // unknown, not empty (`AGENTS.md` §7.2 also forbids waiting).
+                Some(Err(_)) => TailState::Unknown,
+                None => TailState::Empty,
+            };
         }
         if kind.eq_ignore_ascii_case("PLAID")
             || kind.eq_ignore_ascii_case("SMVE")
@@ -1097,11 +1141,37 @@ impl Engine {
                 let tables = self.tables.lock().unwrap();
                 tables.get(&key).and_then(|e| e.mv.get(&meta.id).cloned())
             };
-            return mv
-                .and_then(|m| m.read().ok().map(|g| !g.tail.is_empty()))
-                .unwrap_or(false);
+            return match mv.as_ref().map(|m| m.read()) {
+                Some(Ok(g)) => TailState::of(!g.tail.is_empty()),
+                Some(Err(_)) => TailState::Unknown,
+                None => TailState::Empty,
+            };
         }
-        true
+        // A SPANN dump is **not** driven by a memory tail: `spann_build_in` reads
+        // the column and builds the tree from the rows, so `CREATE INDEX` over a
+        // table with no `spann_mem` tail at all still has to dump (that is how
+        // the index is materialised at creation - `query.rs` calls
+        // `dump_index_transaction` as soon as the catalog entry exists).
+        // `HasRows` is therefore the honest answer, and `dump_every_table_index`
+        // keeps that from costing anything: it drops an index whose
+        // `index_memory_bytes` is 0, and `index_memory_bytes` has a SPANN branch
+        // that counts the tail and a `Memory`-form handle.
+        TailState::HasRows
+    }
+
+    /// Whether `index` has a **frozen** tail: entries a dump took but could not
+    /// publish, still in `secondary.sealing`.
+    ///
+    /// Those rows are readable (readers merge the frozen tails) but not
+    /// reclaimable, and its live tail is new rows, so only a dump that counts
+    /// this state can ever publish them again.
+    fn index_has_frozen_tail(&self, table: &str, meta: &IndexMeta) -> bool {
+        let key = self.table_key(table);
+        let tables = self.tables.lock().unwrap();
+        tables
+            .get(&key)
+            .and_then(|e| e.secondary.sealing.get(&meta.id))
+            .is_some_and(|list| !list.is_empty())
     }
 
     /// Whether the index has chunk files the catalog does not record yet.
@@ -1234,13 +1304,19 @@ impl Engine {
     pub async fn dump_index_transaction(&self, table: &str, index: &str) -> Result<()> {
         let version = self.dump_version(table, index)?;
         let table = self.qualified_table(table);
-        // An `IMPORT` in flight owns its index tails until it commits: its rows
-        // are staged, not committed, and a chunk that sealed them would be a
-        // record for rows the table may never have (a failure past this point
-        // only clears the marker). The quota's `propose_dump` already declines
-        // to queue one, but a task queued **before** the import began reaches
-        // this function directly (`dump_under_pressure` -> here), so the check
-        // has to hold at execution time.
+        // An `IMPORT` in flight owns its index tails: its rows belong to a
+        // segment it is still filling, and a chunk sealed over part of it would
+        // split the segment's coverage (`populate_import_indexes` explains why
+        // that must not happen).
+        //
+        // The marker is **not** "uncommitted rows" - an import commits before it
+        // inserts into the tails (`import_literal_rows`), and what stays open is
+        // the statement's index population. What makes the check sound is the
+        // order it shares with the staging guard: `stage_import` takes
+        // `flush_lock` to raise the marker, and the flag is **re-read under that
+        // same lock** below, immediately before the seal. Reading it here can
+        // only skip a dump early; it cannot let one through, since the decisive
+        // read happens with the import excluded.
         if self.import_in_flight(&table) {
             return Ok(());
         }
@@ -1251,7 +1327,16 @@ impl Engine {
         // *whole-segment* dump (PLAID/IVF/multi-vector) - rows on disk that no
         // chunk covers yet, which is the state a table is in right after an
         // insert and before the first query has rebuilt the memory index.
-        if !self.index_has_memory_tail(&table, &version.index)
+        //
+        // `Unknown` (a query holds the tail's lock) is treated as "something
+        // new": the seal is the only way those rows leave memory, and skipping
+        // it would strand them until the next write.
+        // A frozen tail from a run whose chunk write failed counts as
+        // "something new" too. Its entries are readable (readers merge
+        // `sealing`), so without this the dump would skip and they could never
+        // be published: the live tail is new rows, not those.
+        if self.index_has_memory_tail(&table, &version.index) == TailState::Empty
+            && !self.index_has_frozen_tail(&table, &version.index)
             && !self.index_has_unpublished_chunks(&table, &version.index)
             && !self.index_has_uncovered_rows(&table, &version.index).await
         {
@@ -1278,6 +1363,12 @@ impl Engine {
             // happen (dump and checkpoint only exclude each other, not two
             // dumps), so this takes the same `write()` the checkpoint does.
             let _serial = self.storage.flush_lock.write().await;
+            // The decisive read, with imports excluded: `stage_import` holds
+            // this lock to raise the marker, so a marker that is absent here
+            // cannot appear before the seal finishes.
+            if self.import_in_flight(&table) {
+                return Ok(());
+            }
             let (seal_table, seal_index) = (table.clone(), version.index.clone());
             // The seal is async itself (it awaits the chunk writes), so it runs
             // on this task instead of being handed to the blocking pool: a
@@ -1605,6 +1696,47 @@ impl Engine {
         // this the peak of a dump stays resident until then (and on macOS,
         // forever).
         storage::trim_allocator();
+        // Re-derive the index's unsealed mark from the index itself rather than
+        // tracking which arm released what: this is the one place every dump
+        // passes through, and it already holds the locks the probe needs. A mark
+        // left non-zero after a successful dump would keep the table in the
+        // reclaim candidate set for ever; one zeroed while rows remain would
+        // strand those rows in memory, which is worse. Asking the index makes
+        // both impossible.
+        self.sync_unsealed_mark(&table, meta);
+    }
+
+    /// Sets one index's unsealed mark to what the index actually holds.
+    ///
+    /// Called from the dump path only (after a seal), where the index's own
+    /// locks are already part of the operation; the per-tick candidate scan
+    /// never calls this.
+    pub(crate) fn sync_unsealed_mark(&self, table: &str, meta: &IndexMeta) {
+        let holds = self.index_has_memory_tail(table, meta);
+        let key = self.table_key(table);
+        if let Some(entry) = self.tables.lock().unwrap().get_mut(&key) {
+            match holds {
+                TailState::HasRows => {
+                    // Keep it non-zero without claiming a row count we do not
+                    // have: the mark is a "has data" flag to the candidate scan.
+                    if entry
+                        .unsealed_marks
+                        .get(&meta.id)
+                        .map(|m| m.load(std::sync::atomic::Ordering::Relaxed))
+                        .unwrap_or(0)
+                        == 0
+                    {
+                        entry.bump_unsealed(meta.id, 1);
+                    }
+                }
+                TailState::Empty => entry.clear_unsealed(meta.id),
+                // The probe could not look (a query holds the graph or the
+                // text tail). Clearing here would drop an index-only table out
+                // of the candidate set until its next write, so the mark keeps
+                // its previous value and the next round asks again.
+                TailState::Unknown => {}
+            }
+        }
     }
 
     /// Drops one multi-vector index's cached instance so the next query
@@ -2148,6 +2280,23 @@ impl Engine {
             };
             let low_card = self.secondary_low_cardinality(&im.table, &column, &ty);
             let tail_kind = secondary_key_kind(&ty);
+            // Frozen tails an earlier attempt could not finish come first: a
+            // failed segment keeps its tail in `sealing` (readable, but not
+            // reclaimable), and only this loop can ever retry it - the live
+            // tail below is new rows, not those. Retiring them here is what
+            // makes the retry terminate.
+            let pending: Vec<Arc<index::SealedTail>> = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.secondary.sealing.get(&index_id).cloned())
+                    .unwrap_or_default()
+            };
+            for frozen in pending {
+                self.write_frozen_secondary_tail(
+                    &tkey, &im.table, index_id, low_card, tail_kind, &frozen,
+                );
+            }
             // `seal` empties the tail, and the chunk below only becomes visible
             // after it is written; the frozen entries stay in `sealing`, where
             // readers merge them, so the window in between loses no row.
@@ -2171,6 +2320,32 @@ impl Engine {
                     .push(Arc::clone(&sealed));
                 sealed
             };
+            self.write_frozen_secondary_tail(
+                &tkey, &im.table, index_id, low_card, tail_kind, &sealed,
+            );
+        }
+    }
+
+    /// Writes one frozen secondary tail into its chunk files and publishes the
+    /// readers.
+    ///
+    /// The tail leaves `secondary.sealing` **only** when every segment's chunk
+    /// was written and opened. A failed segment keeps it: retiring it would
+    /// drop those rows out of every read (no chunk covers them) and the entries
+    /// would be gone, so no later round could retry them. The retry itself is
+    /// [`Self::seal_secondary_indexes_filtered_of`]'s first step, which walks
+    /// whatever is still in `sealing`.
+    fn write_frozen_secondary_tail(
+        &self,
+        tkey: &str,
+        table: &str,
+        index_id: u64,
+        low_card: bool,
+        tail_kind: KeyKind,
+        sealed: &Arc<index::SealedTail>,
+    ) {
+        let tkey = tkey.to_string();
+        {
             let tail = sealed.entries();
             // `ChunkIndexMetaInfo`: the first row id in the dump and its row
             // count. Recorded per dump (one chunk per seal call).
@@ -2208,16 +2383,23 @@ impl Engine {
                             .push((ordered, (*id & 0xffff_ffff) as u32));
                     }
                 }
-                let set = self.index_segment_set(&im.table);
+                let set = self.index_segment_set(table);
                 let mut readers = Vec::new();
+                // Whether **every** segment's chunk reached a readable file.
+                // One failed segment means the frozen tail must stay where it
+                // is: retiring it would drop those rows out of every read (the
+                // chunk that should cover them does not exist), and the next
+                // round could not retry because the entries are gone.
+                let mut all_written = !by_segment.is_empty();
                 for (segment, mut entries) in by_segment.into_iter() {
                     entries.sort_by(|a, b| a.0.order(&b.0));
                     // The chunk id comes from the catalog's counter
                     // (`GetAndSetNextChunkID`), never from a count of files.
                     let next =
                         self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
-                    let seg_dir = self.index_segment_dir(&im.table, index_id, segment as u32);
+                    let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
                     if std::fs::create_dir_all(&seg_dir).is_err() {
+                        all_written = false;
                         continue;
                     }
                     let path = seg_dir.join(format!("chunk_{next}.idx"));
@@ -2226,14 +2408,20 @@ impl Engine {
                     )
                     .is_err()
                     {
+                        all_written = false;
                         continue;
                     }
-                    if let Ok(reader) =
-                        storage::secondary_segment::SecondarySegmentReader::open_with_kind(
-                            &path, tail_kind,
-                        )
-                    {
-                        readers.push((segment << 32, Arc::new(reader)));
+                    match storage::secondary_segment::SecondarySegmentReader::open_with_kind(
+                        &path, tail_kind,
+                    ) {
+                        Ok(reader) => readers.push((segment << 32, Arc::new(reader))),
+                        Err(_) => {
+                            // Written but unreadable is not published: the
+                            // chunk a reader cannot open is no better than a
+                            // missing one, and it must not retire the tail.
+                            all_written = false;
+                            continue;
+                        }
                     }
                     // `ChunkIndexMetaInfo::base_row_id_` is the **first row**
                     // this dump's memory index holds, not the segment's base: a
@@ -2271,17 +2459,21 @@ impl Engine {
                         .entry(index_id)
                         .or_default()
                         .extend(readers);
-                    entry
-                        .secondary
-                        .chunk_meta
-                        .entry(index_id)
-                        .or_default()
-                        .push((base, row_count));
-                    // The chunk now covers the frozen entries, atomically with
-                    // the readers above: a reader either sees the chunk or the
-                    // frozen tail.
-                    if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
-                        pending.retain(|tail| !Arc::ptr_eq(tail, &sealed));
+                    if all_written {
+                        entry
+                            .secondary
+                            .chunk_meta
+                            .entry(index_id)
+                            .or_default()
+                            .push((base, row_count));
+                        // The chunk now covers the frozen entries, atomically
+                        // with the readers above: a reader either sees the chunk
+                        // or the frozen tail. Only when **every** segment made
+                        // it - a partial write keeps the tail so the rows stay
+                        // readable and the next round retries them.
+                        if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
+                            pending.retain(|tail| !Arc::ptr_eq(tail, sealed));
+                        }
                     }
                 }
             } else {
@@ -2300,8 +2492,8 @@ impl Engine {
                             .push((*id & 0xffff_ffff) as u32);
                     }
                 }
-                let (readers, meta) =
-                    self.write_secondary_low_chunks(&im.table, im.id, tail_kind, grouped);
+                let (readers, meta, all_written) =
+                    self.write_secondary_low_chunks(table, index_id, tail_kind, grouped);
                 let mut tables = self.tables.lock().unwrap();
                 let entry = tables.entry(tkey.clone()).or_default();
                 entry
@@ -2310,22 +2502,25 @@ impl Engine {
                     .entry(index_id)
                     .or_default()
                     .extend(readers);
-                entry
-                    .secondary
-                    .chunk_meta
-                    .entry(index_id)
-                    .or_default()
-                    .extend(meta);
-                entry
-                    .secondary
-                    .chunk_meta
-                    .entry(index_id)
-                    .or_default()
-                    .push((base, row_count));
-                // Atomic with the readers above: a reader sees either the chunk
-                // or the frozen tail.
-                if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
-                    pending.retain(|frozen| !Arc::ptr_eq(frozen, &sealed));
+                if all_written {
+                    entry
+                        .secondary
+                        .chunk_meta
+                        .entry(index_id)
+                        .or_default()
+                        .extend(meta);
+                    entry
+                        .secondary
+                        .chunk_meta
+                        .entry(index_id)
+                        .or_default()
+                        .push((base, row_count));
+                    // Atomic with the readers above: a reader sees either the
+                    // chunk or the frozen tail. A segment that failed keeps the
+                    // tail readable and retryable.
+                    if let Some(pending) = entry.secondary.sealing.get_mut(&index_id) {
+                        pending.retain(|frozen| !Arc::ptr_eq(frozen, sealed));
+                    }
                 }
             }
         }
@@ -2564,13 +2759,18 @@ impl Engine {
     /// distinct from a rebuild's (`tail` versus empty).
     /// Returns the readers and the `(base row id, data row count)` of every chunk
     /// it wrote, the `ChunkIndexMetaInfo` the reference records per chunk.
+    ///
+    /// The third element says whether **every** segment produced a readable
+    /// chunk. A caller that retires a frozen tail must check it: a segment that
+    /// failed has no chunk to cover its rows, so dropping the tail would make
+    /// them unreadable and unretryable.
     fn write_secondary_low_chunks(
         &self,
         table: &str,
         index_id: u64,
         kind: KeyKind,
         grouped: HashMap<u64, std::collections::BTreeMap<Vec<u8>, Vec<u32>>>,
-    ) -> (SecondaryLowChunks, Vec<(u64, usize)>) {
+    ) -> (SecondaryLowChunks, Vec<(u64, usize)>, bool) {
         use storage::secondary_lowcard::{write_lowcard_segment_typed, LowCardKey, LowCardReader};
         // A chunk goes straight into the segment's own directory under the id
         // the catalog hands out (`GetAndSetNextChunkID`), so no directory is
@@ -2578,6 +2778,7 @@ impl Engine {
         let set = self.index_segment_set(table);
         let mut readers: SecondaryLowChunks = Vec::new();
         let mut meta: Vec<(u64, usize)> = Vec::new();
+        let mut all_written = !grouped.is_empty();
         for (segment, keys) in grouped.into_iter() {
             let entries: Vec<(LowCardKey, Vec<u32>)> = keys
                 .into_iter()
@@ -2598,10 +2799,12 @@ impl Engine {
             let next = self.next_index_chunk_id(&set, &index_id.to_string(), segment as u32);
             let seg_dir = self.index_segment_dir(table, index_id, segment as u32);
             if std::fs::create_dir_all(&seg_dir).is_err() {
+                all_written = false;
                 continue;
             }
             let path = seg_dir.join(format!("chunk_{next}.idx"));
             if write_lowcard_segment_typed(&path, &entries).is_err() {
+                all_written = false;
                 continue;
             }
             // `AddNewChunkIndex1`.
@@ -2644,9 +2847,13 @@ impl Engine {
                 offsets.dedup();
                 meta.push((segment << 32, offsets.len()));
                 readers.push((segment << 32, Arc::new(reader)));
+            } else {
+                // Written but unreadable: no reader covers these rows, so the
+                // caller must not retire the tail.
+                all_written = false;
             }
         }
-        (readers, meta)
+        (readers, meta, all_written)
     }
 
     /// The functional index an `IndexMeta` describes, from the parameters its
@@ -4278,14 +4485,54 @@ impl Engine {
     /// `whitespace` are carried by the delimiters.
     pub(crate) fn index_analyzer(&self, table: &str, column: &str) -> Option<String> {
         let name = self.column_analyzer_name(table, column)?;
-        match analyzer::parse_analyzer_name(&name) {
-            Ok(analyzer::AnalyzerName::Standard { .. })
-            | Ok(analyzer::AnalyzerName::Whitespace { .. })
-            | Err(_) => None,
-            Ok(_) => Some(name),
-        }
+        analyzer_family(&name)
     }
 
+    /// The tokeniser **one catalog record** was created with.
+    ///
+    /// All three settings - analyzer family, delimiters, stemmer - come from
+    /// the same record, so a column with two `FULLTEXT` indexes tokenises each
+    /// one the way it was declared. Deriving the delimiters or the stemmer from
+    /// the column instead (`index_delims` / `index_stemmer`) gave a second
+    /// record with a different analyzer the *first* record's settings, so its
+    /// postings did not follow its own declaration.
+    ///
+    /// `fallback` is only used when the record names no analyzer.
+    pub(crate) fn index_tokenizer_of_name(
+        &self,
+        table: &str,
+        index_name: &str,
+        fallback: TextTokenizer,
+    ) -> TextTokenizer {
+        // The record's **own** analyzer: the column-level fallback would give a
+        // record that declares nothing the other index's delimiters.
+        let Some(name) = self.analyzer_recorded_for_index(table, index_name) else {
+            return fallback;
+        };
+        let delimiters = match analyzer::parse_analyzer_name(&name) {
+            Ok(analyzer::AnalyzerName::Whitespace { delimiters }) => {
+                Some(delimiters.chars().collect())
+            }
+            // A record that names the standard family keeps the column's
+            // delimiters: the delimiters are a property of the *tokeniser*
+            // family, and `standard` splits the standard way.
+            _ => None,
+        };
+        let mut tokenizer = TextTokenizer::new(delimiters, analyzer_family(&name));
+        tokenizer.stemmer = match analyzer::parse_analyzer_name(&name) {
+            Ok(analyzer::AnalyzerName::Standard { language }) => {
+                match analyzer::standard_stemmer(language) {
+                    analyzer::Stemmer::Snowball(rust_stemmers::Algorithm::English) => None,
+                    stemmer => Some(stemmer),
+                }
+            }
+            _ => None,
+        };
+        tokenizer
+    }
+}
+
+impl Engine {
     /// `WalCmdDumpIndexV2` per index over `segment`: the chunk the dump that
     /// runs inside the import/compaction transaction produced
     /// (`ImportTxnStore::ToWalEntry`, `base_txn_store_impl.cpp:387`).
@@ -4354,195 +4601,13 @@ impl Engine {
         Ok(out)
     }
 
-    /// Releases memory in the order that gives the most back per unit of work.
-    ///
-    /// Two things hold rows in memory here, and the reference bounds both with
-    /// one budget: the append buffer (its `BufferObject`s) and the in-memory
-    /// index tails. The port's quota covered the second only, and the append
-    /// buffer had no other limiter at all, so the rows a write-heavy table
-    /// appended stayed resident until a checkpoint - a day by default.
-    ///
-    /// A breach therefore does both:
-    ///
-    /// 1. **Unsealed rows go to their block files.** That is the per-table step
-    ///    of a checkpoint (`write_blocks_bounded`), not a checkpoint: no
-    ///    timestamp moves, no WAL entry is written, and the rows stay readable
-    ///    because those files *are* the mirror. It is what the reference's
-    ///    buffer manager does when it evicts a block.
-    /// 2. **The largest memory index is dumped** - the unit the reference's
-    ///    `DumpIndexProcessor` works in when one step cannot free the whole
-    ///    budget. Dumping all of them would spend a transaction per index on
-    ///    every breach; the next check picks the next largest if it is still
-    ///    over.
-    ///
-    /// `only` restricts the block drain to one table, for the caller that runs
-    /// inside that table's commit bottom half - see
-    /// [`Self::dump_all_sealed_blocks`] for why walking the others there can
-    /// deadlock. The index steps are engine-wide either way: they take no
-    /// bottom gate.
-    pub(crate) async fn dump_under_pressure(&self, only: Option<&str>) {
-        self.dump_all_sealed_blocks(only).await;
-        // §9.5: `hard` pressure seals **every** tail of the table - the point of
-        // the escalate level is that one seal is not enough. `soft` seals the
-        // one that gives the most memory back.
-        if self.seal_pressure() == Pressure::Hard {
-            self.dump_every_table_index(only).await;
-        } else {
-            self.dump_largest_memory_index(only).await;
-        }
-        // Orphan tails (a sparse or multi-vector column with no `CREATE INDEX`)
-        // are **not** sealed here. `seal_sparse_index` is only half a dump: it
-        // calls `SealedTail::take`, which removes the entries and hands them
-        // back, and the chunk writer that persists them is the dump transaction
-        // (`seal_index_tail` -> `publish_index_chunks`). Calling it from here
-        // discarded the returned tail and lost those rows - `test_mem_bmp` in
-        // the restart suite caught it. What the quota can release here is
-        // therefore the rows in the append buffer and the named indexes; the
-        // rest waits for the next checkpoint, which is what makes their files.
-        //
-        // The dump released tails: fold that into the engine-wide total so the
-        // next quota check sees it without a second scan of every table.
-        self.recompute_memindex_total();
-    }
-
-    /// Writes unsealed rows into their block files.
-    ///
-    /// `only` narrows it to one table. The caller inside a commit's bottom half
-    /// **must** pass it: that caller holds its own table's gate, and walking
-    /// other tables would wait on *their* gates while those commits wait on
-    /// this one - A holding A and waiting for B while B waits for A is a
-    /// deadlock, and `run_commit_bottom` only special-cases the same table.
-    ///
-    /// Each write takes the table's bottom gate, so this cannot simply await
-    /// one: the quota is proposed from **inside** a commit's bottom half
-    /// (`update_text_indexes_batch`, which the bottom calls while holding the
-    /// gate), and re-entering it there self-locks. `run_commit_bottom` is the
-    /// entry that knows this - it runs the work inline when the gate is already
-    /// held on this thread, and on the table's bottom worker otherwise.
-    ///
-    /// `only == None` is for the background dump task, which holds no gate and
-    /// may therefore walk every table.
-    pub(crate) async fn dump_all_sealed_blocks(&self, only: Option<&str>) {
-        let wanted = only.map(|table| self.table_key(table));
-        let tables: Vec<String> = self
-            .tables
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(key, entry)| {
-                !entry.pending_rows.is_empty() && wanted.as_ref().is_none_or(|want| *key == want)
-            })
-            .map(|(key, _)| key.clone())
-            .collect();
-        let checkpoint_ts = self.checkpoint_ts();
-        for table in tables {
-            let key = self.table_key(&table);
-            // `ivf_mem` is deliberately left alone: a checkpoint clears it after
-            // its own block write because its bound covers every row it wrote,
-            // but the rows a transaction still in flight holds are not in these
-            // files and their vectors must stay searchable. The IVF tail is
-            // released by the index dump that follows.
-            let work_table = table.clone();
-            let _ = self
-                .run_commit_bottom(&key, move |engine: &Engine| {
-                    Box::pin(async move {
-                        engine
-                            .write_blocks_bounded_locked(&work_table, checkpoint_ts)
-                            .map(|_| ())
-                    })
-                })
-                .await;
-        }
-    }
-
-    /// Dumps the in-memory index that holds the most bytes.
-    ///
-    /// **One** index, not all of them: this runs on every quota breach, and a
-    /// table with several indexes would spend a transaction per index on each
-    /// one. The largest gives the most memory back for that single unit of
-    /// work, which is the choice the reference's `DumpIndexProcessor` makes.
-    ///
-    /// Ties go to the index dumped **longest ago** (`dump_ts`, 0 when never).
-    /// Two tails can hold the same number of bytes - the same table shape in
-    /// two databases, or two indexes over one column - and with a strict
-    /// `bytes > seen` the first of the pair was picked on every breach, so the
-    /// other one was never drained and its chunk never appeared.
-    ///
-    /// The rows are the part that has to go now: they are what grows without
-    /// any other bound, and [`Self::dump_all_sealed_blocks`] has just released
-    /// them.
-    ///
-    /// `only` restricts the choice to one table. The write path passes the
-    /// table whose batch raised the charge: picking the largest tail in the
-    /// *engine* would let a table that merely happens to hold more bytes
-    /// absorb every breach, and the table that just grew would never drain
-    /// (`test_optimize_from_different_database` in the restart suite).
-    async fn dump_largest_memory_index(&self, only: Option<&str>) {
-        let Some((tenant, im)) = self.pick_seal_candidate(only) else {
-            return;
-        };
-        let _ = self.dump_index_transaction(&im.table, &im.name).await;
-        // The slot the pick took is released once the seal finished, so the
-        // per-tenant in-flight bound reflects real work.
-        if let Ok(mut scheduler) = self.context.seal_scheduler.lock() {
-            scheduler.done(&tenant);
-        }
-    }
-
-    /// §9.6's fair pick over the tails that hold bytes: weighted by pending
-    /// bytes per **database**, one seal per tenant in flight, and a tail that
-    /// has not been dumped for [`SEAL_STARVE_TICKS`] jumps the queue.
-    ///
-    /// The old rule was "largest wins, ties to the oldest dump". It is the same
-    /// greedy choice §9.6 calls a noisy-neighbour failure: a database holding
-    /// most of the bytes absorbed every seal while another database's tail grew
-    /// unbounded, and nothing counted the starvation.
-    fn pick_seal_candidate(&self, only: Option<&str>) -> Option<(String, IndexMeta)> {
-        let wanted = only.map(|table| self.table_key(table));
-        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
-        let mut picked: Vec<(SealCandidate, IndexMeta)> = Vec::new();
-        for im in indexes {
-            if let Some(wanted) = &wanted {
-                if &self.table_key(&im.table) != wanted {
-                    continue;
-                }
-            }
-            if !self.index_has_memory_tail(&im.table, &im) {
-                continue;
-            }
-            let bytes = self.index_memory_bytes(&im.table, im.id, &im.index_type);
-            if bytes == 0 {
-                continue;
-            }
-            let tenant = im.table.split('.').next().unwrap_or(&im.table).to_string();
-            picked.push((
-                SealCandidate {
-                    tenant,
-                    bytes: bytes as u64,
-                    last_dump: self.last_dump_ts(&im.table, &im.name),
-                },
-                im,
-            ));
-        }
-        if picked.is_empty() {
-            return None;
-        }
-        let list: Vec<SealCandidate> = picked.iter().map(|(c, _)| c.clone()).collect();
-        let now = self.current_ts();
-        let mut scheduler = self.context.seal_scheduler.lock().unwrap();
-        let at = scheduler.pick(&list, now, SEAL_STARVE_TICKS)?;
-        let tenant = list[at].tenant.clone();
-        let (_, im) = picked.swap_remove(at);
-        Some((tenant, im))
-    }
-
     /// Seals every tail of `only` (or of every table when `None`).
     ///
     /// Only reached under `hard` pressure: the normal path seals one index per
     /// breach because a table with several indexes would otherwise spend a
     /// transaction per index on every write. Under memory pressure that trade
     /// flips - one transaction per tail is cheaper than being over the hard line.
-    async fn dump_every_table_index(&self, only: Option<&str>) {
+    pub(crate) async fn dump_every_table_index(&self, only: Option<&str>) {
         let wanted = only.map(|table| self.table_key(table));
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for im in indexes {
@@ -4551,7 +4616,7 @@ impl Engine {
                     continue;
                 }
             }
-            if !self.index_has_memory_tail(&im.table, &im) {
+            if self.index_has_memory_tail(&im.table, &im) == TailState::Empty {
                 continue;
             }
             if self.index_memory_bytes(&im.table, im.id, &im.index_type) == 0 {
@@ -4559,27 +4624,6 @@ impl Engine {
             }
             let _ = self.dump_index_transaction(&im.table, &im.name).await;
         }
-    }
-
-    /// The §9.5 waterline the byte ledger sits at, after the AIMD retune.
-    ///
-    /// One function computes it, so the write path and the explicit check cannot
-    /// disagree about which level they are at.
-    pub(crate) fn seal_pressure(&self) -> Pressure {
-        let budget = self
-            .context
-            .memindex_quota
-            .load(std::sync::atomic::Ordering::Relaxed);
-        if budget == 0 {
-            return Pressure::Normal;
-        }
-        let pending = self.budget_bytes() as u64;
-        let mut marks = self.context.watermarks.lock().unwrap();
-        if marks.budget() != budget {
-            marks.set_budget(budget);
-        }
-        marks.retune(pending);
-        marks.level(pending)
     }
 
     /// The indexes whose recall stayed below target long enough to suggest a
@@ -4605,32 +4649,6 @@ impl Engine {
             .unwrap_or_default();
         out.sort_unstable();
         out
-    }
-
-    /// `index_seal_starvation` (§9.5): tails that jumped the queue because their
-    /// previous dump was too long ago. Not surfaced through `SHOW VARIABLE` - the
-    /// global variable list mirrors the reference's `global_name_map_`, and this
-    /// counter has no counterpart there.
-    pub fn index_seal_starvation(&self) -> u64 {
-        self.context
-            .seal_scheduler
-            .lock()
-            .map(|s| s.starvation())
-            .unwrap_or(0)
-    }
-
-    /// The commit ts of the last dump this index published, or 0 when it has
-    /// never been dumped (so an undumped index wins a tie).
-    fn last_dump_ts(&self, table: &str, index: &str) -> u64 {
-        self.storage
-            .catalog
-            .store()
-            .get(&crate::dump_ts_key(&self.qualified_table(table), index))
-            .ok()
-            .flatten()
-            .filter(|v| v.len() >= 8)
-            .map(|v| u64::from_le_bytes(v[..8].try_into().unwrap()))
-            .unwrap_or(0)
     }
 
     /// One index's in-memory footprint, for picking the largest to dump.
@@ -4700,6 +4718,27 @@ impl Engine {
         // The handles are cloned out before any index lock is taken: holding a
         // read guard while fetching would close the `tables` -> index cycle
         // `Engine::text_index_for` documents.
+        if kind.eq_ignore_ascii_case("SPANN") {
+            // Both forms the ledger already counts: the write-time tail
+            // (`spann_mem`) and a published tree that is still `Memory`. A
+            // `File` handle reports 0 (its slots are page cache). Without this
+            // branch the figure fell through to the multi-vector reader and
+            // returned 0, so `dump_every_table_index` skipped every SPANN index
+            // (`== 0 -> continue`) and its tail could never be released by a
+            // quota breach.
+            let (tail, published) = {
+                let tables = self.tables.lock().unwrap();
+                let Some(entry) = tables.get(&tkey) else {
+                    return 0;
+                };
+                (
+                    entry.spann_mem.get(&index_id).cloned(),
+                    entry.spann.get(&index_id).cloned(),
+                )
+            };
+            return tail.map(|t| t.mem_usage()).unwrap_or(0)
+                + published.map(|h| h.mem_usage()).unwrap_or(0);
+        }
         let (text, sparse, mv) = {
             let tables = self.tables.lock().unwrap();
             let Some(entry) = tables.get(&tkey) else {
@@ -4734,12 +4773,12 @@ impl Engine {
     /// `flush_lock`, and an index with an empty tail is skipped without
     /// spending a timestamp.
     pub(crate) async fn dump_all_memory_indexes(&self) {
-        // Serial on purpose. This runs from the insert path
-        // (`enforce_memindex_quota`) while the table's bottom gate is held, so
-        // handing each index to a pool and waiting (`pool.install`) deadlocks:
-        // the worker needs the gate its caller is holding. The sweep is
-        // per-index work on one table's indexes, not the whole directory, so
-        // the serial form is what the call sites can afford.
+        // Serial on purpose. A caller may hold a table's bottom gate (a
+        // test helper, `FLUSH` with dumps on), so handing each index to a pool
+        // and waiting (`pool.install`) deadlocks: the worker needs the gate its
+        // caller is holding. The sweep is per-index work on one table's
+        // indexes, not the whole directory, so the serial form is what the call
+        // sites can afford.
         let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
         for im in indexes {
             let _ = self.dump_index_transaction(&im.table, &im.name).await;
@@ -5030,7 +5069,11 @@ impl Engine {
             .collect()
     }
 
-    /// Test-only: the commit path dumps through `note_index_insert`.
+    /// Test-only: a secondary index's row-capacity dump.
+    ///
+    /// The production trigger for this bound no longer runs from the commit
+    /// path's byte-quota hook, so a test that wants the capacity behaviour asks
+    /// for it directly.
     #[cfg(test)]
     pub(crate) async fn dump_secondary_over_capacity(&self, table: &str) {
         let full = self.secondary_columns_over_capacity(table);
@@ -5248,4 +5291,19 @@ pub(crate) struct RecordedChunk {
     pub(crate) base_row_id: u64,
     pub(crate) row_count: u64,
     pub(crate) index_size: u64,
+}
+
+/// The analyzer **family** a name selects: `Some` only for a family the
+/// delimiter split does not reproduce (`ik`, `rag-chinese`, `ngram`,
+/// `japanese`, …).
+///
+/// `standard` is the default path and `keyword` / `whitespace` are carried by
+/// the delimiters, so all three answer `None`.
+fn analyzer_family(name: &str) -> Option<String> {
+    match analyzer::parse_analyzer_name(name) {
+        Ok(analyzer::AnalyzerName::Standard { .. })
+        | Ok(analyzer::AnalyzerName::Whitespace { .. })
+        | Err(_) => None,
+        Ok(_) => Some(name.to_string()),
+    }
 }

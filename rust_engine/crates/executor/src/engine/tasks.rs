@@ -14,26 +14,6 @@
 
 use super::*;
 
-/// Background `DumpMemIndexTask` (`src/storage/bg_task/bg_task.cppm`).
-///
-/// Submitted by [`Engine`] when the in-memory quota is exceeded while a
-/// `BGTaskProcessor` is attached. It upgrades the weak engine handle when it
-/// runs, so the dump sees every row buffered by the time the worker starts —
-/// the reference's proposed-dump coalescing.
-pub struct DumpMemIndexTask {
-    pub(crate) engine: std::sync::Weak<Engine>,
-    pub(crate) pending: Arc<std::sync::Mutex<MemIndexPending>>,
-    /// Whether every tail must go, or only the largest one: an explicit quota
-    /// check asks for everything, a write-triggered one takes the largest.
-    pub(crate) drain_all: bool,
-    /// The table whose batch raised the charge. A write-triggered dump picks
-    /// its victim among **that** table's indexes: choosing across the engine
-    /// let a table that merely held more bytes absorb every breach, and the
-    /// table that had just grown never drained. `None` for an explicit check,
-    /// which drains everything anyway.
-    pub(crate) table: Option<String>,
-}
-
 /// Background `CleanupTask` (`src/storage/bg_task/bg_task.cppm:107-114`).
 ///
 /// The trigger submits it once a transaction has committed since the last
@@ -91,12 +71,18 @@ pub(crate) async fn trigger_loop(
     cleanup_interval: std::time::Duration,
     compact_interval: std::time::Duration,
     optimize_interval: std::time::Duration,
+    reclaim_interval: std::time::Duration,
 ) {
     pub(crate) const TICK: std::time::Duration = std::time::Duration::from_secs(1);
     let mut last_checkpoint = std::time::Instant::now();
     let mut last_cleanup = std::time::Instant::now();
     let mut last_compact = std::time::Instant::now();
     let mut last_optimize = std::time::Instant::now();
+    // The one clock the reclaim loop runs on. Its cadence is
+    // `unsealed_reclaim_interval`, **not** the tick: the sweep walks every
+    // table, so running it once a second would pay that walk on every tick for
+    // an engine whose writes already check the quota themselves.
+    let mut last_reclaim = std::time::Instant::now();
     loop {
         {
             let Some(engine) = engine.upgrade() else {
@@ -137,6 +123,30 @@ pub(crate) async fn trigger_loop(
             {
                 last_cleanup = std::time::Instant::now();
                 engine.submit_cleanup();
+            }
+            // Reclaim of unsealed memory (`docs/MEMORY_RECLAIM.md` §4.7). The
+            // **only** place a drain runs.
+            //
+            // Two things ask for it and they share one gate here:
+            // * the interval, for a table that stopped being written while
+            //   still holding memory (writes cannot see that case);
+            // * the write path's flag, raised when a batch pushed the ledger
+            //   over the quota.
+            //
+            // Short-circuiting both through this one slot is what keeps the
+            // spacing between two drains at least one tick, whichever of the
+            // two asked. `reclaim_unsealed` re-checks the target itself, so a
+            // flag raised and then satisfied by another path costs one atomic
+            // read.
+            let due_interval =
+                !reclaim_interval.is_zero() && last_reclaim.elapsed() >= reclaim_interval;
+            let requested = engine
+                .context
+                .unsealed_reclaim_requested
+                .swap(false, std::sync::atomic::Ordering::Relaxed);
+            if due_interval || requested {
+                last_reclaim = std::time::Instant::now();
+                let _ = engine.reclaim_unsealed().await;
             }
             // The insert path takes a couple of queued splits per row and
             // leaves the rest of a bulk load's backlog behind it; this is the

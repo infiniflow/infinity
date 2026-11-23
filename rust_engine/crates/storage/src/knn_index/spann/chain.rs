@@ -37,6 +37,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::sync::Arc;
 
+use common::RowMask;
 use index::spann::search::{self, SearchSet};
 use index::spann::{Member, Options, PartitionKey, SpannError, ROOT_KEY};
 use index::vector::Metric;
@@ -430,7 +431,9 @@ impl ChunkChain {
     /// [`Self::coverage`] plus "which live rows the tree does **not** hold".
     ///
     /// The caller's `live` is the segment's row set; a delta that dropped a leaf
-    /// page shows up here rather than as a silently smaller index.
+    /// page shows up here rather than as a silently smaller index. This is a
+    /// diagnostic (the tests' `covers`), not a query path, so it takes a plain
+    /// set rather than the [`RowBitmap`] a filter uses.
     pub fn covers(&self, live: &HashSet<u64>) -> Coverage {
         let mut out = self.coverage();
         let mut held: HashSet<u64> = HashSet::new();
@@ -455,9 +458,19 @@ impl ChunkChain {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
+    }
+
+    /// The admitted rows this chain holds, scored exactly.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short: the beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to walking every leaf rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
     }
 
     fn search_masked(
@@ -465,7 +478,7 @@ impl ChunkChain {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         let dims = self.dims();
         if k == 0 || q.len() != dims || self.owners.is_empty() {
@@ -495,12 +508,19 @@ impl ChunkChain {
                 continue;
             };
             if meta.level <= 1 {
-                if scanned >= budget {
+                // The budget is checked **before** the scan, so `beam = 1`
+                // scans exactly one leaf. Only a leaf that admits at least one
+                // row is charged: a leaf the mask rejects cannot contribute, and
+                // charging it made a selective filter come back short.
+                if allowed.is_some() && scanned >= budget {
                     break;
                 }
-                scanned += 1;
-                if let Some(layer) = self.owner(key) {
-                    self.layers[layer].scan_leaf_into(key, q, allowed, &mut set);
+                let admitted = match self.owner(key) {
+                    Some(layer) => self.layers[layer].scan_leaf_into(key, q, allowed, &mut set),
+                    None => 0,
+                };
+                if admitted > 0 || allowed.is_none() {
+                    scanned += 1;
                 }
                 continue;
             }

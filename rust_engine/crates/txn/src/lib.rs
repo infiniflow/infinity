@@ -1300,16 +1300,28 @@ impl TxnManager {
     ) -> Result<usize> {
         let mut applied = 0;
         // A sealed segment's name carries the timestamp it was sealed at, and
-        // every record inside it is at or below that. One the checkpoint already
-        // covers is therefore skipped **without being read**: the loop below
+        // every record inside it is at or below that, so a segment both floors
+        // already cover can be skipped **without being read**: the loop below
         // floors each record out anyway, but only after the whole file - and
         // `WalEntryIterator::make` reads a segment whole - so a directory with a
         // long history paid for it on every open (measured: 227 MB of segments,
         // 33 s to open 4.6 k rows).
+        //
+        // **Both floors, not just the store's.** An entry carries two roles -
+        // the KV batch (covered by `checkpoint_ts`) and the rows that reach a
+        // block in the commit's bottom half (covered by `block_floor`) - and the
+        // two advance independently: the checkpoint's frame is written after its
+        // blocks were read at `bound_ts`, so a commit that landed while the
+        // mirror ran is above the blocks and at or below the frame. Skipping a
+        // segment by `checkpoint_ts` alone dropped exactly those rows: the log
+        // that held them was sealed with a ts the frame covers, and their blocks
+        // were never written (`test_insert_checkpoint`: one 8192-row batch lost
+        // on the restart after each checkpoint).
+        let floor = checkpoint_ts.min(block_floor);
         let covered: std::collections::HashSet<std::path::PathBuf> =
             sealed_segments(&self.wal_path)?
                 .into_iter()
-                .filter(|(_, seal_ts)| *seal_ts <= checkpoint_ts)
+                .filter(|(_, seal_ts)| *seal_ts <= floor)
                 .map(|(path, _)| path)
                 .collect();
         for path in segment_paths(&self.wal_path)? {

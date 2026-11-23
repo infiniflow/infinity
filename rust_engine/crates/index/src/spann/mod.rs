@@ -53,6 +53,7 @@ pub use store::{MemStore, SpannStore};
 use std::fmt::{self, Display};
 
 use crate::vector::Metric;
+use common::RowMask;
 
 /// Partition identifier. `u32` because the metadata table is 64 B per partition
 /// and the root is fixed at 0.
@@ -419,9 +420,20 @@ impl SpannIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
+    }
+
+    /// [`Self::search_filtered`] with the beam disabled: every leaf that holds
+    /// an admitted row is probed.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short. The beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to the whole tree rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
     }
 
     fn search_masked(
@@ -429,7 +441,7 @@ impl SpannIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         if k == 0 || q.len() != self.dim {
             return Vec::new();
@@ -469,12 +481,24 @@ impl SpannIndex {
                 continue;
             };
             if part.is_leaf() {
-                if scanned >= budget {
+                // The budget is checked **before** the scan, so `beam = 1` scans
+                // exactly one leaf. Only a leaf that admits at least one row is
+                // charged; a leaf the mask rejects cannot contribute, and
+                // charging it made a selective filter spend its budget on
+                // partitions that add nothing and answer short.
+                //
+                // The admitted count comes from `search_into`, not from the
+                // growth of `set`: the set prunes at its capacity, so a
+                // replacement leaves its length unchanged although the leaf did
+                // admit rows.
+                if allowed.is_some() && scanned >= budget {
                     break;
                 }
                 let query = part.make_query(&self.rotation, q);
-                part.search_into(&query, q, self.opts.metric, &mut set, allowed);
-                scanned += 1;
+                let admitted = part.search_into(&query, q, self.opts.metric, &mut set, allowed);
+                if admitted > 0 || allowed.is_none() {
+                    scanned += 1;
+                }
             } else {
                 for child in &part.children {
                     if let Some(c) = self.store.partition(*child) {
@@ -643,21 +667,22 @@ mod tests {
         let index = SpannIndex::build(rows.clone(), opts(32, Encode::Rabitq)).unwrap();
 
         // One admitted row: whatever the beam, that row is the only answer.
-        let one: std::collections::HashSet<u64> = [rows[7].0].into_iter().collect();
+        let one = common::RowMask::from_rows([rows[7].0].into_iter().collect());
         let hits = index.search_filtered(&rows[200].1, 5, Some(usize::MAX), &one);
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].0, rows[7].0);
 
         // A sparse mask: the answer must be the exact best *among the mask*.
-        let mask: std::collections::HashSet<u64> = rows
-            .iter()
-            .map(|(id, _)| *id)
-            .filter(|id| id % 97 == 0)
-            .collect();
+        let mask = common::RowMask::from_rows(
+            rows.iter()
+                .map(|(id, _)| *id)
+                .filter(|id| id % 97 == 0)
+                .collect(),
+        );
         let query = &rows[123].1;
         let mut want: Vec<(u64, f32)> = rows
             .iter()
-            .filter(|(id, _)| mask.contains(id))
+            .filter(|(id, _)| mask.contains(*id))
             .map(|(id, v)| {
                 let d: f32 = v
                     .iter()
@@ -674,7 +699,7 @@ mod tests {
             got.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
             want.iter().take(3).map(|(id, _)| *id).collect::<Vec<_>>()
         );
-        assert!(got.iter().all(|(id, _)| mask.contains(id)));
+        assert!(got.iter().all(|(id, _)| mask.contains(*id)));
     }
 
     #[test]

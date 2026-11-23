@@ -150,6 +150,7 @@ async fn start_background_tasks_sets_processor() {
             std::time::Duration::ZERO,
             std::time::Duration::ZERO,
             std::time::Duration::ZERO,
+            std::time::Duration::ZERO,
         )
         .await;
     assert!(engine.submit_optimize_indexes(), "no processor attached");

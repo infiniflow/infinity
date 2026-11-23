@@ -154,7 +154,10 @@ pub(crate) fn mem_dump_threshold(opts: &Options) -> usize {
 /// which is the same bound the flat list had.
 pub(crate) struct SpannTail {
     tree: RwLock<IncIndex>,
-    dead: Mutex<std::collections::HashSet<u64>>,
+    /// Tombstoned rows of this tail. A bitmap, like the engine's journal and
+    /// the reference's `Bitmask`: a `DELETE … WHERE id < n` marks a run, and the
+    /// set is tested once per candidate the beam returns.
+    dead: Mutex<common::RowBitmap>,
     dim: usize,
     opts: Options,
     /// Splits/merges this tail has run, from both the paced insert path and the
@@ -204,7 +207,7 @@ impl SpannTail {
         let tree = IncIndex::new(dim, opts.clone()).map_err(spann_err)?;
         Ok(Arc::new(Self {
             tree: RwLock::new(tree),
-            dead: Mutex::new(std::collections::HashSet::new()),
+            dead: Mutex::new(common::RowBitmap::new()),
             dim,
             opts,
             fixup_steps: std::sync::atomic::AtomicU64::new(0),
@@ -266,8 +269,8 @@ impl SpannTail {
         let tree = recover_poisoned(self.tree.read(), "tail tree");
         let dead = recover_poisoned(self.dead.lock(), "tail tombstones");
         let budget = self.budget(&tree, beam);
-        let mut hits = tree.search(q, k + dead.len(), budget);
-        hits.retain(|(id, _)| !dead.contains(id));
+        let mut hits = tree.search(q, k + dead.len() as usize, budget);
+        hits.retain(|(id, _)| !dead.contains(*id));
         hits.truncate(k);
         hits
     }
@@ -277,13 +280,13 @@ impl SpannTail {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<u64>,
+        allowed: &common::RowMask,
     ) -> Vec<(u64, f32)> {
         let tree = recover_poisoned(self.tree.read(), "tail tree");
         let dead = recover_poisoned(self.dead.lock(), "tail tombstones");
         let budget = self.budget(&tree, beam);
-        let mut hits = tree.search_masked(q, k + dead.len(), budget, Some(allowed));
-        hits.retain(|(id, _)| !dead.contains(id));
+        let mut hits = tree.search_masked(q, k + dead.len() as usize, budget, Some(allowed));
+        hits.retain(|(id, _)| !dead.contains(*id));
         hits.truncate(k);
         hits
     }
@@ -322,7 +325,7 @@ impl SpannTail {
     pub(crate) fn len(&self) -> usize {
         let tree = recover_poisoned(self.tree.read(), "tail tree");
         let dead = recover_poisoned(self.dead.lock(), "tail tombstones");
-        tree.len().saturating_sub(dead.len())
+        tree.len().saturating_sub(dead.len() as usize)
     }
 
     /// Live row ids, ascending - the coverage check's input (§9.7).
@@ -332,7 +335,7 @@ impl SpannTail {
         let mut ids: Vec<u64> = tree
             .row_ids()
             .into_iter()
-            .filter(|id| !dead.contains(id))
+            .filter(|id| !dead.contains(*id))
             .collect();
         ids.sort_unstable();
         ids
@@ -346,7 +349,7 @@ impl SpannTail {
         let dead = recover_poisoned(self.dead.lock(), "tail tombstones");
         tree.row_ids()
             .into_iter()
-            .any(|id| (id >> 32) as u32 == segment && !dead.contains(&id))
+            .any(|id| (id >> 32) as u32 == segment && !dead.contains(id))
     }
 
     /// Drops rows a commit deleted (an `UPDATE` is delete + insert, so both
@@ -363,7 +366,7 @@ impl SpannTail {
     pub(crate) fn mem_usage(&self) -> usize {
         let tree = recover_poisoned(self.tree.read(), "tail tree");
         let dead = recover_poisoned(self.dead.lock(), "tail tombstones");
-        tree.mem_usage() + dead.len() * std::mem::size_of::<u64>()
+        tree.mem_usage() + dead.mem_usage()
     }
 }
 
@@ -377,7 +380,7 @@ impl SpannTail {
     /// A publisher that re-inserts the tree's row ids into a segment's published
     /// tree has to skip them, or the delete would be undone by the checkpoint
     /// that was supposed to make it durable.
-    pub(crate) fn take_live(&self) -> Option<(IncIndex, std::collections::HashSet<u64>)> {
+    pub(crate) fn take_live(&self) -> Option<(IncIndex, common::RowBitmap)> {
         let mut tree = recover_poisoned(self.tree.write(), "tail tree");
         let replacement = IncIndex::new(self.dim, self.opts.clone()).ok()?;
         let taken = std::mem::replace(&mut *tree, replacement);
@@ -394,11 +397,11 @@ impl SpannTail {
     /// [`Self::take_live`] clears them, and the rows they cover are still in the
     /// tail (the checkpoint only removed the ones it published). Dropping them
     /// would publish a deleted-before-publish row on the next pass.
-    pub(crate) fn restore_dead(&self, dead: std::collections::HashSet<u64>) {
+    pub(crate) fn restore_dead(&self, dead: common::RowBitmap) {
         if dead.is_empty() {
             return;
         }
-        recover_poisoned(self.dead.lock(), "tail tombstones").extend(dead);
+        recover_poisoned(self.dead.lock(), "tail tombstones").extend(dead.iter());
     }
 }
 
@@ -516,7 +519,7 @@ impl SpannHandle {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<usize>,
+        allowed: &common::RowMask,
     ) -> Vec<(u64, f32)> {
         if k == 0 || allowed.is_empty() {
             return Vec::new();
@@ -528,10 +531,13 @@ impl SpannHandle {
         // asked for the whole table at 1% selectivity.
         // One mask for every segment: the bitmap is rows of the whole table, and
         // a per-chunk copy would rebuild it once per segment per attempt.
-        let ids: Arc<std::collections::HashSet<u64>> =
-            Arc::new(allowed.iter().map(|id| *id as u64).collect());
+        // One shared mask for every segment: the bitmap is rows of the whole
+        // table, and a per-chunk rebuild would redo it once per segment per
+        // attempt. `RowMask` is `Clone` and its inner sets are treemaps, so the
+        // clone shares nothing but costs a container copy, not a row copy.
+        let ids: Arc<common::RowMask> = Arc::new(allowed.clone());
         let mut width = beam.unwrap_or(DEFAULT_SEARCH_BEAM).max(1);
-        for attempt in 0..3 {
+        for _attempt in 0..3 {
             let mut hits = match self {
                 SpannHandle::Memory(index) => index.search_filtered(q, k, Some(width), &ids),
                 SpannHandle::File(chains) => {
@@ -569,13 +575,33 @@ impl SpannHandle {
                     merged
                 }
             };
-            if hits.len() >= k || attempt == 2 {
+            if hits.len() >= k {
                 hits.truncate(k);
                 return hits;
             }
+            // A short answer means the beam did not reach enough leaves that
+            // hold admitted rows. Widen it, then **fall back to the whole
+            // tree**: the beam is a work bound, not a correctness one, so a
+            // selective filter must not answer fewer than `k` rows while
+            // admitted rows remain. The exhaustive attempt walks every leaf
+            // that holds an admitted row and is still cheaper than letting the
+            // caller's exact scan re-read the table.
             width = (width * 2).min(MAX_RERANK_CANDIDATES);
         }
-        Vec::new()
+        let mut hits = match self {
+            SpannHandle::Memory(index) => index.search_admitted_exact(q, k, &ids),
+            SpannHandle::File(chains) => {
+                let mut merged: Vec<(u64, f32)> = chains
+                    .iter()
+                    .flat_map(|c| c.search_admitted_exact(q, k, &ids))
+                    .collect();
+                merge_chunks(&mut merged);
+                merged.truncate(k);
+                merged
+            }
+        };
+        hits.truncate(k);
+        hits
     }
 
     /// `(partitions, height)`, reported by `SHOW INDEX` (§16.4).
