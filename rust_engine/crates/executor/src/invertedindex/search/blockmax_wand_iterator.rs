@@ -368,6 +368,15 @@ impl<'a> Cursor<'a> {
                 // `pct = 65535` the score is `1.4293134`, the bound
                 // `1.4293131`), which would prune a document that clears the
                 // threshold.
+                // A coefficient can overflow: `bm25_param_k1=2e35` with
+                // `avg = 20` makes `f3` infinite (the parameter is only checked
+                // for being non-negative), `f3 / pct` is infinite too, and the
+                // norm collapses to `0` - a zero bound for a block whose scores
+                // are finite. Fall back to the whole-term bound, which is the
+                // largest value any block can reach.
+                if !self.f3.is_finite() || !self.f1.is_finite() {
+                    return self.upper_bound;
+                }
                 let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / (pct.max(1) as f32));
                 // The margin must survive the cap. In exact arithmetic
                 // `norm + f4 <= 1 + delta/(k1+1)`, so `common * (norm + f4)`
@@ -1521,6 +1530,42 @@ mod tests {
         );
         assert_eq!(pruned.len(), 1, "row 1 must survive");
         assert_eq!(pruned[0].0, 1);
+    }
+
+    /// An overflowing `f3` must not collapse the block bound to zero.
+    ///
+    /// `bm25_param_k1` is only checked for being non-negative, so `2e35` is
+    /// accepted; with `b = 0.75` and `avg = 20` the `k1*b/avg*u16::MAX` that
+    /// becomes `f3` overflows to infinity, `f3/pct` is infinite, and the norm
+    /// `1/(1 + ...)` is `0`. A block bound of zero prunes every document in it.
+    #[test]
+    fn an_overflowing_coefficient_falls_back_to_the_term_bound() {
+        let ranker = Bm25Ranker::with_params(2e35, 0.75, 0.0);
+        let idf = ranker.idf(2.0, 2.0);
+        let avg = 20.0f32;
+        // The block's statistics: one occurrence, the corpus average length.
+        let f3 = ranker.f3(avg);
+        assert!(
+            !f3.is_finite(),
+            "f3 must overflow for this test to mean anything"
+        );
+        let postings: Vec<(u64, u32)> = vec![(0, 1), (1, 10)];
+        let doc_len: Vec<(u64, u32)> = vec![(0, 20), (1, 20)];
+        let field = field(&[("t", &postings)], &doc_len, 2, vec![1.0]);
+        let dead = common::RowBitmap::new();
+        let mut it = BlockMaxWandIterator::new(vec![field], 1, &dead, 0.0, 1, WandMode::Bm25)
+            .with_bm25_params(2e35, 0.75);
+        let cursor = &mut it.cursors[0];
+        let id = cursor.stream.block_id();
+        cursor.block_index = id;
+        cursor.block_stats_cache = (1, 1.0, 65535);
+        let bound = cursor.block_max(WandMode::Bm25);
+        assert!(bound > 0.0, "the block bound collapsed to {bound}");
+        assert!(
+            bound >= cursor.upper_bound * 0.5,
+            "the fallback is the whole-term bound, not a fraction of it"
+        );
+        let _ = idf;
     }
 
     /// The whole-term bound must cover the term's score, which `f32` rounding
