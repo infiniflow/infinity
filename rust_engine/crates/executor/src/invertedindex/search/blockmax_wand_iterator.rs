@@ -160,9 +160,19 @@ impl Bm25Ranker {
         delta / (self.k1 + 1.0)
     }
 
-    /// tf_norm <= k1+1, so this is a safe upper bound for pruning.
+    /// The whole-term bound: `tf_norm <= k1+1`, so this covers every score the
+    /// term can produce.
+    ///
+    /// In `f32` it does not, quite: `score_with` evaluates `common * (tf/(tf+p)
+    /// + f4)` and this evaluates `idf * (k1 + 1 + delta) * weight`, and the two
+    /// round differently. With `df = 1`, `n = 1000`, `delta = 3` and
+    /// `tf = dl = avg = 2^25` the score is `23.663778305` against a bound of
+    /// `23.663772583`. Pruning uses this bound for the termination ledger and
+    /// for the pivot, so a document above a user threshold could be skipped.
+    /// The result carries the same `1 + 2^-20` margin the block bound uses.
     pub fn upper_bound(&self, idf: f32, weight: f32) -> f32 {
-        idf * (self.k1 + 1.0 + self.delta.max(0.0)) * weight
+        let bound = idf * (self.k1 + 1.0 + self.delta.max(0.0)) * weight;
+        round_up32(bound * (1.0 + 2f32.powi(-20)), 1)
     }
 
     /// bm25_common_score_ (term_doc_iterator_impl.cpp:71):
@@ -1511,6 +1521,27 @@ mod tests {
         );
         assert_eq!(pruned.len(), 1, "row 1 must survive");
         assert_eq!(pruned[0].0, 1);
+    }
+
+    /// The whole-term bound must cover the term's score, which `f32` rounding
+    /// makes false for the plain formula.
+    ///
+    /// `upper_bound` multiplies `idf * (k1 + 1 + delta) * weight`; `score_with`
+    /// multiplies `common * (tf/(tf+p) + f4)`. With `df = 1`, `n = 1000`,
+    /// `delta = 3`, `tf = dl = avg = 2^25` and weight `0.6997575163841248` the
+    /// score is `23.663778305` and the plain bound `23.663772583`, so pruning
+    /// would stop on a document that clears a threshold of `23.663776398`.
+    #[test]
+    fn the_term_bound_covers_the_term_score() {
+        let ranker = Bm25Ranker::new(3.0);
+        let (n, df) = (1000.0f32, 1.0f32);
+        let idf = ranker.idf(n, df);
+        let tf = 2f32.powi(25);
+        for w in [0.699_757_5_f32, 0.1, 1.0] {
+            let score = ranker.score(tf, tf, tf, idf, w);
+            let bound = ranker.upper_bound(idf, w);
+            assert!(score <= bound, "w={w}: score {score} > upper bound {bound}");
+        }
     }
 
     /// `BlockMaxBM25Score` must not fall below the exact score of the block it
