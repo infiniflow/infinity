@@ -371,11 +371,11 @@ impl<'a> Cursor<'a> {
                 let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / (pct.max(1) as f32));
                 // The margin must survive the cap. In exact arithmetic
                 // `norm + f4 <= 1 + delta/(k1+1)`, so `common * (norm + f4)`
-                // never exceeds `upper_bound` and the cap never binds; with the
-                // margin the left side can pass it by a rounding step, and a
-                // plain `min(upper_bound)` would then clip exactly the margin
-                // that keeps the bound above the score. Both sides of the `min`
-                // are widened by the same factor, so the cap can only pick the
+                // never exceeds `upper_bound`; with the margin the left side can
+                // pass it by a rounding step (a large `delta` does it by more),
+                // and a plain `min(upper_bound)` would then clip exactly the
+                // margin that keeps the bound above the score. Both sides are
+                // widened by the same factor, so the `min` can only pick the
                 // larger of two bounds.
                 let margin = 1.0 + 2f32.powi(-20);
                 let bound = round_up32((self.common * (norm + self.f4)) * margin, 1);
@@ -1554,38 +1554,44 @@ mod tests {
     /// below. A document whose score just clears the threshold would then be
     /// pruned as uncompetitive.
     ///
-    /// This drives `Cursor::block_max`, not the raw formula, because the
-    /// `.min(upper_bound)` cap is part of the answer: a margin clipped away
-    /// there would put the bound back below the score.
+    /// The `2^24` rows are the ones where the raw bound passes `upper_bound` by
+    /// a rounding step and `.min` binds - without widening the cap, the margin
+    /// is removed there and the bound drops back below the score.
     ///
     /// `pct = 65535` claims the block's longest document is the corpus average,
     /// which only bounds the block when `dl >= avg`; that is the point sampled.
     #[test]
     fn block_maximum_never_falls_below_the_exact_score() {
-        for delta in [0.0f32, 0.5, 3.0] {
+        // `delta = 100` is where the raw bound passes `upper_bound` by more
+        // than a rounding step, so `.min` genuinely binds there.
+        for delta in [0.0f32, 0.5, 3.0, 100.0] {
             let ranker = Bm25Ranker::new(delta);
-            let n = 1000.0f32;
-            let idf = ranker.idf(n, 1.0);
-            let avg = 1216.0f32;
-            for tf in [1.0f32, 2.0, 1216.0] {
-                for w in [0.1f32, 1.0, 1.7] {
+            let idf = ranker.idf(1000.0, 1.0);
+            for (avg, tf) in [(1216.0f32, 1216.0f32), (16_777_216.0, 1_048_576.0)] {
+                for w in [0.1f32, 0.7, 1.7] {
                     let postings: Vec<(u64, u32)> = vec![(0, tf as u32)];
                     let doc_len: Vec<(u64, u32)> = vec![(0, tf as u32)];
                     let mut field = field(&[("t", &postings)], &doc_len, 1, vec![w]);
-                    // Make the block's ratio and percentage the ones under test.
-                    field.total_len = (avg * n) as u64;
-                    field.n_docs = n as usize;
+                    field.total_len = (avg * 1000.0) as u64;
+                    field.n_docs = 1000;
                     if let Some(unit) = field.units.first_mut() {
                         unit.idf = idf;
                     }
                     let dead = common::RowBitmap::new();
                     let mut it =
                         BlockMaxWandIterator::new(vec![field], 1, &dead, delta, 1, WandMode::Bm25);
+                    let cursor = &mut it.cursors[0];
+                    // Pin the block statistics the bound reads: the largest tf
+                    // the block holds, and a full percentage (the block's
+                    // longest document is the corpus average).
+                    let id = cursor.stream.block_id();
+                    cursor.block_index = id;
+                    cursor.block_stats_cache = (0, tf, 65535);
                     let exact = ranker.score(tf, tf, avg, idf, w);
-                    let bound = it.cursors[0].block_max(WandMode::Bm25);
+                    let bound = cursor.block_max(WandMode::Bm25);
                     assert!(
                         exact <= bound,
-                        "delta={delta} tf={tf} w={w}: exact {exact} > block_max {bound}"
+                        "delta={delta} avg={avg} w={w}: exact {exact} > block_max {bound}"
                     );
                 }
             }
