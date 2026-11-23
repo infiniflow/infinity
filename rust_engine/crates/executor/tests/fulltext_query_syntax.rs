@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `minimum_should_match` alongside the query-string grammar.
+//! `minimum_should_match` and `rank_features` alongside the query-string grammar.
 //!
-//! RAGFlow's retrieval spells out the default on every English query -
-//! `minimum_should_match=0%` - and its query text is always a boolean
-//! expression (`(a OR b)^5 OR ("c d")^0.7`). A zero share asks for nothing the
-//! tree path cannot answer ("any clause may match" is what its boolean
-//! structure computes), so it must be accepted; a positive share counts matched
-//! clauses, which only the WAND path implements, and stays an error instead of
-//! being silently dropped.
+//! RAGFlow's retrieval spells a share out on every Chinese query - the default
+//! `minimum_should_match=30%` - and its query text is always a boolean
+//! expression (`(a OR b)^5 OR ("c d")^0.7`). The reference answers both options on
+//! the parsed tree (`MinimumShouldMatchIterator` over the root's clauses, and a
+//! `rank_features` bonus added to each score), so rejecting them turned every such
+//! search into an error. A share that no clause set can satisfy is the reference's
+//! null iterator: it matches nothing.
 
 use executor::{Engine, QueryResult};
 
@@ -44,6 +44,29 @@ async fn engine_with_rows() -> (tempfile::TempDir, Engine) {
     (dir, engine)
 }
 
+/// One row per clause level: `apple`, `apple banana`, `apple banana cherry`.
+async fn engine_with_nested_rows() -> (tempfile::TempDir, Engine) {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    engine
+        .execute("CREATE TABLE m (id INTEGER, doc VARCHAR);")
+        .await
+        .unwrap();
+    engine
+        .execute("CREATE INDEX m_ft ON m (doc) USING FULLTEXT;")
+        .await
+        .unwrap();
+    engine
+        .execute(
+            "INSERT INTO m VALUES (1, 'apple'), (2, 'apple banana'), (3, 'apple banana cherry');",
+        )
+        .await
+        .unwrap();
+    (dir, engine)
+}
+
 fn ids(result: &[QueryResult]) -> Vec<i64> {
     match &result[0] {
         QueryResult::Rows { rows, .. } => rows
@@ -52,6 +75,12 @@ fn ids(result: &[QueryResult]) -> Vec<i64> {
             .collect(),
         other => panic!("expected rows, got {other:?}"),
     }
+}
+
+fn sorted_ids(result: &[QueryResult]) -> Vec<i64> {
+    let mut ids = ids(result);
+    ids.sort_unstable();
+    ids
 }
 
 #[tokio::test]
@@ -63,22 +92,117 @@ async fn zero_minimum_should_match_is_accepted_with_query_syntax() {
         )
         .await
         .expect("a zero share must not be rejected on a parsed query");
-    let mut got = ids(&result);
-    got.sort();
-    assert_eq!(got, vec![1, 2], "the OR expression should match both rows");
+    assert_eq!(
+        sorted_ids(&result),
+        vec![1, 2],
+        "the OR expression should match both rows"
+    );
 }
 
 #[tokio::test]
-async fn positive_minimum_should_match_is_still_rejected() {
-    let (_dir, engine) = engine_with_rows().await;
-    let err = engine
+async fn minimum_should_match_counts_matched_clauses() {
+    let (_dir, engine) = engine_with_nested_rows().await;
+    let search = |option: &str| {
+        format!(
+            "SELECT id FROM m SEARCH MATCH TEXT ('doc', '(apple OR banana OR cherry)', 'topn=10;{option}');"
+        )
+    };
+
+    // All three clauses: only the row carrying every term.
+    let all = engine
+        .execute(&search("minimum_should_match=100%"))
+        .await
+        .expect("a full share is answerable on a parsed query");
+    assert_eq!(sorted_ids(&all), vec![3]);
+
+    // 67% of three leaves rounds down to two clauses.
+    let two = engine
+        .execute(&search("minimum_should_match=67%"))
+        .await
+        .expect("a partial share is answerable on a parsed query");
+    assert_eq!(sorted_ids(&two), vec![2, 3]);
+
+    // A bare count is taken literally.
+    let two_count = engine
+        .execute(&search("minimum_should_match=2"))
+        .await
+        .expect("a clause count is answerable on a parsed query");
+    assert_eq!(sorted_ids(&two_count), vec![2, 3]);
+
+    // `0` and `1` ask for nothing beyond the query's own boolean structure.
+    let any = engine
+        .execute(&search("minimum_should_match=1"))
+        .await
+        .expect("a one-clause share keeps the plain OR");
+    assert_eq!(sorted_ids(&any), vec![1, 2, 3]);
+
+    // A share above the root's clause count can never be satisfied, which is the
+    // reference's null iterator. `(apple AND banana) OR (cherry AND apple)` has
+    // two root clauses but four leaves, so a full share asks for four of two.
+    let impossible = engine
         .execute(
-            "SELECT id FROM t SEARCH MATCH TEXT ('doc', '(apple OR banana OR cherry)', 'minimum_should_match=50%');",
+            "SELECT id FROM m SEARCH MATCH TEXT \
+             ('doc', '(apple AND banana) OR (cherry AND apple)', 'topn=10;minimum_should_match=100%');",
         )
         .await
-        .expect_err("the tree path cannot count matched clauses");
-    assert!(
-        err.to_string().contains("minimum_should_match"),
-        "error should name the option: {err}"
-    );
+        .expect("an unsatisfiable share answers with no rows");
+    assert_eq!(ids(&impossible), Vec::<i64>::new());
+}
+
+#[tokio::test]
+async fn rank_features_score_a_grammar_query() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    engine
+        .execute("CREATE TABLE rg (id INTEGER, doc VARCHAR, feat VARCHAR);")
+        .await
+        .unwrap();
+    engine
+        .execute(
+            "INSERT INTO rg VALUES (1, 'apple', '[{\"Tag1\":1}]'), (2, 'apple', '[{\"Tag1\":2}]');",
+        )
+        .await
+        .unwrap();
+    engine
+        .execute("CREATE INDEX rg_doc ON rg (doc) USING FULLTEXT;")
+        .await
+        .unwrap();
+    engine
+        .execute("CREATE INDEX rg_feat ON rg (feat) USING FULLTEXT WITH (analyzer='rankfeatures');")
+        .await
+        .unwrap();
+
+    let score_of = |result: &[QueryResult], id: &str| -> f64 {
+        match &result[0] {
+            QueryResult::Rows { rows, .. } => rows
+                .iter()
+                .find(|r| r[0].to_slt_string() == id)
+                .unwrap_or_else(|| panic!("id {id} missing: {rows:?}"))[1]
+                .to_slt_string()
+                .parse()
+                .unwrap(),
+            other => panic!("expected rows, got {other:?}"),
+        }
+    };
+
+    let base = engine
+        .execute(
+            "SELECT id, SCORE() FROM rg SEARCH MATCH TEXT ('doc','(apple OR banana)','topn=10');",
+        )
+        .await
+        .unwrap();
+    let ranked = engine
+        .execute(
+            "SELECT id, SCORE() FROM rg SEARCH MATCH TEXT \
+             ('doc','(apple OR banana)','topn=10;rank_features=feat^Tag1^1');",
+        )
+        .await
+        .expect("rank_features must be answerable on a parsed query");
+
+    // Both rows carry the same `doc`, so the BM25 half is identical and the
+    // difference is exactly the feature weight.
+    assert!((score_of(&ranked, "1") - score_of(&base, "1") - 1.0).abs() < 1e-4);
+    assert!((score_of(&ranked, "2") - score_of(&base, "2") - 2.0).abs() < 1e-4);
 }
