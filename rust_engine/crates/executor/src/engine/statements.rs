@@ -9147,16 +9147,25 @@ impl Engine {
             let (Some(col), Some(tag)) = (parts.first(), parts.get(1)) else {
                 continue;
             };
-            // The scoring column needs a `rankfeatures` full-text index.
-            let tkey = self.table_key(table);
-            let analyzer = self
-                .tables
-                .lock()
-                .unwrap()
-                .get(&tkey)
-                .and_then(|e| e.analyzers.get(*col).cloned())
-                .unwrap_or_default();
-            if !analyzer.eq_ignore_ascii_case("rankfeatures") {
+            // The scoring column needs a `rankfeatures` full-text index. The
+            // record comes from the catalog: the in-memory analyzer maps are only
+            // filled once the table's indexes are open, so a cold process (the
+            // CLI, a restarted server) would otherwise reject a valid column.
+            let rankfeatures_index = self
+                .storage
+                .catalog
+                .indexes_of_table(&self.qualified_table(table))
+                .unwrap_or_default()
+                .into_iter()
+                .any(|im| {
+                    im.column == *col
+                        && im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                        && im.options.iter().any(|(key, value)| {
+                            key.eq_ignore_ascii_case("analyzer")
+                                && value.eq_ignore_ascii_case("rankfeatures")
+                        })
+                });
+            if !rankfeatures_index {
                 return Err(Error::Invalid(format!(
                     "rank_features requires a rankfeatures index on '{col}'"
                 )));
