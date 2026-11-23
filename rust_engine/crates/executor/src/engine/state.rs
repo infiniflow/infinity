@@ -6246,6 +6246,17 @@ pub struct Engine {
     /// Bumped when `optimize_indexes` runs: a `DumpMemIndex` staged before the
     /// optimize cannot commit after it (the reference's index meta version).
     pub(crate) index_epoch: std::sync::atomic::AtomicU64,
+    /// The ts every table's **block mirror** has written its rows at or below,
+    /// or `0` when this process has not checkpointed since it opened.
+    ///
+    /// The frame a checkpoint appends covers what the KV store holds
+    /// (`synced`), which is a different floor from the rows: rows live in the
+    /// block mirror, and a commit that lands while that mirror runs is in the
+    /// SST and in no block. `CLEANUP` prunes sealed WAL segments by the frame,
+    /// so it has to respect this floor too - the rows a crash left in the log
+    /// are only replayed into the buffer at open, and stay there until the next
+    /// mirror writes them (`TxnManager::drop_sealed_wal_up_to`).
+    pub(crate) mirrored_ts: std::sync::atomic::AtomicU64,
     /// Engine-wide runtime state (the reference's `InfinityContext`).
     pub(crate) context: Context,
     /// cached `SELECT` results keyed by the statement text. A `std::sync::Mutex`

@@ -230,6 +230,10 @@ fn is_id_ordered(rows: &[(usize, Vec<Value>)]) -> bool {
     rows.windows(2).all(|w| w[0].0 <= w[1].0)
 }
 
+/// What a tensor-index build produces: the chunk id, the number of documents,
+/// the index, and the row each document came from (in document order).
+type PlaidChunkBuild = (u32, usize, PlaidIndex, Vec<u64>);
+
 /// The stored text form of a column default: the same value `AddColumnsData`
 impl Engine {
     /// Root of the C++-format block mirror. The C++ engine keeps the table
@@ -1856,7 +1860,10 @@ impl Engine {
     /// block writer writes - and two tables share nothing, so they run side by
     /// side. The global steps (the checkpoint ts, the index-cache reload, the
     /// catalog layout, the final `store.flush`) stay in the caller.
-    pub async fn flush_blocks(&self, bound_ts: u64) -> Result<()> {
+    /// Returns whether **every** table's rows reached the mirror: a table whose
+    /// columns are not packable keeps them buffered, and the caller must not
+    /// treat the log below this bound as reclaimable for it.
+    pub async fn flush_blocks(&self, bound_ts: u64) -> Result<bool> {
         let tables = self.storage.catalog.list_tables()?;
         self.flush_tables(&tables, bound_ts, checkpoint_workers())
             .await
@@ -1872,13 +1879,14 @@ impl Engine {
         tables: &[catalog::TableMeta],
         bound_ts: u64,
         workers: usize,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let workers = workers.min(tables.len()).max(1);
         if workers <= 1 {
+            let mut all = true;
             for meta in tables {
-                self.flush_table(meta, bound_ts).await?;
+                all &= self.flush_table(meta, bound_ts).await?;
             }
-            return Ok(());
+            return Ok(all);
         }
         // One table's checkpoint is an **async** unit: it waits for the
         // table's bottom gate (`.await`), then writes that table's blocks and
@@ -1891,16 +1899,26 @@ impl Engine {
         // below, which is the same work.
         if let Some(engine) = self.engine_handle() {
             let metas: Vec<catalog::TableMeta> = tables.to_vec();
-            return crate::fanout::for_each_async(metas, workers, move |meta| {
+            let all = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+            let flag = std::sync::Arc::clone(&all);
+            crate::fanout::for_each_async(metas, workers, move |meta| {
                 let engine = engine.clone();
-                async move { engine.flush_table(&meta, bound_ts).await }
+                let flag = std::sync::Arc::clone(&flag);
+                async move {
+                    if !engine.flush_table(&meta, bound_ts).await? {
+                        flag.store(false, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    Ok(())
+                }
             })
-            .await;
+            .await?;
+            return Ok(all.load(std::sync::atomic::Ordering::Relaxed));
         }
+        let mut all = true;
         for meta in tables {
-            self.flush_table(meta, bound_ts).await?;
+            all &= self.flush_table(meta, bound_ts).await?;
         }
-        Ok(())
+        Ok(all)
     }
 
     /// One table's share of a checkpoint.
@@ -1915,7 +1933,9 @@ impl Engine {
     /// touch the in-memory registries only after each write came back. No
     /// `std::sync::Mutex` is held across an await, and no blocking pool thread
     /// ever runs more than one file write.
-    async fn flush_table(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<()> {
+    /// Returns whether this table's rows reached the mirror; a table the mirror
+    /// cannot encode keeps them buffered.
+    async fn flush_table(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<bool> {
         let key = self.table_key(&meta.name);
         let gate = self.bottom_gate(&key);
         let _turn = gate.lock().await;
@@ -1927,8 +1947,9 @@ impl Engine {
     }
 
     /// [`Self::flush_table`] body, with the table's bottom gate already held.
-    async fn flush_table_locked(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<()> {
-        if meta.types.iter().all(|t| column_type_of(t).is_some()) {
+    async fn flush_table_locked(&self, meta: &catalog::TableMeta, bound_ts: u64) -> Result<bool> {
+        let packable = meta.types.iter().all(|t| column_type_of(t).is_some());
+        if packable {
             let table = meta.name.clone();
             self.flush_leaf(move |engine| engine.write_blocks_bounded_locked(&table, bound_ts))
                 .await?;
@@ -1944,7 +1965,7 @@ impl Engine {
         // held a CPU for minutes while rows kept arriving) and invented chunk
         // records no dump transaction names.
         self.refresh_memindex_charge(&meta.name);
-        Ok(())
+        Ok(packable)
     }
 
     /// Runs one file write of a checkpoint on the blocking pool.
@@ -4607,6 +4628,24 @@ impl Engine {
         table: &str,
         first: usize,
     ) -> Vec<(usize, Vec<String>)> {
+        self.read_blocks_including_deleted_wanted(table, first, None)
+    }
+
+    /// [`Self::read_blocks_including_deleted_from`] for a **column subset**.
+    ///
+    /// No column outside `wanted` is decoded; the slots it does not name come
+    /// back as `null`, so a row keeps its schema positions. This exists because
+    /// an index recovery wants **one** column of the table and the full walk
+    /// renders all of them: a MULTIVECTOR cell is one `fmt_f32_cpp` per float
+    /// it holds, so three secondary indexes reopening over an unprojected read
+    /// cost 1.4 GB of tensor text each (rgrep's 62 k-row table, minutes of a
+    /// cold open, sampled inside `parse_value` copying them).
+    pub(crate) fn read_blocks_including_deleted_wanted(
+        &self,
+        table: &str,
+        first: usize,
+        wanted: Option<&[usize]>,
+    ) -> Vec<(usize, Vec<String>)> {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
             return Vec::new();
@@ -4630,7 +4669,7 @@ impl Engine {
             if block_first + DEFAULT_BLOCK_CAPACITY as u64 <= first as u64 {
                 continue;
             }
-            if let Some(cells) = self.decode_block_cells(&table, &root, &meta, &types, id, None) {
+            if let Some(cells) = self.decode_block_cells(&table, &root, &meta, &types, id, wanted) {
                 out.extend(cells.into_iter().filter(|(seq, _)| *seq >= first));
             }
         }
@@ -8825,8 +8864,8 @@ impl Engine {
     ///
     /// `reuse` supplies an earlier chunk's centroids and quantizer
     /// (`PlaidIndex::ShareGlobalCentroids`), which skips training - and the
-    /// extra pass that feeds it. Returns `(documents, tokens, index)`, or `None`
-    /// when those rows carry no tensor at all.
+    /// extra pass that feeds it. Returns [`PlaidChunkBuild`], or `None` when those
+    /// rows carry no tensor at all.
     ///
     /// Two passes over the column are the price of bounded memory: `k` (and so
     /// the training sample) depends on the corpus size, which the first pass is
@@ -8844,7 +8883,7 @@ impl Engine {
         skip: usize,
         reuse: Option<&PlaidIndex>,
         dir: Option<&std::path::Path>,
-    ) -> Result<Option<(u32, usize, PlaidIndex)>> {
+    ) -> Result<Option<PlaidChunkBuild>> {
         let mut total = 0usize;
         let mut sample: Vec<f32> = Vec::new();
         let mut sampled = 0usize;
@@ -8964,10 +9003,17 @@ impl Engine {
         // documents to be representative. A per-batch probe would cost more than
         // the encoding it guards.
         let mut probed = false;
-        self.for_each_tensor_doc(table, col, dims, skip, &mut |_seq, doc| {
+        // The row id each document came from, in document order: a chunk file
+        // carries vectors and nothing else, so this list is the only exact
+        // statement of which rows its documents are. `write_plaid_index` saves
+        // it beside the chunk (`rows_{id}.bin`) and a reload uses it instead of
+        // re-deriving the rows from a document count.
+        let mut rows: Vec<u64> = Vec::new();
+        self.for_each_tensor_doc(table, col, dims, skip, &mut |seq, doc| {
             if doc.is_empty() {
                 return true;
             }
+            rows.push(seq);
             if batch_tokens > 0 && batch_tokens + doc.len() > batch_limit {
                 if !probed && reuse.is_some() {
                     probed = true;
@@ -9019,7 +9065,54 @@ impl Engine {
         if let Some(dir) = dir {
             Self::save_plaid_outliers(dir, &outliers)?;
         }
-        Ok(Some((docs, index.total_embedding_num() as usize, index)))
+        Ok(Some((
+            docs,
+            index.total_embedding_num() as usize,
+            index,
+            rows,
+        )))
+    }
+
+    /// Where a chunk's document-to-row list lives, beside the chunk file.
+    fn plaid_chunk_rows_path(dir: &std::path::Path, chunk_id: u64) -> std::path::PathBuf {
+        dir.join(format!("rows_{chunk_id}.bin"))
+    }
+
+    /// Saves the row ids of a chunk's documents (`u64` little endian, document
+    /// order).
+    ///
+    /// The chunk format is the reference's and carries vectors only, while a
+    /// reader has to name the rows those vectors came from. The record's
+    /// `base_row_id`/`row_count` state it as a *document* offset, which is only
+    /// true while no row is deleted: a delete after the dump shifts every later
+    /// document, and the mirror could then never be loaded again - each cold
+    /// start retrained the whole index (measured: minutes on rgrep's 62 k rows,
+    /// every launch). This list is unaffected by later writes.
+    fn write_plaid_chunk_rows(dir: &std::path::Path, chunk_id: u64, rows: &[u64]) -> Result<()> {
+        let path = Self::plaid_chunk_rows_path(dir, chunk_id);
+        let mut bytes = Vec::with_capacity(rows.len() * 8);
+        for row in rows {
+            bytes.extend_from_slice(&row.to_le_bytes());
+        }
+        storage::definition::format::write_synced(&path, &bytes)
+            .map_err(|e| Error::Io { path, source: e })
+    }
+
+    /// [`Self::write_plaid_chunk_rows`] read back; `None` for a chunk written
+    /// before the list existed or one whose file is short.
+    fn read_plaid_chunk_rows(dir: &std::path::Path, chunk_id: u64) -> Option<Vec<u64>> {
+        let bytes =
+            storage::chunk_store::read_file(Self::plaid_chunk_rows_path(dir, chunk_id)).ok()?;
+        if bytes.is_empty() || bytes.len() % 8 != 0 {
+            return None;
+        }
+        let (words, _) = bytes.as_chunks::<8>();
+        Some(
+            words
+                .iter()
+                .map(|b| u64::from_le_bytes(*b))
+                .collect::<Vec<u64>>(),
+        )
     }
 
     /// The outlier buffer of a mirror, as raw embeddings (`dims` floats each).
@@ -9148,6 +9241,105 @@ impl Engine {
         index_name: &str,
     ) -> Result<Vec<PlaidChunkFile>> {
         self.read_plaid_chunks_selected(table, index_name, None)
+    }
+
+    /// The rows each chunk of the mirror names, when **every** live chunk
+    /// carries the list [`Self::write_plaid_chunk_rows`] saved.
+    ///
+    /// A loader wants exactly this and nothing else: the chunk files hold
+    /// vectors, and the record's document offsets only describe the table as it
+    /// was at dump time. `None` means at least one chunk predates the list, and
+    /// the caller falls back to reconstructing the rows.
+    pub(crate) fn plaid_chunk_rows(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Option<std::collections::HashMap<u64, Vec<u64>>> {
+        let mirror = self.plaid_mirror(table, index_name).ok()?;
+        let bases: std::collections::HashMap<u64, u64> = self
+            .plaid_chunk_records(table, index_name)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(id, base, _)| (id, base))
+            .collect();
+        // Document order, the same order `read_plaid_chunks` returns.
+        let mut live: Vec<(u64, u64, u32)> = Vec::new();
+        for (id, path) in self.live_chunk_files(table, index_name, 0, &mirror.dir) {
+            if !path.exists() {
+                continue;
+            }
+            let docs = crate::blocks::index_chunk::plaid_chunk_doc_num(&path)?;
+            if docs == 0 {
+                continue;
+            }
+            live.push((id, bases.get(&id).copied().unwrap_or(0), docs));
+        }
+        if live.is_empty() {
+            return None;
+        }
+        live.sort_by_key(|(id, base, _)| (*base, *id));
+        let mut listed: Vec<(u64, u64, u32, Vec<u64>)> = Vec::new();
+        let mut unlisted: Vec<(u64, u64, u32)> = Vec::new();
+        for (id, base, docs) in live {
+            match Self::read_plaid_chunk_rows(&mirror.dir, id) {
+                Some(rows) if rows.len() == docs as usize => listed.push((id, base, docs, rows)),
+                _ => unlisted.push((id, base, docs)),
+            }
+        }
+        if listed.is_empty() {
+            return None;
+        }
+        // A rewrite (or a fold whose deprecation did not land) leaves chunks
+        // without a list beside the ones that have it. Such a chunk is only
+        // skippable when it cannot hold a row the listed chunks do not: either
+        // the listed span covers it, or it starts past that span - its documents
+        // are all deletions by then, which is exactly what a whole rewrite of a
+        // table with tombstones produces.
+        let span_min = listed.iter().map(|(_, base, _, _)| *base).min()?;
+        let span_max = listed
+            .iter()
+            .map(|(_, base, docs, _)| base + u64::from(*docs))
+            .max()?;
+        // A list that starts at document 0 is a whole rewrite: it holds every
+        // live row of the column, so a chunk without a list beside it can only
+        // name rows that are gone (the rewrite dropped them) - the loader's
+        // tail pass covers anything this misses.
+        let full_end = listed
+            .iter()
+            .filter(|(_, base, _, _)| *base == 0)
+            .max_by_key(|(id, ..)| *id)
+            .map(|(_, _, docs, _)| u64::from(*docs));
+        for (_, base, docs) in &unlisted {
+            if full_end.is_some() {
+                continue;
+            }
+            let end = base + u64::from(*docs);
+            if *base >= span_max || (*base >= span_min && end <= span_max) {
+                continue;
+            }
+            return None;
+        }
+        // Of the listed chunks, one whose span another chunk covers is not live
+        // (the newer copy of the same documents).
+        let spans: Vec<(u64, u64)> = listed
+            .iter()
+            .map(|(_, base, docs, _)| (*base, u64::from(*docs)))
+            .collect();
+        let mut out = std::collections::HashMap::new();
+        for (at, (id, _, _, rows)) in listed.into_iter().enumerate() {
+            let covered = spans.iter().enumerate().any(|(other, (base_o, docs_o))| {
+                other > at && *base_o <= spans[at].0 && base_o + docs_o >= spans[at].0 + spans[at].1
+            });
+            if covered {
+                continue;
+            }
+            out.insert(id, rows);
+        }
+        if out.is_empty() {
+            None
+        } else {
+            Some(out)
+        }
     }
 
     /// [`Self::read_plaid_chunks`] decoded for `only` (every chunk when `None`):
@@ -9469,6 +9661,24 @@ impl Engine {
         // allocation of an optimize pass, and serializing it into a `Vec` put a
         // second copy of the whole mirror beside it.
         let written = Self::write_plaid_chunk_file(&path, &merged)?;
+        // The merged chunk's document order is the concatenation of its
+        // sources', so its row list is theirs, joined. A source without a list
+        // (written before the sidecar existed) leaves the merged chunk without
+        // one, and a loader falls back to the record's document offsets.
+        let mut merged_rows: Option<Vec<u64>> = Some(Vec::new());
+        for chunk in &chunks {
+            match Self::read_plaid_chunk_rows(&mirror.dir, chunk.id) {
+                Some(rows) if rows.len() == chunk.index.doc_num() as usize => {
+                    if let Some(acc) = merged_rows.as_mut() {
+                        acc.extend_from_slice(&rows);
+                    }
+                }
+                _ => merged_rows = None,
+            }
+        }
+        if let Some(rows) = merged_rows {
+            Self::write_plaid_chunk_rows(&mirror.dir, u64::from(next), &rows)?;
+        }
         // What this merge folded, recorded **before** the transaction commits:
         // if the deprecation of the sources does not land, the next pass reads
         // this and treats them as already folded instead of counting their rows
@@ -9531,7 +9741,7 @@ impl Engine {
                 .iter()
                 .position(|c| c == &mirror.column)
                 .ok_or_else(|| Error::NotFound(format!("column '{}'", mirror.column)))?;
-            let Some((docs_len, count, index)) = self.build_plaid_chunk(
+            let Some((docs_len, count, index, rows)) = self.build_plaid_chunk(
                 &table,
                 col,
                 mirror.dims as usize,
@@ -9554,6 +9764,7 @@ impl Engine {
             let chunk_id = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
             let path = mirror.dir.join(format!("chunk_{chunk_id}.idx"));
             let written = Self::write_plaid_chunk_file(&path, &index)?;
+            Self::write_plaid_chunk_rows(&mirror.dir, u64::from(chunk_id), &rows)?;
             // `row_cnt_` is the **document** count (`ChunkIndexMetaInfo`), which
             // is what the chunk covers; `count` here is the token total.
             self.record_chunk(
@@ -9641,12 +9852,35 @@ impl Engine {
             .map(|chunk| &chunk.index)
             .ok_or_else(|| Error::NotFound(format!("no PLAID chunk for '{index_name}'")))?;
         let codec_centroids = codec.n_centroids();
-        let Some((docs, total, index)) = self.build_plaid_chunk(
+        // A mirror whose chunks predate the row list cannot be reloaded once a
+        // row is deleted: the record's document offsets stop describing the
+        // table, the loader's count never matches, and every cold start retrains
+        // the index (minutes per launch). Rewrite it once as a whole - sharing
+        // the trained centroids, so nothing is thrown away - and the next open
+        // has a list to read.
+        let rewrite = self.plaid_chunk_rows(&table, index_name).is_none();
+        let skip = if rewrite { 0 } else { watermark };
+        // A watermark past the column's live row count names more documents than
+        // the table has rows - a folded chunk's offsets run past it once rows are
+        // deleted, and a chunk written before the row lists existed is counted
+        // from a document order the table no longer has. Nothing above it can be
+        // a document, and `build_plaid_chunk` would discover that by walking the
+        // column and decoding every tensor (measured: 30 s per checkpoint, on
+        // every checkpoint, once the tail stopped being empty). The ids answer it
+        // in milliseconds.
+        if skip > 0 {
+            if let Some(live) = self.tensor_row_ids(&table, col) {
+                if skip >= live.len() {
+                    return Ok(indexed as usize);
+                }
+            }
+        }
+        let Some((docs, total, index, rows)) = self.build_plaid_chunk(
             &table,
             col,
             mirror.dims as usize,
             &options,
-            watermark,
+            skip,
             Some(codec),
             Some(&mirror.dir),
         )?
@@ -9679,20 +9913,36 @@ impl Engine {
         let next = self.next_index_chunk_id(&set, &index_id.to_string(), 0);
         let path = mirror.dir.join(format!("chunk_{next}.idx"));
         let written = Self::write_plaid_chunk_file(&path, &index)?;
+        Self::write_plaid_chunk_rows(&mirror.dir, u64::from(next), &rows)?;
         // The record's `row_cnt_` is the document count, not the token total,
         // and `base_row_id` is the document offset this chunk starts at - what
-        // the next dump reads back as its watermark.
+        // the next dump reads back as its watermark. A rewrite starts at 0.
         self.record_chunk(
             &set,
             crate::engine::RecordedChunk {
                 index_id,
                 chunk_id: next,
                 segment: 0,
-                base_row_id: watermark as u64,
+                base_row_id: skip as u64,
                 row_count: docs as u64,
                 index_size: written,
             },
         );
+        if rewrite {
+            // This chunk holds every live row, so the chunks it replaced are
+            // strictly subsumed: retiring their records keeps the next reader on
+            // one file instead of eleven, and lets `Cleanup` drop their bytes.
+            // The files stay until then - a reader must never see a record
+            // whose bytes are gone.
+            let old: Vec<u32> = chunks.iter().map(|chunk| chunk.id as u32).collect();
+            let _ = self.deprecate_chunks(
+                &table,
+                index_name,
+                0,
+                &old,
+                crate::engine::chunk_commit_ts(self),
+            );
+        }
         Ok(indexed as usize + total)
     }
 

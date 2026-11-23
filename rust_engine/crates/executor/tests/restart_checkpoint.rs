@@ -134,6 +134,17 @@ async fn a_crash_after_a_racing_checkpoint_keeps_every_committed_row() {
             total,
             "round {round}: rows lost across the restart"
         );
+        // A `CLEANUP` right after a replay, before the next mirror writes the
+        // buffered rows anywhere: pruning the sealed segments by the checkpoint
+        // frame alone loses the batch the crash left in the log.
+        e.cleanup().await.unwrap();
+        drop(e);
+        let e = Arc::new(open(dir.path()).await);
+        assert_eq!(
+            count(&e).await,
+            total,
+            "round {round}: a cleanup pruned WAL the replay still needed"
+        );
         let inserted = Arc::new(AtomicI64::new(0));
         {
             let stop = Arc::new(AtomicBool::new(false));

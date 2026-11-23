@@ -560,6 +560,7 @@ impl Engine {
                 .unwrap_or_else(|| dir_for.clone().join("snapshot")),
             persistence,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
+            mirrored_ts: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
@@ -4015,13 +4016,29 @@ impl Engine {
         table: &str,
         first: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
+        self.fetch_rows_including_deleted_wanted(table, first, None)
+    }
+
+    /// [`Self::fetch_rows_including_deleted_from`] for a **column subset**.
+    ///
+    /// A caller that wants one column (an index recovery projecting the column
+    /// it indexes) must say so: the unprojected walk decodes every column of
+    /// every row, and a MULTIVECTOR column is rendered float by float - three
+    /// secondary indexes reopening over the full walk cost 1.4 GB of tensor
+    /// text each on rgrep's 62 k-row table.
+    pub(crate) fn fetch_rows_including_deleted_wanted(
+        &self,
+        table: &str,
+        first: usize,
+        wanted: Option<&[usize]>,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
         let name = self.table_key(table);
         // The blocks hold every row a segment ever held, tombstoned slots
         // included - which is what the index mirrors count. The append buffer
         // adds the rows above the last checkpoint, exactly as it does for a
         // visible scan.
         let mut rows: Vec<(usize, Vec<Value>)> = self
-            .read_blocks_including_deleted_from(&name, first)
+            .read_blocks_including_deleted_wanted(&name, first, wanted)
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .collect();
@@ -5799,21 +5816,7 @@ impl Engine {
         // re-adds every embedding. The chunk's document order is the row order,
         // so a light column scan recovers the row ids.
         if record.index_type.eq_ignore_ascii_case("PLAID") {
-            let profile = std::env::var_os("INFINITY_DEBUG_PLAN").is_some();
-            let mut started = std::time::Instant::now();
             let mirror_read = self.read_plaid_chunks(table, &index_name);
-            if profile {
-                match &mirror_read {
-                    Ok(loaded) => eprintln!(
-                        "DEBUG plaid mirror read ok, chunks={} docs={} in {:?}",
-                        loaded.len(),
-                        loaded.iter().map(|c| c.index.doc_num()).sum::<u32>(),
-                        started.elapsed()
-                    ),
-                    Err(e) => eprintln!("DEBUG plaid mirror read failed: {e}"),
-                }
-                started = std::time::Instant::now();
-            }
             if let Ok(loaded) = mirror_read {
                 // An **empty** chunk list is not a mirror: no dump ever ran, so
                 // there is nothing to load and the rebuild below is the only way
@@ -5822,6 +5825,101 @@ impl Engine {
                 // complete, so the optimise/build step never ran and the column
                 // was served by the exact scan forever.
                 if !loaded.is_empty() {
+                    // A chunk that names its own rows (`rows_{id}.bin`, written
+                    // by every dump and fold) is loaded as-is. The record's
+                    // document offsets describe the table as it was at dump
+                    // time, so they stop lining up the moment a row is deleted -
+                    // and every cold start then retrained the whole index
+                    // (minutes, per launch, on rgrep's 62 k units). The list
+                    // does not move when later writes land.
+                    if let Some(listed) = self.plaid_chunk_rows(table, &index_name) {
+                        let mut index = MultiVectorIndex::new(
+                            dir.clone(),
+                            dims,
+                            self.mv_plaid_config(table, &index_name),
+                            self.mv_smve_config(table, &index_name),
+                            self.mv_emvb_config(table, &index_name),
+                        );
+                        self.attach_mv_chunk_root(table, index_id, &mut index);
+                        index.scanned_rows = reserved;
+                        let mut known: std::collections::HashSet<u64> =
+                            std::collections::HashSet::new();
+                        // `listed` already dropped the chunks a newer chunk
+                        // covers (a fold whose deprecation did not land), so a
+                        // chunk it does not name is not live.
+                        for chunk in loaded {
+                            let Some(rows) = listed.get(&chunk.id) else {
+                                continue;
+                            };
+                            if rows.len() != chunk.index.doc_num() as usize {
+                                continue;
+                            }
+                            known.extend(rows.iter().copied());
+                            index.plaid_chunks.push(PlaidChunk {
+                                row_ids: rows.clone(),
+                                index: Arc::new(chunk.index),
+                            });
+                        }
+                        // The rows no chunk names - written after the last dump
+                        // - stay in the tail, where the search scores them
+                        // exactly. Only those rows are decoded: reading every
+                        // row to find them re-rendered the whole tensor column.
+                        if let Some(all) = self.tensor_row_ids(table, ci) {
+                            let set: std::collections::HashSet<usize> = all
+                                .into_iter()
+                                .filter(|seq| !known.contains(seq))
+                                .map(|seq| seq as usize)
+                                .collect();
+                            if !set.is_empty() {
+                                for (seq, cells) in self
+                                    .read_blocks_candidates_values(table, &[ci], &set)
+                                    .await?
+                                    .1
+                                {
+                                    let Some(cell) = cells.get(ci) else {
+                                        continue;
+                                    };
+                                    let text = match cell {
+                                        Value::Str(s) => s.clone(),
+                                        other => other.to_slt_string(),
+                                    };
+                                    if let Some(doc) = parse_multivector_doc(&text, dims) {
+                                        index.insert(seq as u64, doc);
+                                    }
+                                }
+                                for (seq, values) in self.pending_rows_of(table) {
+                                    if !set.contains(&seq) {
+                                        continue;
+                                    }
+                                    let Some(Value::Str(text)) = values.get(ci) else {
+                                        continue;
+                                    };
+                                    if let Some(doc) = parse_multivector_doc(text, dims) {
+                                        index.insert(seq as u64, doc);
+                                    }
+                                }
+                            }
+                        }
+                        // Rows written since the last dump live in the registered
+                        // index's tail; they are buffered here too, or replacing
+                        // the registration without this dropped them from every
+                        // answer.
+                        if let Some(previous) = cached.as_ref() {
+                            let rows = previous.read().map(|p| p.tail_rows()).unwrap_or_default();
+                            for (seq, doc) in rows {
+                                index.insert(seq, doc);
+                            }
+                        }
+                        let shared = Arc::new(std::sync::RwLock::new(index));
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .mv
+                            .insert(index_id, shared.clone());
+                        return Ok(shared);
+                    }
                     // Every document the chunk set holds, in chunk order - that
                     // order is the order rows were dumped in, and each chunk's
                     // `base_row_id` is the offset it starts at.
@@ -5841,15 +5939,6 @@ impl Engine {
                         } else {
                             self.multivector_row_ids(table, ci, dims).await?
                         };
-                    if profile {
-                        eprintln!(
-                            "DEBUG plaid mirror: docs={} rows={} ids in {:?}",
-                            docs,
-                            seqs.len(),
-                            started.elapsed()
-                        );
-                        started = std::time::Instant::now();
-                    }
                     // A mirror that covers a **prefix** of the rows is usable: the
                     // next dump appends the rows past the ones already mirrored, so
                     // the chunks hold the first `docs` row ids. The rows past them
@@ -5894,12 +5983,6 @@ impl Engine {
                             if begin + n > seqs.len() {
                                 break;
                             }
-                            if profile {
-                                eprintln!(
-                                    "DEBUG plaid chunk {} base {} docs {}",
-                                    chunk.id, chunk.base_row_id, n
-                                );
-                            }
                             index.plaid_chunks.push(PlaidChunk {
                                 row_ids: seqs[begin..begin + n].to_vec(),
                                 index: Arc::new(chunk.index),
@@ -5925,9 +6008,6 @@ impl Engine {
                                 }
                             }
                             index.scanned_rows = reserved;
-                        }
-                        if profile {
-                            eprintln!("DEBUG plaid load in {:?}", started.elapsed());
                         }
                         // Rows written since the last dump live in the registered
                         // index's tail; they are buffered here too, or replacing the
@@ -6788,6 +6868,11 @@ impl Engine {
     }
 
     /// [`Self::fetch_rows_with_ids_projected_all`] from row id `first` on.
+    ///
+    /// The projection reaches the block reader (`wanted`), so the columns this
+    /// caller does not name are never decoded - `cells.get(idx)` below used to
+    /// be the only thing keeping a whole-table decode, tensor column included,
+    /// alive.
     pub(crate) fn fetch_rows_with_ids_projected_from(
         &self,
         table: &str,
@@ -6795,7 +6880,7 @@ impl Engine {
         first: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         Ok(self
-            .fetch_rows_including_deleted_from(table, first)?
+            .fetch_rows_including_deleted_wanted(table, first, Some(&[idx]))?
             .into_iter()
             .map(|(seq, cells)| {
                 let value = cells.get(idx).cloned().unwrap_or(Value::Null);
@@ -12710,9 +12795,16 @@ impl Engine {
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
         // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
-        // records the KV store holds are reclaimed here, not at a checkpoint.
+        // records both floors hold are reclaimed here, not at a checkpoint.
+        //
+        // The frame covers the KV store, not the rows: a segment may hold an
+        // `INSERT` the crash left there, replayed into the buffer at open and
+        // not in any block until the next mirror writes it. Pruning by the frame
+        // alone dropped those segments, so a second crash lost rows this process
+        // had already answered from (`Engine::mirrored_ts`).
         if let Ok(applied) = self.txn.applied_ts().await {
-            let _ = self.txn.drop_sealed_wal_up_to(applied).await;
+            let mirrored = self.mirrored_ts.load(std::sync::atomic::Ordering::Relaxed);
+            let _ = self.txn.drop_sealed_wal_up_to(applied.min(mirrored)).await;
         }
         self.reclaim_deprecated_segments()?;
         // The column files an `ALTER TABLE … DROP COLUMN` left behind: the

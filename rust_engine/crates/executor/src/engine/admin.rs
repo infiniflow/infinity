@@ -1141,7 +1141,15 @@ impl Engine {
                 let Ok(index) = shared.read() else {
                     continue;
                 };
-                if index.tail.len() < target {
+                // A mirror written before the row list existed can never be
+                // loaded again once a row is deleted (see
+                // `write_plaid_index`), so an index that has been built has to
+                // be published once even with an empty tail. Only a built index:
+                // a checkpoint on a table nothing has queried must not start a
+                // full build here.
+                let stale_layout =
+                    index.plaid.is_some() && self.plaid_chunk_rows(&im.table, &im.name).is_none();
+                if index.tail.len() < target && !stale_layout {
                     continue;
                 }
             }
@@ -1413,6 +1421,15 @@ impl Engine {
         // write (a column with no block layout) keeps its rows buffered only.
         let mirror = self.flush_blocks(bound_ts).await;
         mark("flush_blocks");
+        // Every table's rows are in a block for this bound, so the log below it
+        // is reclaimable - `CLEANUP` prunes by the frame alone otherwise, and
+        // the rows a previous crash left in the log would go with it. A table
+        // the mirror could not encode keeps its rows buffered, so a checkpoint
+        // that skipped one does not move this floor.
+        if mirror.as_ref().copied().unwrap_or(false) {
+            self.mirrored_ts
+                .store(bound_ts, std::sync::atomic::Ordering::Relaxed);
+        }
         // `EngineOptions::object_dir`: publish this checkpoint's data files as
         // the reference does (`pm|object|` + packed objects).
         if let Some(pm) = self.persistence.as_ref() {

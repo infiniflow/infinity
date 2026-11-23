@@ -6966,6 +6966,170 @@ mod tests {
         assert_eq!(fast, vec![0, 3]);
     }
 
+    /// Diagnostic: what one file's `ReplaceUnits` costs on a table the size
+    /// rgrep builds - a `DELETE ... WHERE path = ?` followed by that file's
+    /// units. rgrep runs this per changed file, so this is the indexer's
+    /// throughput ceiling.
+    #[tokio::test]
+    #[ignore = "bench: write path"]
+    async fn rgrep_replace_units_cost() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute(
+            "CREATE TABLE cu (path VARCHAR, lang VARCHAR, kind VARCHAR, body VARCHAR, \
+             vec MULTIVECTOR(FLOAT,8));",
+        )
+        .await
+        .unwrap();
+        let row = |n: usize| {
+            format!(
+                "('f{n}.go', 'go', 'func', 'func body number {n} with some words', \
+                 [[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8],[0.2,0.2,0.3,0.4,0.5,0.6,0.7,0.8]])"
+            )
+        };
+        for batch in 0..60 {
+            let values: Vec<String> = (0..1000).map(|i| row(batch * 1000 + i)).collect();
+            e.execute(&format!("INSERT INTO cu VALUES {};", values.join(",")))
+                .await
+                .unwrap();
+        }
+        e.execute("CREATE INDEX cu_path ON cu (path) USING SECONDARY;")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX cu_lang ON cu (lang) USING SECONDARY WITH (cardinality = 'low');")
+            .await
+            .unwrap();
+        e.checkpoint().await.unwrap();
+        let mut delete_time = std::time::Duration::ZERO;
+        let mut insert_time = std::time::Duration::ZERO;
+        let at = std::time::Instant::now();
+        for i in 0..10 {
+            let started = std::time::Instant::now();
+            e.execute(&format!("DELETE FROM cu WHERE path = 'f{i}.go';"))
+                .await
+                .unwrap();
+            delete_time += started.elapsed();
+            let started = std::time::Instant::now();
+            e.execute(&format!("INSERT INTO cu VALUES {};", row(100_000 + i)))
+                .await
+                .unwrap();
+            insert_time += started.elapsed();
+        }
+        eprintln!(
+            "10 cycles: {:?} total, delete {:?}, insert {:?}",
+            at.elapsed(),
+            delete_time,
+            insert_time
+        );
+    }
+
+    /// A mirror a **delete** invalidated is still loaded, because every chunk
+    /// carries the row ids its documents came from.
+    ///
+    /// The record's `base_row_id`/`row_count` describe the table as it was at
+    /// dump time; a tombstone afterwards shifts every later document, so a
+    /// loader that re-derives the rows from those offsets never matches the live
+    /// row count again and retrains the whole index on the first query - on
+    /// rgrep's 62 k units that was minutes of every launch. The row list is
+    /// written beside the chunk (`rows_{id}.bin`) and does not move.
+    #[tokio::test]
+    async fn a_mirror_survives_a_delete_because_its_chunks_name_their_rows() {
+        let dir = tempdir().unwrap();
+        let total = 200usize;
+        let mut values = Vec::new();
+        for i in 0..total {
+            values.push(format!("({i}, [[{}.0,0.5,0.25]])", i % 7));
+        }
+        let deleted: Vec<String> = (0..total)
+            .filter(|i| i % 10 == 0)
+            .map(|i| i.to_string())
+            .collect();
+        let query = "SELECT id FROM pd SEARCH MATCH TENSOR \
+                     (t, [[1.0,0.5,0.25]], 'float', 'maxsim', \
+                      'topn=300;plaid_centroid_score_threshold=0');";
+        {
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.set_plaid_chunk_target_rows(64);
+            e.execute("CREATE TABLE pd (id INT, t MULTIVECTOR(FLOAT,3));")
+                .await
+                .unwrap();
+            e.execute("CREATE INDEX pdi ON pd (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+                .await
+                .unwrap();
+            e.execute(&format!("INSERT INTO pd VALUES {};", values.join(",")))
+                .await
+                .unwrap();
+            e.checkpoint().await.unwrap();
+        }
+        // A delete after the dump: the offsets the records carry no longer
+        // describe the table, which is what used to force the rebuild.
+        {
+            let e = Engine::open_async(dir.path(), Default::default())
+                .await
+                .unwrap();
+            e.execute(&format!(
+                "DELETE FROM pd WHERE id IN ({});",
+                deleted.join(",")
+            ))
+            .await
+            .unwrap();
+            e.checkpoint().await.unwrap();
+        }
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let hits = rows(&e, query).await;
+        let tkey = e.table_key("default_db.pd");
+        let loaded = e
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .and_then(|t| t.mv.get(&e.test_index_id("default_db.pd", "t", "PLAID")))
+            .map(|m| m.read().unwrap().plaid_chunks.len())
+            .unwrap_or(0);
+        assert!(
+            loaded > 0,
+            "the mirror was rebuilt instead of loaded after a delete"
+        );
+        // Every live tensor row has to be named by a loaded chunk: a list that
+        // drifted would score another row's vector under this id. The chunk
+        // files also keep the rows deleted after the dump - the search masks
+        // them out - so this is a superset, not an equality.
+        let index = e.multivector_index_for("pd", "t", 3).await.unwrap();
+        let named: std::collections::HashSet<u64> = index
+            .read()
+            .unwrap()
+            .plaid_chunks
+            .iter()
+            .flat_map(|chunk| chunk.row_ids.clone())
+            .collect();
+        let ci = e
+            .table_schema("pd")
+            .unwrap()
+            .iter()
+            .position(|c| c == "t")
+            .unwrap();
+        for seq in e.tensor_row_ids("pd", ci).unwrap() {
+            assert!(named.contains(&seq), "live row {seq} is not in the mirror");
+        }
+        assert_eq!(hits.len(), total - deleted.len());
+        // Every surviving row is answerable and no deleted one came back.
+        let ids: std::collections::HashSet<i64> = hits
+            .iter()
+            .map(|row| row[0].parse().expect("id column"))
+            .collect();
+        for i in 0..total {
+            if i % 10 == 0 {
+                assert!(!ids.contains(&(i as i64)), "deleted row {i} answered");
+            }
+        }
+    }
+
     /// Concurrent searches while rows are appended and the tail is dumped: the
     /// readers never deadlock, every answer is a subset of the table, and the
     /// final answer covers every row.
@@ -7867,7 +8031,13 @@ mod tests {
         );
         let index = e.multivector_index_for("md", "t", 4).await.unwrap();
         let guard = index.read().unwrap();
-        assert!(guard.plaid.is_some(), "PLAID was not restored");
+        // Either shape is "restored": the chunks loaded as they are (each names
+        // its rows) or one index rebuilt from the rows below. What must not
+        // happen is neither, which is the retrain.
+        assert!(
+            guard.plaid.is_some() || !guard.plaid_chunks.is_empty(),
+            "PLAID was not restored"
+        );
         // The restored id lists have to line up with the chunks that carry
         // them; a tombstoned row in the list would shift every later id.
         assert!(
@@ -7886,6 +8056,13 @@ mod tests {
                 .unwrap_or(0),
             "the restored document ids do not cover the loaded index"
         );
+        for chunk in &guard.plaid_chunks {
+            assert_eq!(
+                chunk.row_ids.len(),
+                chunk.index.doc_num() as usize,
+                "a loaded chunk does not name one row per document"
+            );
+        }
     }
 
     /// `IndexOptions`' PLAID knobs: the reference's defaults
