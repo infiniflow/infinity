@@ -8694,16 +8694,24 @@ impl Engine {
                     (1.0f64 + f64::from(ratio)).ln() as f32
                 };
                 let mut wand_units: Vec<WandUnit<'_>> = Vec::with_capacity(units.len());
+                // The field boost, rounded once: the reference pushes every
+                // factor down as a `float` and multiplies `float *= float`
+                // (`query_node.cppm:87`, `PushDownWeight(float)`), and the
+                // streaming arms below read this same `f32` value. Multiplying
+                // the two in `f64` first and rounding the product gave a
+                // different weight for the same query (`1.00000004` squared is
+                // `1.0000001192` that way and `1.0` the other), so the two
+                // paths could score one document differently.
+                let field_boost = *boost as f32;
                 for (phrase, toks, uboost, slop) in &units {
                     // Boolean similarity ignores per-term boosts (one point per
                     // matched unit, weighted by the field boost).
                     // `weight_` is a `float` on every iterator
-                    // (`term_doc_iterator_impl.cpp:106`), so both arms are
-                    // rounded rather than just the one the `as` binds to.
+                    // (`term_doc_iterator_impl.cpp:106`).
                     let weight: f32 = if boolean {
-                        *boost as f32
+                        field_boost
                     } else {
-                        (boost * uboost) as f32
+                        field_boost * (*uboost as f32)
                     };
                     if boolean {
                         // `similarity=boolean` counts matched *terms*, not units:

@@ -394,6 +394,13 @@ fn parse_json(text: &str) -> Option<Json> {
     let bytes = text.as_bytes();
     let mut i = 0usize;
     let v = value(bytes, &mut i)?;
+    // The whole body has to be the document. Without this, `{"sql":"SELECT 1;"}junk`
+    // parsed as the object and the rest was silently ignored, so a malformed
+    // body reached the engine instead of being answered with `bad json`.
+    skip(bytes, &mut i);
+    if i != bytes.len() {
+        return None;
+    }
     Some(v)
 }
 
@@ -3500,6 +3507,17 @@ mod tests {
         );
         assert!(sql_of(parse_json("{}").expect("json")).is_none());
         assert!(parse_json("not json").is_none());
+
+        // The document must be the whole body: trailing content is malformed,
+        // trailing whitespace is not.
+        assert!(
+            parse_json("{\"body\":\"x\"}junk").is_none(),
+            "trailing content must be rejected"
+        );
+        assert!(
+            parse_json("{\"body\":\"x\"}  \n\t").is_some(),
+            "trailing whitespace is still a valid body"
+        );
 
         // The route tells the two faults apart: a body `parse_json` rejects is
         // "bad json", a well-formed one without a `sql` string is "missing sql".

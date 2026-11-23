@@ -762,10 +762,19 @@ impl<'a> BlockMaxWandIterator<'a> {
             self.prefix.clear();
             // '<' (not '<='): a document that ties the k-th score can still win
             // on the smaller doc id, and the heap is already doc-ordered, so
-            // this needs no extra bookkeeping. Both sides are widened to `f64`:
-            // the ledger is `f64` (see `total_upper`), and comparing it against
-            // the `f32` threshold in `f32` would round the ledger down.
-            if self.total_upper < f64::from(self.threshold) {
+            // this needs no extra bookkeeping.
+            //
+            // The ledger is the *exact* sum of the `f32` bounds, but the score
+            // this bar stands in for is accumulated in `f32` (see
+            // `score_prefix`), and a chain of `f32` additions can end above the
+            // exact sum - those roundings go both ways, and stopping on the
+            // exact value would then cut a document whose real score clears the
+            // bar. Each of the `n` additions can raise the value by at most one
+            // ulp (`f32::EPSILON`), so the bar is the exact sum widened by
+            // `n * EPSILON`: an upper bound on any order of accumulation.
+            let live = self.heap.len() as f64;
+            let bound = self.total_upper * (1.0 + live * f64::from(f32::EPSILON));
+            if bound < f64::from(self.threshold) {
                 break;
             }
             // (1) FindPivotOptimized: the pivot is the first prefix whose upper
@@ -1194,6 +1203,45 @@ mod tests {
             from = last + 1;
             cursor.seek(from);
         }
+    }
+
+    /// The pruning ledger must bound the score the iterator will actually
+    /// produce, which is accumulated in `f32`.
+    ///
+    /// Summing the exact `f32` bounds in `f64` keeps each addend exact, but the
+    /// score is still summed in `f32` (`sum_score` in the reference), and a
+    /// chain of `f32` additions can end up *above* the exact sum. Six boolean
+    /// fields with weights `[1, s, s, s, s, s]` (`s = 3 * 2^-25`) sum to
+    /// `1 + 3.75 * 2^-23` exactly while the `f32` accumulation rounds up to
+    /// `1 + 5 * 2^-23`; a threshold in between then stops the search on a
+    /// document whose real score clears it.
+    #[test]
+    fn the_ledger_bounds_the_f32_score_it_is_compared_against() {
+        let doc_len: Vec<(u64, u32)> = vec![(0, 10)];
+        let dead = common::RowBitmap::new();
+        let s = 3.0f32 * 2f32.powi(-25);
+        let weights = [1.0f32, s, s, s, s, s];
+        let threshold = 1.0f32 + 4.0 * 2f32.powi(-23);
+        // All six fields match document 0.
+        let t: &[(u64, u32)] = &[(0, 1)];
+        let make = || {
+            weights
+                .iter()
+                .map(|w| field(&[("t", t)], &doc_len, 1, vec![*w]))
+                .collect::<Vec<_>>()
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the ledger stopped a document whose f32 score clears the threshold"
+        );
+        assert_eq!(pruned.len(), 1, "document 0 qualifies");
     }
 
     /// A rounded threshold must not make the pruning switch change the answer.
