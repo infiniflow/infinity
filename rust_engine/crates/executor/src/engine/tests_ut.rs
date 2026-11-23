@@ -4850,6 +4850,13 @@ mod tests {
     /// cpp:980`, `bound_select_statement_impl.cpp` for `MATCH`). The port used
     /// to analyze only on the `MATCH` side and to match the filter's words as
     /// written, so `family` found 1 row one way and 2 the other.
+    ///
+    /// Both sides now fold a word and its stem to **one term per offset**, the
+    /// shorter of the two (`GetTermListFromAnalyzer`,
+    /// `search_driver_impl.cpp:144-159`), which is also the reference's
+    /// answer: `family` and `famili` are both six bytes, so the word wins and
+    /// `family` reaches only row 2 — not both family rows. Verified on the
+    /// reference engine (ids are the set, in score order).
     #[tokio::test]
     async fn filter_fulltext_and_match_text_agree_on_stems() {
         let dir = tempdir().unwrap();
@@ -4868,7 +4875,15 @@ mod tests {
         e.execute("CREATE INDEX sp_idx ON stem_probe (body) USING FULLTEXT;")
             .await
             .unwrap();
-        for word in ["family", "families", "famili", "implies", "imply", "impli"] {
+        // The reference's answers, per word: matched ids, sorted.
+        for (word, want) in [
+            ("family", vec![2]),
+            ("families", vec![1, 2]),
+            ("famili", vec![1, 2]),
+            ("implies", vec![3, 4]),
+            ("imply", vec![4]),
+            ("impli", vec![3, 4]),
+        ] {
             let filtered = int_ids(
                 &e,
                 &format!("SELECT id FROM stem_probe WHERE filter_fulltext('body','{word}');"),
@@ -4887,15 +4902,87 @@ mod tests {
                 filtered, matched,
                 "filter_fulltext and MATCH TEXT disagree on '{word}'"
             );
+            assert_eq!(matched, want, "wrong rows for '{word}'");
         }
-        // `family` and `families` both stem to `famili`, so the query reaches
-        // both rows - the count the unfixed filter could not produce.
-        let family = int_ids(
-            &e,
-            "SELECT id FROM stem_probe WHERE filter_fulltext('body','family');",
-        )
-        .await;
-        assert_eq!(family.len(), 2, "family should match both family rows");
+    }
+
+    /// A word's score must not depend on `topn`. The block-max WAND prunes with
+    /// a score threshold derived from the k-th result, so a `topn` bug shows up
+    /// as a **different score for the same document** - not merely a different
+    /// ranking - and that is what enwiki hit: `friedman stroke directorate` gave
+    /// one document 15.15 at `topn=100` and 10.92 at `topn=10`, because the
+    /// cursor of `directorate` (a 1648-posting list) was skipped past that
+    /// document's block, so its contribution vanished from the score.
+    ///
+    /// The shape here reproduces it: `rare` appears in a handful of documents
+    /// including the pivot one, `dense` appears in every document (so its
+    /// posting list spans many blocks), and the pivot document sits behind a
+    /// block boundary of `dense`. Small `topn` must score it the same as large.
+    #[tokio::test]
+    async fn a_documents_score_does_not_depend_on_topn() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        // Several chunks plus the tail: the enwiki failure only appeared
+        // once the posting lists were split across sealed segments.
+        e.set_memindex_capacity(1000);
+        e.execute("CREATE TABLE wand (id INTEGER, body VARCHAR)")
+            .await
+            .unwrap();
+        e.execute("CREATE INDEX wand_idx ON wand (body) USING FULLTEXT")
+            .await
+            .unwrap();
+        // 8000 documents: `dense` in every one (8000 postings, 63 blocks),
+        // `rare` in 1600 of them spread across the range (13 blocks), and one
+        // pivot document deep inside **both** lists that repeats both terms, so
+        // its score is the highest and it must stay in the top-10 at every
+        // `topn`.
+        //
+        // The enwiki failure needed this exact shape: the rare term's list has
+        // its own block boundaries and the pivot sits behind one of them while
+        // the dense cursor is far ahead, so a block skip can jump the rare
+        // cursor over the pivot.
+        let pivot = 5000usize;
+        let mut sql = String::from("INSERT INTO wand VALUES ");
+        for i in 0..8000 {
+            let body = if i == pivot {
+                "dense rare dense rare dense rare dense rare".to_string()
+            } else if i % 5 == 0 {
+                format!("dense rare doc{i}")
+            } else {
+                format!("dense doc{i}")
+            };
+            if i > 0 {
+                sql.push(',');
+            }
+            sql.push_str(&format!("({i}, '{body}')"));
+        }
+        sql.push(';');
+        e.execute(&sql).await.unwrap();
+        e.flush().await.unwrap();
+
+        let score_of = async |topn: usize, id: i64| -> String {
+            let r = rows(
+                &e,
+                &format!(
+                    "SELECT ROW_ID(), SCORE() FROM wand SEARCH MATCH TEXT \
+                     ('body','dense rare','topn={topn}');"
+                ),
+            )
+            .await;
+            r.into_iter()
+                .find(|row| row[0] == id.to_string())
+                .map(|row| row[1].clone())
+                .unwrap_or_else(|| panic!("id {id} missing at topn={topn}"))
+        };
+        for topn in [10usize, 20, 50, 100, 200, 8000] {
+            assert_eq!(
+                score_of(topn, pivot as i64).await,
+                score_of(8000, pivot as i64).await,
+                "the score changed with topn={topn}"
+            );
+        }
     }
 
     /// The intersection case: `filter_fulltext` used to run the index mask

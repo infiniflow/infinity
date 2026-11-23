@@ -2146,10 +2146,17 @@ impl<'a> Source<'a> {
         }
     }
 
-    /// Appends up to `max` postings to the caller's three columns, stopping at
-    /// `until` (the block's last row id), and returns how many it took. A sealed
-    /// chunk already holds them decoded, so that case copies the slices instead
-    /// of going through posting() per entry.
+    /// Appends up to `max` postings the caller's block can hold, stopping at
+    /// `until` (the block's last row id). Returns `(taken, exhausted)`:
+    ///
+    /// * `taken` is how many postings were appended (`0` is normal when the
+    ///   cursor's decoded mini-block lies entirely beyond `until` - the caller
+    ///   will ask again for the next block, with a larger `until`).
+    /// * `exhausted` is true only when this source has no posting left at all,
+    ///   which is the single case where a concatenation may move to its next
+    ///   source. Conflating it with `taken == 0` dropped every posting of a
+    ///   source whose first block started after the caller's block end - a term
+    ///   silently vanishing from a document's score depending on `topn`.
     pub(crate) fn extend_block(
         &mut self,
         docs: &mut Vec<u64>,
@@ -2157,21 +2164,27 @@ impl<'a> Source<'a> {
         lens: &mut Vec<u32>,
         max: usize,
         until: u64,
-    ) -> usize {
+    ) -> (usize, bool) {
         if let Source::Segment(cur) = self {
             // A block the cursor has not decoded yet has to be loaded first;
             // block() only reports what is already there.
             if cur.doc().is_none() {
-                return 0;
+                return (0, true);
             }
             let Some((rows, tfs_at, _)) = cur.block() else {
-                return 0;
+                return (0, true);
             };
             let n = rows
                 .iter()
                 .position(|row| *row > until)
                 .unwrap_or(rows.len())
                 .min(max);
+            if n == 0 {
+                // The whole decoded block is past `until`. Keep the position so
+                // the next call can hand these postings out; the source is not
+                // exhausted.
+                return (0, false);
+            }
             docs.extend_from_slice(&rows[..n]);
             tfs.extend_from_slice(&tfs_at[..n]);
             lens.reserve(n);
@@ -2179,12 +2192,15 @@ impl<'a> Source<'a> {
                 lens.push(cur.doc_len_at(i));
             }
             cur.skip(n);
-            return n;
+            // The block is consumed; only `doc()` can say whether another one
+            // follows (`skip` does not cross blocks, `block()` is now empty).
+            let ended = cur.doc().is_none();
+            return (n, ended);
         }
         let mut n = 0;
         while n < max {
             let Some((doc, tf, len)) = self.posting() else {
-                break;
+                return (n, true);
             };
             if doc > until {
                 break;
@@ -2195,7 +2211,11 @@ impl<'a> Source<'a> {
             self.advance(doc + 1);
             n += 1;
         }
-        n
+        if n == max {
+            // `max` bounded the call, not the source.
+            return (n, false);
+        }
+        (n, self.doc().is_none())
     }
 
     pub(crate) fn advance(&mut self, target: u64) {
@@ -2444,7 +2464,8 @@ impl<'a> MergeCursor<'a> {
         until: u64,
     ) -> bool {
         if self.single {
-            return self.sources[0].extend_block(docs, tfs, lens, max, until) > 0;
+            let (n, _) = self.sources[0].extend_block(docs, tfs, lens, max, until);
+            return n > 0;
         }
         if self.concat {
             let mut filled = 0;
@@ -2458,8 +2479,9 @@ impl<'a> MergeCursor<'a> {
                     Some(doc) if doc > until => break,
                     Some(_) => {}
                 }
-                let n = self.sources[self.next].extend_block(docs, tfs, lens, max - filled, until);
-                if n == 0 {
+                let (n, exhausted) =
+                    self.sources[self.next].extend_block(docs, tfs, lens, max - filled, until);
+                if n == 0 && exhausted {
                     // This source ran out: move to the next one.
                     self.cached = None;
                     if self.next + 1 >= self.sources.len() {
@@ -2467,6 +2489,12 @@ impl<'a> MergeCursor<'a> {
                     }
                     self.next += 1;
                     continue;
+                }
+                if n == 0 {
+                    // The decoded block lies past `until`: stop here, the caller
+                    // refills with the next block's bound. Moving to the next
+                    // source would drop the rest of this one.
+                    break;
                 }
                 filled += n;
             }
@@ -2639,10 +2667,12 @@ impl<'a> WandStream<'a> {
     }
 
     /// The unit's frequency: an integer for a term, fractional for a sloppy
-    /// phrase (`PhraseDocIterator::tf_` is a float in the reference).
-    pub(crate) fn tf(&mut self) -> f64 {
+    /// phrase. Both are `float` in the reference (`PhraseDocIterator::tf_` is
+    /// `float`), so the value is `f32` - see [`crate::Bm25Ranker`] for why the
+    /// whole BM25 chain stays single precision.
+    pub(crate) fn tf(&mut self) -> f32 {
         match self {
-            WandStream::Term(s) => f64::from(s.tf()),
+            WandStream::Term(s) => s.tf() as f32,
             WandStream::Phrase(s) => s.tf(),
         }
     }
@@ -2940,6 +2970,17 @@ impl<'a> TermStream<'a> {
             // for a jump the skip list covers in one decode.
             if target > self.last {
                 self.at = self.docs.len();
+                // The block this cursor was scored against is no longer the
+                // block it sits in: `load` has not run yet, so `stored` still
+                // holds the *old* block's (last, max_tf, pct) and `block_last()`
+                // would keep claiming the cursor covers rows it has already
+                // passed. The WAND reads exactly that pair to decide a cursor
+                // "still covers the candidate" and adds its block bound without
+                // seeking - a stale bound made it skip a term whose posting was
+                // on the pivot document, so the document scored from only the
+                // other term (a real answer change on enwiki: 15.15 vs 10.92).
+                self.stored = None;
+                self.stats_ready = false;
                 self.merge.advance(target);
                 continue;
             }
@@ -3009,7 +3050,7 @@ pub(crate) struct PhraseCursor<'a> {
     /// The phrase frequency (`tf`). Fractional for a sloppy phrase, whose
     /// frequency is the sum of `1/(1+matchLength)` over the acceptable
     /// solutions (`phrase_doc_iterator_impl.cpp:337-340`).
-    pub(crate) cur_tf: f64,
+    pub(crate) cur_tf: f32,
     pub(crate) cur_len: u32,
     pub(crate) scratch: Vec<Vec<u32>>,
     /// cur is stale: seek_block repositioned the children without verifying any
@@ -3109,8 +3150,8 @@ impl<'a> PhraseCursor<'a> {
             }
             // `slop == 0` keeps the exact-adjacency path (integer frequency);
             // a sloppy phrase sums `1/(1+matchLength)` over its solutions.
-            let freq = if self.slop == 0 {
-                phrase_freq_lists(scratch, self.unit_len) as f64
+            let freq: f32 = if self.slop == 0 {
+                phrase_freq_lists(scratch, self.unit_len) as f32
             } else {
                 phrase_freq_lists_sloppy(scratch, self.unit_len, self.slop)
             };
@@ -3132,7 +3173,8 @@ impl<'a> PhraseCursor<'a> {
         self.cur
     }
 
-    pub(crate) fn tf(&mut self) -> f64 {
+    /// `PhraseDocIterator::tf_` is a `float` (`phrase_doc_iterator.cppm:109`).
+    pub(crate) fn tf(&mut self) -> f32 {
         self.resolve();
         self.cur_tf
     }
@@ -3184,11 +3226,11 @@ pub(crate) struct WandField<'a> {
 /// delta its score uses (delta_term for a term, delta_phrase for a phrase).
 pub(crate) struct WandUnit<'a> {
     pub stream: WandStream<'a>,
-    pub weight: f64,
-    pub idf: f64,
+    pub weight: f32,
+    pub idf: f32,
     /// None uses the iterator's delta (its delta_term); a phrase passes its own
     /// delta_phrase.
-    pub delta: Option<f64>,
+    pub delta: Option<f32>,
 }
 
 /// Cap for one in-memory inverted index. The heavy import tests build several
@@ -8548,8 +8590,9 @@ impl RowFulltextProvider<'_> {
     /// instead searched the raw word: a `standard` column stores `families` and
     /// its stem `famili`, a query for `family` matched only the document that
     /// spelled it that way, while `MATCH TEXT` (which does analyze) matched
-    /// both. The analyzer emits a word *and* its stem at one offset, so every
-    /// emitted form is searched and the caller's boolean tree decides the rest.
+    /// both. The analyzer emits a word *and* its stem at one offset; the query
+    /// keeps one term per offset (see [`fold_to_shorter_per_offset`]) and the
+    /// caller's boolean tree decides the rest.
     pub(crate) fn query_terms(&self, term: &str) -> Vec<String> {
         let needle = term.to_lowercase();
         // A sparse-gram index is a literal-run test over the text, not a term
@@ -8560,11 +8603,16 @@ impl RowFulltextProvider<'_> {
         let Some((_, tokenizer)) = self.index else {
             return vec![needle];
         };
-        let mut terms: Vec<String> = crate::tokenize_index_positions(&needle, tokenizer)
-            .into_iter()
-            .map(|(term, _)| term)
-            .filter(|term| !term.is_empty())
-            .collect();
+        // The reference builds the filter's query tree with the same
+        // `GetTermListFromAnalyzer` the `MATCH` path uses, so it folds a word
+        // and its stem down to one term per offset — the shorter one, the word
+        // on a tie. Looking up *every* emitted form (the old behaviour) matched
+        // documents the reference does not.
+        let mut terms: Vec<String> =
+            crate::fold_to_shorter_per_offset(crate::tokenize_index_positions(&needle, tokenizer))
+                .into_iter()
+                .map(|(term, _)| term)
+                .collect();
         terms.sort_unstable();
         terms.dedup();
         if terms.is_empty() {
@@ -9525,7 +9573,17 @@ pub(crate) fn standard_tokenize(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// Query-side tokens: the standard analyzer's stem replaces the word.
+/// Query-side tokens for the `standard` analyzer: one term per position, the
+/// one `SearchDriver::GetTermListFromAnalyzer` keeps.
+///
+/// The analyzer emits a word and, when it differs, its stem at the same
+/// offset. The reference folds each offset down to **one** term by taking the
+/// shorter of the two and keeping the earlier one on a tie
+/// (`search_driver_impl.cpp:154-158`: `if (term.text_.size() <
+/// last_term.text_.size())`). Sending the stem unconditionally was a real
+/// divergence: `family` stems to `famili`, both six bytes, so the reference
+/// searches `family` while the port searched `famili` — different document
+/// sets and scores for every word whose stem is not strictly shorter.
 pub(crate) fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
     // A column indexed with a real analyzer (`ik`, `rag-chinese`, `ngram`, …)
     // tokenises the query with that same analyzer (`Analyzer::Analyze`); the
@@ -9540,17 +9598,47 @@ pub(crate) fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
     let delims = &tokenizer.delims;
     // The C++ default analyzer is `standard` (`index_full_text_impl.cpp:68`) — a
     // `StandardAnalyzer` with `STEM_LANG_ENGLISH` (`analyzer_pool_impl.cpp:266-289`)
-    // — so the `None` (standard) case stems English and drops the word form.
-    // `keyword`/`whitespace`(±chars) do not.
+    // — so the `None` (standard) case emits the word and its stem at one
+    // offset and folds them to the shorter one. `keyword`/`whitespace`(±chars)
+    // emit neither and are left alone.
     if delims.is_none() {
-        return tokenizer
-            .standard(true)
-            .analyze(s)
-            .into_iter()
-            .map(|t| t.text)
-            .collect();
+        return fold_to_shorter_per_offset(
+            tokenizer
+                .standard(false)
+                .analyze(s)
+                .into_iter()
+                .map(|t| (t.text, t.word_offset)),
+        )
+        .into_iter()
+        .map(|(text, _)| text)
+        .collect();
     }
     split_words(s, delims)
+}
+
+/// `SearchDriver::GetTermListFromAnalyzer`: the analyzer emits several terms at
+/// one offset (a word and its stem); the query keeps **one**, the shorter of
+/// the run, and the earlier one wins a tie (`search_driver_impl.cpp:144-159`).
+///
+/// The tie matters: `family` and `famili` are both six bytes, so the reference
+/// searches the *word* there, and sending the stem instead changed both the
+/// matching documents and the score. The terms arrive in offset order.
+pub(crate) fn fold_to_shorter_per_offset<I>(terms: I) -> Vec<(String, u32)>
+where
+    I: IntoIterator<Item = (String, u32)>,
+{
+    let mut out: Vec<(String, u32)> = Vec::new();
+    for (text, offset) in terms {
+        match out.last_mut() {
+            Some((last_text, last_offset)) if *last_offset == offset => {
+                if text.len() < last_text.len() {
+                    *last_text = text;
+                }
+            }
+            _ => out.push((text, offset)),
+        }
+    }
+    out
 }
 
 /// The **index-side** tokenizer. The C++ `standard` analyzer emits each token
@@ -9558,8 +9646,10 @@ pub(crate) fn tokenize_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
 /// The engine's own statistics prove it: for a five-row probe table the C++
 /// lengths are 2,4,6,5,4 for token counts 2,3,4,4,2 — every extra term is a
 /// stem that differs (`multiple`->`multipl`, `many`->`mani`, `words`->`word`,
-/// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. Query terms stay
-/// stem-only (a boolean query for `second text multiple` scores 3, not 4).
+/// `another`->`anoth`), and `doc_len_sum` is 21 rather than 15. The query side
+/// folds those two forms back to one per offset (see
+/// [`fold_to_shorter_per_offset`]), so a boolean query for `second text
+/// multiple` scores 3, not 4.
 pub(crate) fn tokenize_index_text(s: &str, tokenizer: &TextTokenizer) -> Vec<String> {
     if let Some(terms) = tokenizer.analyze(s) {
         return terms
@@ -9943,12 +10033,12 @@ pub(crate) fn phrase_freq_lists(lists: &[Vec<u32>], unit_len: usize) -> usize {
 /// level at the first position that can still reach the previous level's
 /// `min_phrase_pos` (`lower_bound` in `:321-324`) and backtracking when the
 /// spread exceeds the slop (`:297-300`).
-pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop: u32) -> f64 {
+pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop: u32) -> f32 {
     if unit_len == 0 || lists.len() < unit_len || lists[0].is_empty() {
         return 0.0;
     }
     if slop == 0 {
-        return phrase_freq_lists(lists, unit_len) as f64;
+        return phrase_freq_lists(lists, unit_len) as f32;
     }
     struct Step {
         pos_i: usize,
@@ -9964,7 +10054,7 @@ pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop
         min_phrase_pos: 0,
         max_phrase_pos: 0,
     });
-    let mut tf = 0.0f64;
+    let mut tf = 0.0f32;
     while !steps.is_empty() {
         // `CalibrateLastStep`: the spread of the prefix ending at the last step.
         // `too_low` says the position is behind the window the prefix allows, so
@@ -10010,7 +10100,7 @@ pub(crate) fn phrase_freq_lists_sloppy(lists: &[Vec<u32>], unit_len: usize, slop
         if ok {
             if steps.len() == unit_len {
                 let step = steps.last().expect("non-empty");
-                let match_length = (step.max_phrase_pos - step.min_phrase_pos) as f64;
+                let match_length = (step.max_phrase_pos - step.min_phrase_pos) as f32;
                 tf += 1.0 / (1.0 + match_length);
                 steps.last_mut().expect("non-empty").term_pos_idx += 1;
             } else {
@@ -10735,5 +10825,81 @@ mod float_format_ut {
     #[allow(clippy::excessive_precision)]
     fn a_decimal_tie_rounds_like_ryu() {
         assert_eq!(fmt_f32_cpp(0.470703125), "0.47070312");
+    }
+}
+
+#[cfg(test)]
+mod merge_extend_ut {
+    use super::*;
+    use std::collections::BTreeMap;
+
+    /// A concatenation must not treat "this source's block starts past `until`"
+    /// as "this source is exhausted".
+    ///
+    /// The merged block's `until` is the **smallest** block end among the
+    /// sources, so a source whose own block begins after that end returns `0`
+    /// postings - it has nothing in *this* block, but plenty in the next ones.
+    /// The concatenation used to advance past such a source for good, which is
+    /// how a term disappeared from a document's BM25 score: enwiki's
+    /// `friedman stroke directorate` scored one document 15.15 at `topn=100`
+    /// and 10.92 at `topn=10`.
+    ///
+    /// Two sealed chunks whose row ranges do not touch is exactly that shape:
+    /// chunk 0 spans rows 0..=9, chunk 1 spans 1000..=1009, and the merged first
+    /// block ends at row 9 (chunk 0's last row). Chunk 1 must not be dropped.
+    #[tokio::test]
+    async fn a_source_whose_block_starts_after_until_is_not_exhausted() {
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap().to_string();
+        let write = |base: u64| {
+            let index_dir = index_dir.clone();
+            async move {
+                let docs: Vec<(u64, u32)> = (base..base + 10).map(|row| (row, 1)).collect();
+                let postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::from([(
+                    "alpha".to_string(),
+                    docs.iter().map(|(row, _)| (*row, 1, vec![0])).collect(),
+                )]);
+                // A chunk lives in its segment's directory - `seg_{n}` - which
+                // is where a seal writes and `load_sealed` looks.
+                let dir = storage::invertedindex::format::segment_chunk_dir(&index_dir, base >> 32);
+                storage::invertedindex::disk_segment_reader::write_segment_index(
+                    &dir,
+                    &format!("ft_{base:016x}"),
+                    base,
+                    &docs,
+                    &postings,
+                    storage::invertedindex::format::OPTION_FLAG_ALL,
+                )
+                .await
+                .unwrap();
+            }
+        };
+        write(0).await;
+        write(1000).await;
+
+        let mut index = TextIndex::new(index_dir.clone(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2, "both chunks are loaded");
+
+        let (sources, _) = index.term_sources("alpha");
+        assert_eq!(sources.len(), 2, "one source per chunk");
+        let mut merge = MergeCursor::new(sources, 2, None);
+        assert!(merge.concat, "disjoint ascending ranges concatenate");
+
+        // The first merged block ends at row 9: chunk 1 contributes nothing to
+        // it, but must stay reachable for the next block.
+        let (mut docs, mut tfs, mut lens) = (Vec::new(), Vec::new(), Vec::new());
+        merge.extend_block(&mut docs, &mut tfs, &mut lens, 128, 9);
+        assert_eq!(docs, (0..10).collect::<Vec<u64>>(), "first block");
+
+        docs.clear();
+        tfs.clear();
+        lens.clear();
+        merge.extend_block(&mut docs, &mut tfs, &mut lens, 128, 1009);
+        assert_eq!(
+            docs,
+            (1000..1010).collect::<Vec<u64>>(),
+            "the second chunk's postings must still be reachable"
+        );
     }
 }

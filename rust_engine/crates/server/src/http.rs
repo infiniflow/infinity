@@ -143,33 +143,30 @@ fn rows_json(columns: &[String], rows: &[Vec<String>]) -> String {
     format!("{{\"columns\":[{cols}],\"rows\":[{rs}]}}")
 }
 
-/// Extracts the `sql` field from a tiny JSON object like `{"sql":"..."}`.
+/// Extracts the `sql` field from a JSON object like `{"sql":"..."}`.
+///
+/// Goes through the real JSON reader instead of scanning for the closing quote
+/// itself. The hand-rolled scanner treated `\` as "copy the next character
+/// verbatim", which is wrong for every escape that is not a single character:
+/// a client that sends `\u00fa` (Python's `json.dumps` default for a non-ASCII
+/// character) had the backslash dropped and the field stored the literal text
+/// `u00fa` — the whole enwiki body corrupted that way, 12 characters longer per
+/// non-ASCII code point. Parsing the document keeps `\uXXXX`, the surrogate
+/// pairs and the ordinary escapes on the one code path that already handles
+/// them.
 fn extract_sql(body: &str) -> Option<String> {
-    let key = body.find("\"sql\"")? + 5;
-    let rest = &body[key..];
-    let colon = rest.find(':')? + 1;
-    let mut chars = rest[colon..].chars().peekable();
-    while matches!(chars.peek(), Some(c) if c.is_whitespace()) {
-        chars.next();
-    }
-    if chars.next() != Some('"') {
-        return None;
-    }
-    let mut out = String::new();
-    let mut escaped = false;
-    for c in chars {
-        if escaped {
-            out.push(c);
-            escaped = false;
-        } else if c == '\\' {
-            escaped = true;
-        } else if c == '"' {
-            return Some(out);
-        } else {
-            out.push(c);
+    match parse_json(body)? {
+        Json::Obj(fields) => {
+            fields
+                .into_iter()
+                .find(|(k, _)| k == "sql")
+                .and_then(|(_, v)| match v {
+                    Json::Str(s) => Some(s),
+                    _ => None,
+                })
         }
+        _ => None,
     }
-    None
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +314,16 @@ fn parse_json(text: &str) -> Option<Json> {
             }
         }
     }
+    /// Reads the four hex digits of a `\uXXXX` escape and advances `i`.
+    fn hex4(s: &[u8], i: &mut usize) -> Option<u32> {
+        let digits = s.get(*i..*i + 4)?;
+        let mut cp = 0u32;
+        for &d in digits {
+            cp = (cp << 4) | u32::from((d as char).to_digit(16)? as u8);
+        }
+        *i += 4;
+        Some(cp)
+    }
     fn string(s: &[u8], i: &mut usize) -> Option<String> {
         if *i >= s.len() || s[*i] != b'"' {
             return None;
@@ -341,10 +348,33 @@ fn parse_json(text: &str) -> Option<Json> {
                         b'b' => out.push(8),
                         b'f' => out.push(12),
                         b'u' => {
-                            let hex = std::str::from_utf8(s.get(*i..*i + 4)?).ok()?;
-                            let cp = u32::from_str_radix(hex, 16).ok()?;
-                            *i += 4;
-                            let ch = char::from_u32(cp).unwrap_or('\u{fffd}');
+                            let cp = hex4(s, i)?;
+                            // A character below the BMP is escaped as a UTF-16
+                            // surrogate pair (`\ud83d\ude00` for U+1F600), and
+                            // neither half is a `char` on its own. Decoding them
+                            // one by one wrote two U+FFFD and stored `��` where
+                            // the client sent `😀`. RFC 8259 requires the pair;
+                            // an unpaired half is rejected rather than silently
+                            // replaced, so a bad escape never becomes data.
+                            let cp = match cp {
+                                0xD800..=0xDBFF => {
+                                    // High surrogate: the low half must follow
+                                    // immediately as another `\uXXXX` escape.
+                                    if s.get(*i..*i + 2)? != b"\\u" {
+                                        return None;
+                                    }
+                                    *i += 2;
+                                    let lo = hex4(s, i)?;
+                                    if !(0xDC00..=0xDFFF).contains(&lo) {
+                                        return None;
+                                    }
+                                    0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00)
+                                }
+                                // A lone low surrogate is not a character.
+                                0xDC00..=0xDFFF => return None,
+                                cp => cp,
+                            };
+                            let ch = char::from_u32(cp)?;
                             let mut buf = [0u8; 4];
                             out.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
                         }
@@ -3403,6 +3433,73 @@ mod tests {
     /// A standalone node, the same registry `Server::bind` installs.
     fn leader() -> PeerManager {
         PeerManager::new("leader", "127.0.0.1", 23820)
+    }
+
+    /// The two legal JSON spellings of one string must decode to the same
+    /// bytes. A character above the BMP arrives as a UTF-16 surrogate pair
+    /// (`\ud83d\ude00`); decoding the halves one at a time gave two U+FFFD and
+    /// stored `��` for `😀`, so a REST import silently corrupted every such
+    /// row while still answering 200.
+    #[test]
+    fn json_escapes_decode_utf16_surrogate_pairs() {
+        let direct = parse_json("{\"body\":\"A\u{1F600}B\"}").unwrap();
+        let escaped = parse_json("{\"body\":\"A\\ud83d\\ude00B\"}").unwrap();
+        let text = |j: &Json| j.get("body").and_then(Json::as_str).unwrap().to_string();
+        assert_eq!(text(&escaped), "A\u{1F600}B");
+        assert_eq!(text(&escaped), text(&direct));
+        // A pair at the very start and the end of the string, and back to back.
+        assert_eq!(
+            text(&parse_json("{\"body\":\"\\ud83d\\ude00\\ud83d\\ude01\"}").unwrap()),
+            "\u{1F600}\u{1F601}"
+        );
+        // A BMP escape still works, including one that is itself a two-byte char.
+        assert_eq!(
+            text(&parse_json("{\"body\":\"\\u00e9\\u4e2d\"}").unwrap()),
+            "é中"
+        );
+    }
+
+    /// `/query` has to decode the same escapes the REST routes do. Its own
+    /// hand-rolled scanner copied the byte after a backslash verbatim, so
+    /// `\u00fa` (what Python's `json.dumps` emits for `ú` by default) reached
+    /// the parser as `u00fa` - every non-ASCII character in a bulk import lost
+    /// its backslash and the row grew by up to 12 characters per code point.
+    #[test]
+    fn the_query_route_decodes_unicode_escapes() {
+        // The exact byte sequence a default `json.dumps({"sql": ...})` sends.
+        let body = "{\"sql\":\"SELECT 'Arkt\\u00far' AS x;\"}";
+        assert_eq!(extract_sql(body).as_deref(), Some("SELECT 'Arktúr' AS x;"));
+        // A non-BMP character arrives as a surrogate pair inside the SQL text.
+        let body = "{\"sql\":\"SELECT '\\ud83d\\ude00';\"}";
+        assert_eq!(extract_sql(body).as_deref(), Some("SELECT '😀';"));
+        // Ordinary escapes still work, and a missing field is still None.
+        let body = "{\"sql\":\"a\\nb\"}";
+        assert_eq!(extract_sql(body).as_deref(), Some("a\nb"));
+        assert!(extract_sql("{}").is_none());
+        assert!(extract_sql("not json").is_none());
+    }
+
+    /// A surrogate half with no partner is not a character. Rejecting the body
+    /// keeps the bad escape out of the store instead of writing U+FFFD where
+    /// the client meant something else.
+    #[test]
+    fn json_escapes_reject_unpaired_surrogates() {
+        assert!(parse_json("{\"body\":\"\\ud83d\"}").is_none(), "lone high");
+        assert!(parse_json("{\"body\":\"\\ude00\"}").is_none(), "lone low");
+        assert!(
+            parse_json("{\"body\":\"\\ud83dX\"}").is_none(),
+            "high followed by a plain byte"
+        );
+        assert!(
+            parse_json("{\"body\":\"\\ud83d\\ud83d\"}").is_none(),
+            "two high halves"
+        );
+        assert!(
+            parse_json("{\"body\":\"\\ud83d\\u0041\"}").is_none(),
+            "high followed by a BMP escape"
+        );
+        // A truncated escape is not an escape either.
+        assert!(parse_json("{\"body\":\"\\ud83\"}").is_none(), "short hex");
     }
 
     #[tokio::test]

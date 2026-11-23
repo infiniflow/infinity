@@ -53,79 +53,108 @@ const PERCENTAGE_SCALE: f64 = u16::MAX as f64;
 /// idf = ln(1 + (N - df + 0.5) / (df + 0.5)), plus the optional delta_term added
 /// to the tf norm. `bm25_param_k1` / `bm25_param_b` override the two constants
 /// (`bound_select_statement_impl.cpp:239-252`).
+///
+/// Every quantity is `f32`, like the reference: `k1`, `b`, `delta`, and the
+/// derived `bm25_common_score_` / `f1` / `f2` / `f3` / `f4` / `avg_column_len_`
+/// are all `float` in `TermDocIterator` and `PhraseDocIterator`
+/// (`term_doc_iterator_impl.cpp:55-77`, `phrase_doc_iterator_impl.cpp:41-56`),
+/// and every accumulator in the WAND is `float` too
+/// (`blockmax_wand_iterator_impl.cpp:328,349,402`). Computing in `f64` and
+/// rounding once at the end does not reproduce that: the difference is ~1e-3
+/// on a score of 15, enough to swap two documents at the top-n boundary.
 #[derive(Clone)]
 pub(crate) struct Bm25Ranker {
-    pub k1: f64,
-    pub b: f64,
-    pub delta: f64,
+    pub k1: f32,
+    pub b: f32,
+    pub delta: f32,
 }
 
 impl Bm25Ranker {
     /// The reference defaults (`kBM25K1 = 1.2`, `kBM25B = 0.75`).
-    pub fn new(delta: f64) -> Self {
+    pub fn new(delta: f32) -> Self {
         Self::with_params(1.2, 0.75, delta)
     }
 
     /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the values
     /// `bound_select_statement_impl.cpp:239-252` writes into `BM25Params`.
-    pub fn with_params(k1: f64, b: f64, delta: f64) -> Self {
+    pub fn with_params(k1: f32, b: f32, delta: f32) -> Self {
         Self { k1, b, delta }
     }
 
-    pub fn idf(&self, n_docs: f64, df: f64) -> f64 {
-        (1.0 + (n_docs - df + 0.5) / (df + 0.5)).ln()
+    /// `smooth_idf = log1p((total_df - doc_freq + 0.5F) / (doc_freq + 0.5F))`
+    /// (`term_doc_iterator_impl.cpp:70`): the division is `float`, then
+    /// `std::log1p` on the float promotes to `double`, and the result is stored
+    /// back into a `float`.
+    pub fn idf(&self, n_docs: f32, df: f32) -> f32 {
+        let ratio = ((n_docs - df) + 0.5) / (df + 0.5);
+        (1.0f64 + f64::from(ratio)).ln() as f32
     }
 
     /// idf * (tf_norm + delta) * weight, with
     /// tf_norm = (k1+1)*tf / (tf + k1*((1-b) + b*dl/avgdl)).
     #[cfg(test)]
-    pub fn score(&self, tf: f64, dl: f64, avgdl: f64, idf: f64, weight: f64) -> f64 {
+    pub fn score(&self, tf: f32, dl: f32, avgdl: f32, idf: f32, weight: f32) -> f32 {
         self.score_with(tf, dl, avgdl, idf, weight, self.delta)
     }
 
     /// [`Self::score`] with the unit's own `delta` (`delta_term` for a term,
     /// `delta_phrase` for a phrase).
+    ///
+    /// `TermDocIterator::BM25Score` (`term_doc_iterator_impl.cpp:154-175`)
+    /// evaluates `p = f1 + f2 * doc_len` and then
+    /// `bm25_common_score_ * (tf / (tf + p) + f4)` — every step in `float`, and
+    /// `f1`/`f2`/`f4` are the precomputed members, not a re-derivation. The
+    /// shape is reproduced here with the same intermediate values so the
+    /// rounding matches.
     pub fn score_with(
         &self,
-        tf: f64,
-        dl: f64,
-        avgdl: f64,
-        idf: f64,
-        weight: f64,
-        delta: f64,
-    ) -> f64 {
-        let norm = (self.k1 + 1.0) * tf
-            / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / avgdl.max(1e-9)));
-        idf * (norm + delta) * weight
+        tf: f32,
+        dl: f32,
+        avgdl: f32,
+        idf: f32,
+        weight: f32,
+        delta: f32,
+    ) -> f32 {
+        let f1 = self.f1();
+        let f2 = self.f2(avgdl);
+        let f4 = self.f4(delta);
+        let common = self.common(idf, weight);
+        let p = f1 + f2 * dl;
+        common * (tf / (tf + p) + f4)
     }
 
     /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta
     /// (`term_doc_iterator_impl.cpp:76`).
-    pub fn f4(&self, delta: f64) -> f64 {
+    pub fn f4(&self, delta: f32) -> f32 {
         delta / (self.k1 + 1.0)
     }
 
     /// tf_norm <= k1+1, so this is a safe upper bound for pruning.
-    pub fn upper_bound(&self, idf: f64, weight: f64) -> f64 {
+    pub fn upper_bound(&self, idf: f32, weight: f32) -> f32 {
         idf * (self.k1 + 1.0 + self.delta.max(0.0)) * weight
     }
 
     /// bm25_common_score_ (term_doc_iterator_impl.cpp:71):
     /// weight * idf * (k1 + 1). Both the whole-term bound and every block bound
     /// are this factor times a tf-only term.
-    pub fn common(&self, idf: f64, weight: f64) -> f64 {
+    pub fn common(&self, idf: f32, weight: f32) -> f32 {
         weight * idf * (self.k1 + 1.0)
     }
 
     /// f1 = k1 * (1 - b) (term_doc_iterator_impl.cpp:73).
-    pub fn f1(&self) -> f64 {
+    pub fn f1(&self) -> f32 {
         self.k1 * (1.0 - self.b)
+    }
+
+    /// f2 = k1 * b / avgdl (term_doc_iterator_impl.cpp:74).
+    pub fn f2(&self, avgdl: f32) -> f32 {
+        self.k1 * self.b / avgdl.max(1e-9)
     }
 
     /// f3 = k1 * b / avgdl * u16::MAX (term_doc_iterator_impl.cpp:74-75), the
     /// tf/doc-length ratio term of BlockMaxBM25Score.
-    pub fn f3(&self, avgdl: f64) -> f64 {
-        self.k1 * self.b / avgdl.max(1e-9) * PERCENTAGE_SCALE
+    pub fn f3(&self, avgdl: f32) -> f32 {
+        self.f2(avgdl) * (PERCENTAGE_SCALE as f32)
     }
 }
 
@@ -189,20 +218,20 @@ struct Cursor<'a> {
     /// doc-id sort permuted the cursors.
     ord: usize,
     term: usize,
-    weight: f64,
+    weight: f32,
     /// bm25_common_score_; zero for similarity=boolean.
-    common: f64,
+    common: f32,
     /// BM25ScoreUpperBound() of the whole term.
-    upper_bound: f64,
+    upper_bound: f32,
     /// f1, f3, f4 of TermDocIterator::InitBM25Info.
-    f1: f64,
-    f3: f64,
-    f4: f64,
+    f1: f32,
+    f3: f32,
+    f4: f32,
     /// Field statistics of this unit's BM25 score.
-    avg: f64,
-    idf: f64,
+    avg: f32,
+    idf: f32,
     /// `delta_term` for a term, `delta_phrase` for a phrase.
-    delta: f64,
+    delta: f32,
     /// The posting stream, read one block at a time.
     stream: WandStream<'a>,
     /// iter_->SeekDoc position, cached so the cursors can be sorted. `None`
@@ -213,8 +242,11 @@ struct Cursor<'a> {
     /// BlockMaxBM25Score() cache: the block it was computed for, its bound and
     /// the block's last document (used by the block-skip path).
     block_index: u64,
-    block_max: f64,
+    block_max: f32,
     block_last_doc: u64,
+    /// `(last, max_tf, pct)` of the block `block_index` names, so `block_last`
+    /// and `block_max` agree and neither re-reads the stream.
+    block_stats_cache: (u64, f32, u16),
 }
 
 impl<'a> Cursor<'a> {
@@ -237,41 +269,62 @@ impl<'a> Cursor<'a> {
         self.stream.seek_block(doc);
         self.cur = None;
         self.done = false;
+        // The cursor left the block its bound was computed for; drop the cached
+        // pair so `block_last()`/`block_max()` answer for the block it lands in.
+        // `block_bounds` recomputes whenever `block_index` no longer matches the
+        // stream's block id, and `u64::MAX` can never match one.
+        self.block_index = u64::MAX;
     }
 
     /// BlockLastDocID(): the last document of the current block.
+    ///
+    /// Refreshes on first use after a `seek`: the cursor may have moved and the
+    /// cached pair belongs to the block it left.
     fn block_last(&mut self) -> u64 {
+        self.block_bounds();
         self.block_last_doc
+    }
+
+    /// The block's `(last, max_tf, pct)`, recomputed whenever the cursor is in a
+    /// block whose bounds are not cached yet. `block_last()` and `block_max()`
+    /// both read through here, so a cursor that was `seek`-ed can never answer
+    /// with the bounds of the block it left.
+    fn block_bounds(&mut self) -> (u64, f32, u16) {
+        let id = self.stream.block_id();
+        if self.block_index != id {
+            let (last, max_tf, pct) = self.stream.block_stats();
+            self.block_index = id;
+            self.block_last_doc = last;
+            self.block_stats_cache = (last, max_tf as f32, pct);
+        }
+        self.block_stats_cache
     }
 
     /// BlockMaxBM25Score() (term_doc_iterator_impl.cpp:91-102): the block's
     /// largest tf and largest tf/doc-length ratio, fed through the same BM25
     /// shape as the exact score. Cached per block like the reference's
     /// block_max_bm25_score_cache_end_id_.
-    fn block_max(&mut self, mode: WandMode) -> f64 {
-        let id = self.stream.block_id();
-        if self.block_index == id {
-            return self.block_max;
-        }
-        // `BlockMaxPhraseScore` for a phrase unit: the minimum over its terms',
-        // since a phrase can occur no more often than any one of them.
-        let (last, max_tf, pct) = self.stream.block_stats();
+    ///
+    /// The cache key is the block **identity**, which `seek` invalidates: a
+    /// block-level seek left the old block's pair in place until the next
+    /// `load`, and the WAND reads `block_last()` *before* it asks for the bound
+    /// to decide whether a cursor still covers a candidate. Serving the
+    /// previous block's pair there made a cursor that had moved to a later block
+    /// keep claiming it covered rows it had already passed.
+    fn block_max(&mut self, mode: WandMode) -> f32 {
+        let (_, max_tf, pct) = self.block_bounds();
         let value = match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
             WandMode::Bm25 => {
                 // `bm25_common_score_ * (1/(1 + f1/block_max_tf +
                 // f3/block_max_percentage) + f4)` with the stored `u16`
-                // percentage (`term_doc_iterator_impl.cpp:98-100`), so the bound
-                // is bit-for-bit the reference's.
-                let norm =
-                    1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / f64::from(pct.max(1)));
+                // percentage (`term_doc_iterator_impl.cpp:98-100`), in `float`.
+                let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / (pct.max(1) as f32));
                 (self.common * (norm + self.f4)).min(self.upper_bound)
             }
         };
-        self.block_index = id;
         self.block_max = value;
-        self.block_last_doc = last;
         value
     }
 }
@@ -296,7 +349,7 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     heap: BinaryHeap<Reverse<(u64, usize)>>,
     /// Sum of upper_bound over the cursors in the heap, i.e. the whole query's
     /// upper bound minus everything already retired.
-    total_upper: f64,
+    total_upper: f32,
     /// The cursors the last pivot parked on the candidate, in doc order. This is
     /// the reference's [0, pivot_] slice: what offer() counts matches over and
     /// what the next round repositions.
@@ -308,7 +361,7 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     naive: bool,
     /// Top-k, sorted by score (desc) then doc id (asc), like the scan path.
     best: Vec<(u64, f64)>,
-    threshold: f64,
+    threshold: f32,
     /// doc_id_ / bm25_score_cache_ of the reference: the last candidate Next()
     /// stopped on and its exact score.
     doc_id: Option<u64>,
@@ -329,7 +382,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         fields: Vec<WandField<'a>>,
         k: usize,
         dead: &'a common::RowBitmap,
-        delta: f64,
+        delta: f32,
         min_should: usize,
         mode: WandMode,
     ) -> Self {
@@ -342,8 +395,10 @@ impl<'a> BlockMaxWandIterator<'a> {
                 total_len,
                 units,
             } = field;
-            let n = n_docs.max(1) as f64;
-            let avg = (total_len as f64 / n).max(1e-9);
+            let n = n_docs.max(1) as f32;
+            // `avg_column_len_ = doc_len * 1.0 / doc_cnt` into a `float`
+            // (term_doc_iterator_impl.cpp:66).
+            let avg = (total_len as f32 / n).max(1e-9);
             for (ui, unit) in units.into_iter().enumerate() {
                 let WandUnit {
                     mut stream,
@@ -383,6 +438,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     block_index: u64::MAX,
                     block_max: 0.0,
                     block_last_doc: u64::MAX,
+                    block_stats_cache: (u64::MAX, 0.0, 0),
                 });
                 cursors.last_mut().unwrap().refresh();
             }
@@ -409,7 +465,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             prefix: Vec::new(),
             naive: false,
             best: Vec::new(),
-            threshold: f64::NEG_INFINITY,
+            threshold: f32::NEG_INFINITY,
             doc_id: None,
             candidate_score: 0.0,
             score_evaluations: 0,
@@ -434,7 +490,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// (`bound_select_statement_impl.cpp:239-252`), so every coefficient derived
     /// from k1/b - the whole-term bound, `common`, f1, f3, f4 - is recomputed
     /// here. `similarity=boolean` never touches BM25 and is left alone.
-    pub fn with_bm25_params(mut self, k1: f64, b: f64) -> Self {
+    pub fn with_bm25_params(mut self, k1: f32, b: f32) -> Self {
         if self.mode == WandMode::Boolean {
             return self;
         }
@@ -464,7 +520,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// `physical_match_impl.cpp`), so documents whose bound cannot reach it are
     /// skipped instead of decoded and then dropped. `t <= 0` means "no
     /// threshold" - the reference's `threshold_ <= 0.0f` shortcut.
-    pub fn with_threshold(mut self, t: f64) -> Self {
+    pub fn with_threshold(mut self, t: f32) -> Self {
         if t > 0.0 {
             self.threshold = self.threshold.max(t);
         }
@@ -658,7 +714,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // `UpdateScoreThreshold` only ever raises the bar
             // (`blockmax_wand_iterator_impl.cpp:233-246`), so a user
             // `threshold=` survives a weak k-th score.
-            self.threshold = self.threshold.max(self.best[self.k - 1].1);
+            self.threshold = self.threshold.max(self.best[self.k - 1].1 as f32);
         }
     }
 
@@ -701,7 +757,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
             // (1) FindPivotOptimized: the pivot is the first prefix whose upper
             // bound reaches the threshold, plus everything tied on its document.
-            let mut sum = 0.0;
+            let mut sum: f32 = 0.0;
             let mut pivot = None;
             while let Some(Reverse((doc, i))) = self.heap.pop() {
                 self.heap_ops += 1;
@@ -741,7 +797,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // cursor whose block ends before the candidate contributes nothing
             // (it has no posting there); one that has to move first gets a
             // block-level seek, which then decides which of the two it is.
-            let mut sum_at_doc = 0.0;
+            let mut sum_at_doc: f32 = 0.0;
             for k in 0..self.prefix.len() {
                 let i = self.prefix[k];
                 if self.cursors[i].cur != Some(doc) {
@@ -767,7 +823,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     .all(|&i| self.cursors[i].cur == Some(doc))
                 {
                     let score = self.score_prefix();
-                    if score > self.threshold {
+                    if score > f64::from(self.threshold) {
                         self.doc_id = Some(doc);
                         self.candidate_score = score;
                         return true;
@@ -917,7 +973,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         // block ends first forward by one block.
         let mut next_doc = start;
         loop {
-            let mut sum_range = 0.0;
+            let mut sum_range: f32 = 0.0;
             let mut min_last = u64::MAX;
             let mut earliest = None;
             for k in 0..self.prefix.len() {
@@ -969,7 +1025,12 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// document.
     fn score_prefix(&mut self) -> f64 {
         let ranker = self.ranker.clone();
-        let mut score = 0.0;
+        // The reference's `float sum_score = 0.0f` (`blockmax_wand_iterator_impl.
+        // cpp:402`): the terms' scores are accumulated in `float`, one at a
+        // time, and only the total leaves the iterator. Accumulating in `f64`
+        // and rounding once gives a different value, which is enough to swap
+        // documents at a top-n boundary.
+        let mut score: f32 = 0.0;
         // Sum in cursor creation order (field-major, then term) so the value is
         // independent of the document order the heap handed us, matching the
         // scan path bit for bit. Doc order is not needed after this point.
@@ -980,7 +1041,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     let i = self.prefix[k];
                     let cursor = &mut self.cursors[i];
                     let tf = cursor.stream.tf();
-                    let dl = f64::from(cursor.stream.len());
+                    let dl = cursor.stream.len() as f32;
                     score += ranker.score_with(
                         tf,
                         dl,
@@ -1003,7 +1064,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             let block = self.cursors[self.prefix[k]].block_index;
             self.max_scored_block = self.max_scored_block.max(block);
         }
-        score
+        f64::from(score)
     }
 }
 
@@ -1018,7 +1079,7 @@ mod tests {
         postings: &[(&str, &'a [(u64, u32)])],
         doc_len: &'a [(u64, u32)],
         n: usize,
-        weights: Vec<f64>,
+        weights: Vec<f32>,
     ) -> WandField<'a> {
         let ranker = Bm25Ranker::new(0.0);
         let units = postings
@@ -1027,7 +1088,7 @@ mod tests {
             .map(|(i, (_term, list))| WandUnit {
                 stream: WandStream::Term(TermStream::from_slice(list, doc_len)),
                 weight: weights.get(i).copied().unwrap_or(1.0),
-                idf: ranker.idf(n.max(1) as f64, list.len() as f64),
+                idf: ranker.idf(n.max(1) as f32, list.len() as f32),
                 delta: None,
             })
             .collect();
@@ -1042,13 +1103,13 @@ mod tests {
     fn ranker_matches_the_reference_formula() {
         let r = Bm25Ranker::new(0.0);
         let idf = r.idf(4.0, 3.0);
-        assert!((idf - (1.0f64 + 1.5 / 3.5).ln()).abs() < 1e-12);
+        assert!((idf - ((1.0f64 + 1.5 / 3.5).ln() as f32)).abs() < 1e-6);
         // tf=1, dl=2, avg=2.25
         let expected = idf * (2.2 * 1.0 / (1.0 + 1.2 * (0.25 + 0.75 * 2.0 / 2.25)));
-        assert!((r.score(1.0, 2.0, 2.25, idf, 1.0) - expected).abs() < 1e-12);
+        assert!((r.score(1.0, 2.0, 2.25, idf, 1.0) - expected).abs() < 1e-6);
         // delta adds to the norm
         let rd = Bm25Ranker::new(1.0);
-        assert!((rd.score(1.0, 2.0, 2.25, idf, 1.0) - (expected + idf)).abs() < 1e-12);
+        assert!((rd.score(1.0, 2.0, 2.25, idf, 1.0) - (expected + idf)).abs() < 1e-6);
     }
 
     #[test]
@@ -1092,10 +1153,10 @@ mod tests {
         let lens: HashMap<u64, u32> = doc_len.iter().copied().collect();
         let dead = common::RowBitmap::new();
         let ranker = Bm25Ranker::new(0.0);
-        let n = 400.0f64;
+        let n = 400.0f32;
         let total_len: u64 = doc_len.iter().map(|(_, l)| *l as u64).sum();
-        let avg = total_len as f64 / n;
-        let idf = ranker.idf(n, postings.len() as f64);
+        let avg = total_len as f32 / n;
+        let idf = ranker.idf(n, postings.len() as f32);
         let dl = |row: u64| *lens.get(&row).unwrap_or(&1);
         let mut it = BlockMaxWandIterator::new(
             vec![field(&[("alpha", &postings)], &doc_len, 400, vec![1.7])],
@@ -1114,8 +1175,8 @@ mod tests {
             let (last, _, _) = cursor.stream.block_stats();
             let bound = cursor.block_max(WandMode::Bm25);
             for (doc, tf) in postings.iter().filter(|(d, _)| *d >= from && *d <= last) {
-                let exact = ranker.score(*tf as f64, f64::from(dl(*doc)), avg, idf, 1.7);
-                assert!(exact <= bound + 1e-12, "doc {doc}: {exact} > {bound}");
+                let exact = ranker.score(*tf as f32, dl(*doc) as f32, avg, idf, 1.7);
+                assert!(exact <= bound + 1e-4, "doc {doc}: {exact} > {bound}");
             }
             from = last + 1;
             cursor.seek(from);
@@ -1267,11 +1328,11 @@ mod tests {
         lens: &HashMap<u64, u32>,
         n: usize,
         total_len: u64,
-        weights: &[f64],
+        weights: &[f32],
         terms: &[String],
         k: usize,
         dead: &common::RowBitmap,
-        delta: f64,
+        delta: f32,
         min_should: usize,
         mode: WandMode,
     ) -> Vec<(u64, f64)> {
@@ -1284,10 +1345,10 @@ mod tests {
         }
         candidates.sort_unstable();
         candidates.dedup();
-        let avg = (total_len as f64 / n.max(1) as f64).max(1e-9);
+        let avg = (total_len as f32 / n.max(1) as f32).max(1e-9);
         let mut scored = Vec::new();
         for doc in candidates {
-            let mut score = 0.0;
+            let mut score = 0.0f32;
             let mut seen_terms = HashSet::new();
             let mut matched = 0;
             for (ti, term) in terms.iter().enumerate() {
@@ -1302,9 +1363,9 @@ mod tests {
                 let w = weights.get(ti).copied().unwrap_or(1.0);
                 match mode {
                     WandMode::Bm25 => {
-                        let tf = list[pos].1 as f64;
-                        let dl = f64::from(*lens.get(&doc).unwrap_or(&1));
-                        let idf = ranker.idf(n.max(1) as f64, list.len() as f64);
+                        let tf = list[pos].1 as f32;
+                        let dl = *lens.get(&doc).unwrap_or(&1) as f32;
+                        let idf = ranker.idf(n.max(1) as f32, list.len() as f32);
                         score += ranker.score(tf, dl, avg, idf, w);
                     }
                     WandMode::Boolean => score += w,
@@ -1317,7 +1378,7 @@ mod tests {
             if hits < min_should.max(1) || dead.contains(doc) {
                 continue;
             }
-            scored.push((doc, score));
+            scored.push((doc, f64::from(score)));
         }
         scored.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
@@ -1373,7 +1434,7 @@ mod tests {
                         &lens_slice,
                     )),
                     weight: weights.get(i).copied().unwrap_or(1.0),
-                    idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
+                    idf: ranker.idf(DOCS as f32, postings[t].len() as f32),
                     delta: None,
                 })
                 .collect();
@@ -1490,7 +1551,7 @@ mod tests {
                             &lens_slice,
                         )),
                         weight: weights[i],
-                        idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
+                        idf: ranker.idf(DOCS as f32, postings[t].len() as f32),
                         delta: None,
                     })
                     .collect();
@@ -1593,9 +1654,9 @@ mod tests {
         }
         let lens: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 100)).collect();
         let ranker = Bm25Ranker::new(0.0);
-        let n = DOCS as f64;
-        let idf_a = ranker.idf(n, a.len() as f64);
-        let idf_b = ranker.idf(n, b.len() as f64);
+        let n = DOCS as f32;
+        let idf_a = ranker.idf(n, a.len() as f32);
+        let idf_b = ranker.idf(n, b.len() as f32);
         let make = || {
             let cursor = crate::PhraseCursor::new(
                 vec![

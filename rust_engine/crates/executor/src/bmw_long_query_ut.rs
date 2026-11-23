@@ -56,8 +56,9 @@ fn env_u32(name: &str, default: u32) -> u32 {
 
 /// `BM25Ranker::idf`, spelled out so the corpus statistics of the expected
 /// scores are visible at the call site (`1 + (N - df + 0.5) / (df + 0.5)`).
-fn idf(n_docs: f64, df: f64) -> f64 {
-    (1.0 + (n_docs - df + 0.5) / (df + 0.5)).ln()
+fn idf(n_docs: f32, df: f32) -> f32 {
+    let ratio = ((n_docs - df) + 0.5) / (df + 0.5);
+    (1.0f64 + f64::from(ratio)).ln() as f32
 }
 
 /// One long OR query: `terms` distinct vocabulary words, each appearing once.
@@ -202,7 +203,7 @@ async fn run(engine: &Engine, query: &str, config: RunConfig) -> RunResult {
     let guard = index.read().await;
 
     let n_docs = guard.total_docs();
-    let n = n_docs.max(1) as f64;
+    let n = n_docs.max(1) as f32;
     let mut units: Vec<WandUnit<'_>> = Vec::new();
     for term in query.split_whitespace() {
         let stream = guard.term_stream(term);
@@ -212,7 +213,7 @@ async fn run(engine: &Engine, query: &str, config: RunConfig) -> RunResult {
             continue;
         }
         units.push(WandUnit {
-            idf: idf(n, stream.df() as f64),
+            idf: idf(n, stream.df() as f32),
             stream: WandStream::Term(stream),
             weight: 1.0,
             delta: None,
@@ -678,7 +679,7 @@ async fn long_query_stability() {
             .await
             .unwrap();
         let guard = index.read().await;
-        let n = guard.total_docs().max(1) as f64;
+        let n = guard.total_docs().max(1) as f32;
         let mut units: Vec<WandUnit<'_>> = Vec::new();
         for term in query.split_whitespace() {
             let stream = guard.term_stream(term);
@@ -686,7 +687,7 @@ async fn long_query_stability() {
                 continue;
             }
             units.push(WandUnit {
-                idf: idf(n, stream.df() as f64),
+                idf: idf(n, stream.df() as f32),
                 stream: WandStream::Term(stream),
                 weight: 1.0,
                 delta: None,
@@ -1044,7 +1045,7 @@ async fn long_query_randomized_differential() {
                 .await
                 .unwrap();
             let guard = index.read().await;
-            let n = guard.total_docs().max(1) as f64;
+            let n = guard.total_docs().max(1) as f32;
             let mut units: Vec<WandUnit<'_>> = Vec::new();
             for term in query.split_whitespace() {
                 let stream = guard.term_stream(term);
@@ -1052,7 +1053,7 @@ async fn long_query_randomized_differential() {
                     continue;
                 }
                 units.push(WandUnit {
-                    idf: idf(n, stream.df() as f64),
+                    idf: idf(n, stream.df() as f32),
                     stream: WandStream::Term(stream),
                     weight: 1.0,
                     delta: None,
