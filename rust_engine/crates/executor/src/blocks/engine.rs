@@ -8700,6 +8700,22 @@ impl Engine {
     /// `None` when the column is not a tensor column: "looks like a tensor" is
     /// then a property of the cell's *text*, which the caller has to read.
     pub(crate) fn tensor_row_ids(&self, table: &str, col: usize) -> Option<Vec<u64>> {
+        self.tensor_row_scan(table, col, false)
+    }
+
+    /// How many rows hold a non-empty tensor, without rendering one of them.
+    ///
+    /// The chunk writer counts a document per parsed tensor (`for_each_tensor_doc`
+    /// drops an empty `[]`), so this is the count a chunk's `doc_num` has to be
+    /// compared with. It reads the slot word's count half and the null bitmap -
+    /// the same verdict, no formatting, no outline access.
+    pub(crate) fn tensor_doc_count(&self, table: &str, col: usize) -> u64 {
+        self.tensor_row_scan(table, col, true)
+            .map(|ids| ids.len() as u64)
+            .unwrap_or(0)
+    }
+
+    fn tensor_row_scan(&self, table: &str, col: usize, non_empty_only: bool) -> Option<Vec<u64>> {
         let table = self.qualified_table(table);
         let meta = self.storage.catalog.get_table_by_name(&table).ok()??;
         let type_text = meta.types.get(col)?;
@@ -8739,18 +8755,24 @@ impl Engine {
                 {
                     continue;
                 }
-                // A slot that exists always renders, but an empty tensor
-                // (`[]`, count 0) is not a document and the chunk writer never
-                // counted it. The count is the low half of the slot word.
-                let Some(word) = data.get(slot * 8..slot * 8 + 8) else {
-                    continue;
-                };
-                let Ok(word) = <[u8; 8]>::try_from(word) else {
-                    continue;
-                };
-                if u64::from_le_bytes(word) & 0xffff == 0 {
-                    continue;
+                if non_empty_only {
+                    // The count is the low half of the slot word.
+                    let Some(word) = data.get(slot * 8..slot * 8 + 8) else {
+                        continue;
+                    };
+                    let Ok(word) = <[u8; 8]>::try_from(word) else {
+                        continue;
+                    };
+                    if u64::from_le_bytes(word) & 0xffff == 0 {
+                        continue;
+                    }
                 }
+                // A slot that is present counts, even when its tensor is empty:
+                // the list is the document *sequence* a chunk's `base_row_id`
+                // indexes into, so it has to keep the same positions the writer
+                // saw. Empty documents are dropped when the chunk is built, not
+                // here - a shorter list would make `docs < seqs.len()` fail and
+                // turn every open into a rebuild.
                 let seq = ((id.segment_id as usize) << 32)
                     | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
                 if !dead.contains(seq as u64) {
@@ -8769,8 +8791,10 @@ impl Engine {
                 continue;
             };
             let text = text.trim();
-            // `[]` is an empty tensor: the writer never counted it either.
-            if text.len() > 2 && text.starts_with('[') && text.ends_with(']') {
+            // `[]` is an empty tensor: it keeps its position in the document
+            // sequence, but it is not a document the chunk writer counted.
+            let shaped = text.starts_with('[') && text.ends_with(']');
+            if shaped && (!non_empty_only || text.len() > 2) {
                 out.push(seq as u64);
             }
         }

@@ -1004,6 +1004,13 @@ impl PlaidIndex {
                 let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
                 let centroid_part =
                     c_scores[q * total_tokens_in_c_scores + doc_start_in_c_scores + d];
+                // No `1/‖recon‖` factor: this port's scores are the
+                // un-normalized MaxSim, the same scale `batched_ivf_probe`
+                // builds its centroid cut on (`q·c - ½‖c‖²`). Dividing by the
+                // reconstruction's norm ranked a short-norm token above the
+                // exact winner. The quantization error such a division was
+                // meant to absorb is removed by re-scoring from the column
+                // instead (`ExactScorer` in the executor).
                 max_score = max_score.max(centroid_part + r);
             }
             if max_score > f32::MIN {
@@ -1106,11 +1113,8 @@ impl PlaidIndex {
                     let lut = &luts[q * packed_dim * 256..(q + 1) * packed_dim * 256];
                     let mut max_score = f32::MIN;
                     for d in 0..doc_len {
-                        let r = quantizer.single_ip_distance_from_lut(
-                            doc_offset + d,
-                            lut,
-                            self.packed(),
-                        );
+                        let emb = doc_offset + d;
+                        let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
                         max_score = max_score.max(c_scores[q * total_tokens + start + d] + r);
                     }
                     if max_score > f32::MIN {

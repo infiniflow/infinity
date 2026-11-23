@@ -4110,6 +4110,25 @@ impl MultiVectorIndex {
             );
         }
         if indexed {
+            // The residual codes rank the shortlist; the column holds the
+            // float32 tokens. `ExactScorer` re-scores the rows the probe
+            // returned the way the SMVE branch does, which removes the code's
+            // quantization error from the score the caller sees. It costs one
+            // batch over `topn` rows (200 by default), and without it the
+            // ranking carries `±0.1` per token at a coarse centroid budget:
+            // an unrelated unit whose codes under-reconstruct their magnitude
+            // wins the MaxSim outright.
+            if let Some(rank) = exact.as_mut() {
+                let rank: ExactScorer<'_> = &mut **rank;
+                let seqs: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                let scored: std::collections::HashMap<u64, f32> = rank(&seqs).into_iter().collect();
+                for (seq, score) in hits.iter_mut() {
+                    if let Some(exact) = scored.get(seq) {
+                        *score = *exact;
+                    }
+                }
+            }
+
             // A short answer is the probe's answer, not a missing table: IVF
             // visited `n_ivf_probe` centroids and `centroid_score_threshold` may
             // have dropped more, which is what the reference returns as well -
@@ -4938,6 +4957,7 @@ impl Default for TableEntry {
             analyzers: Default::default(),
             imports: None,
             analyzers_by_index: Default::default(),
+            analyzers_loaded: false,
             column_index_analyzers: Default::default(),
             comments: Default::default(),
             hnsw_mem: Default::default(),
@@ -5344,6 +5364,12 @@ pub(crate) struct TableEntry {
     pub(crate) imports: Option<Vec<(u32, u64, u64)>>,
     /// Analyzer per index name: two indexes on one column may differ.
     pub(crate) analyzers_by_index: HashMap<String, String>,
+    /// Whether the three analyzer maps above were reconciled with the catalog.
+    ///
+    /// `CREATE INDEX` is their only writer, so a reopened process has them empty
+    /// until the first `CREATE INDEX`; [`Self::hydrate_analyzers`] fills them once
+    /// per table from the index records' `options`.
+    pub(crate) analyzers_loaded: bool,
     /// Every full-text index of a column, index name → analyzer, sorted by
     /// index name (`SearchDriver::GetAnalyzerName` walks exactly this shape).
     pub(crate) column_index_analyzers: HashMap<String, std::collections::BTreeMap<String, String>>,

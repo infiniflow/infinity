@@ -11211,6 +11211,69 @@ mod tests {
         assert!((pick(&sealed, "2") - pick(&ranked, "2")).abs() < 1e-4);
     }
 
+    /// A reopened directory must keep the analyzer each full-text record was
+    /// created with.
+    ///
+    /// The analyzer maps are written only by `CREATE INDEX`, so a cold handle had
+    /// them empty: `index_tokenizer` fell back to the default tokeniser, and an
+    /// index rebuilt from the persisted rows re-tokenised every row with it. A
+    /// `ngram-3` column then answered nothing (the row became one token `abcdef`
+    /// while the query asks for `bcd`), and a `rankfeatures` one lost its doc
+    /// payload. Both records keep the analyzer in their catalog `options`, which
+    /// `hydrate_analyzers` reads back.
+    #[tokio::test]
+    async fn a_reopened_table_keeps_its_recorded_analyzer() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE rz (id INT, body VARCHAR, feat VARCHAR);")
+            .await
+            .unwrap();
+        e.execute(
+            "INSERT INTO rz VALUES (1,'abcdef','[{\"Tag1\":1}]'),\
+             (2,'abcdef','[{\"Tag1\":2}]');",
+        )
+        .await
+        .unwrap();
+        e.execute("CREATE INDEX rz_body ON rz (body) USING FULLTEXT WITH (analyzer='ngram-3');")
+            .await
+            .unwrap();
+        e.execute(
+            "CREATE INDEX rz_feat ON rz (feat) USING FULLTEXT WITH (analyzer='rankfeatures');",
+        )
+        .await
+        .unwrap();
+        let query = "SELECT id, SCORE() FROM rz SEARCH MATCH TEXT \
+                     ('body','bcd','topn=10;rank_features=feat^Tag1^1');";
+        let warm = rows(&e, query).await;
+        assert_eq!(
+            warm.len(),
+            2,
+            "ngram-3 must match the middle 3-gram: {warm:?}"
+        );
+
+        drop(e);
+        let reopened = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let cold = rows(&reopened, query).await;
+        assert_eq!(
+            cold.len(),
+            2,
+            "a reopened table must keep the ngram-3 analyzer: {cold:?}"
+        );
+        let pick = |rs: &[Vec<String>], id: &str| -> f64 {
+            rs.iter()
+                .find(|r| r[0] == id)
+                .unwrap_or_else(|| panic!("id {id} missing: {rs:?}"))[1]
+                .parse()
+                .unwrap()
+        };
+        assert!((pick(&cold, "1") - pick(&warm, "1")).abs() < 1e-4);
+        assert!((pick(&cold, "2") - pick(&warm, "2")).abs() < 1e-4);
+    }
+
     /// A phrase, a multi-token clause under `operator=and`, and a boolean
     /// similarity query answer from the index's postings and position lists: no
     /// row is re-tokenised (`MATCH_ROWS_TOKENIZED` stays 0), which is what the
