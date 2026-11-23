@@ -3285,16 +3285,20 @@ pub(crate) struct ScanSlot<'a> {
     _permit: tokio::sync::SemaphorePermit<'a>,
 }
 
-/// One multi-vector index in the reference's two forms: the sealed segment
-/// files (`seg_*.mvec` / `seg_*.emvb`, mapped read-only) and the memory tail
-/// holding rows inserted since the last dump. Building the tail at write time
-/// and dumping it on `flush()` keeps the query path read-only.
+/// One multi-vector index: the chunks it published (row ids, plus the EMVB
+/// prefilter for an uncoded column) and the memory tail holding rows inserted
+/// since the last dump.
 ///
-/// A **PLAID** column is the exception, and follows `PlaidIndexInMem`: its chunk
-/// is the index (`chunk_*.idx`, mapped), there is no raw-token `.mvec` beside
-/// it, and the tail is the buffer the index has not taken yet - `build_plaid`
-/// encodes it and releases it, exactly as `buffered_embeddings_` is released
-/// after `BuildIndex`.
+/// It keeps **no vectors of its own**. The column's blocks hold them, and a
+/// search reads a row's tokens straight out of `col_{id}_out`
+/// (`BlockCursor::tensor_scores`). `seal` used to write them to a
+/// `seg_*.mvec` file and map it straight back - a second copy of a column the
+/// block files already store, which this index no longer produces.
+///
+/// A **PLAID** column follows `PlaidIndexInMem`: its chunk is the index
+/// (`chunk_*.idx`, mapped), and the tail is the buffer the index has not taken
+/// yet - `build_plaid` encodes it and releases it, exactly as
+/// `buffered_embeddings_` is released after `BuildIndex`.
 /// One dumped PLAID chunk: the index `PlaidIndexInMem::Dump` wrote, mapped, plus
 /// the row id of each document it holds.
 ///
@@ -3310,26 +3314,29 @@ pub(crate) struct PlaidChunk {
     pub(crate) index: Arc<index::plaid::PlaidIndex>,
 }
 
+/// One sealed chunk: the row ids it covers, and - when the column carries no
+/// more specific index - the in-memory EMVB prefilter that ranks its
+/// candidates.
+pub(crate) type SealedChunk = (Arc<Vec<u64>>, Option<Arc<storage::emvb_segment::EmvbData>>);
+
+/// Scores a batch of row ids out of the tensor column, returning `(row id,
+/// exact score)` for every row it could read.
+pub(crate) type ExactScorer<'a> = &'a mut dyn FnMut(&[u64]) -> Vec<(u64, f32)>;
+
 pub(crate) struct MultiVectorIndex {
     pub(crate) dims: usize,
-    /// This index's chunk root, `idx_{index_id}`, when the catalog knows one.
-    ///
-    /// Chunks are written to `chunk_root/seg_{n}/` - the place the catalog's
-    /// `idx_chunk` records name. `dir` stays as the transient spill directory.
-    pub(crate) chunk_root: Option<PathBuf>,
     pub(crate) dir: PathBuf,
     /// `ROW_ID -> token rows` for documents not yet dumped.
     pub(crate) tail: std::collections::BTreeMap<u64, Vec<Vec<f32>>>,
-    /// One mmap reader per dumped chunk plus the row id of every document and
-    /// the persisted residual PQ (the reference's stage-2 candidate filter).
-    #[allow(clippy::type_complexity)]
-    pub(crate) sealed: Vec<(
-        Arc<storage::multivector_segment::MultiVectorSegmentReader>,
-        Arc<Vec<u64>>,
-        Option<Arc<storage::emvb_segment::EmvbPqIndex>>,
-    )>,
-    /// Chunk ordinal used in file names.
-    pub(crate) next_chunk: u64,
+    /// One published chunk: the rows it covers, and - when the column carries
+    /// no more specific index - the in-memory EMVB prefilter that ranks its
+    /// candidates.
+    ///
+    /// It holds **no vectors**. `seal` used to write them to a `seg_*.mvec`
+    /// file and map it straight back, which was a second copy of a column the
+    /// block files already store; the rows are scored out of the column now
+    /// (`BlockCursor::tensor_scores`).
+    pub(crate) sealed: Vec<SealedChunk>,
     /// Bytes held by `tail`, for the unified memindex budget.
     pub(crate) tail_bytes: usize,
     /// Bumped on every tail mutation; the in-memory EMVB index is rebuilt when
@@ -3542,17 +3549,11 @@ impl MultiVectorIndex {
         smve_config: Option<SmveConfig>,
         emvb_config: Option<EmvbConfig>,
     ) -> Self {
-        // The counter is seeded from the catalog once the owner knows the index
-        // (`attach_mv_chunk_root`); counting the directory would hand out an id
-        // a file still holds, or skip one a cleanup removed.
-        let next_chunk = 0u64;
         Self {
             dims,
-            chunk_root: None,
             dir,
             tail: Default::default(),
             sealed: Vec::new(),
-            next_chunk,
             tail_bytes: 0,
             tail_generation: 0,
             tail_emvb: std::sync::Mutex::new(None),
@@ -3575,11 +3576,7 @@ impl MultiVectorIndex {
         // Every document the index can answer for: the buffer neither index has
         // taken, the memory index, and each dumped chunk.
         self.tail.len()
-            + self
-                .sealed
-                .iter()
-                .map(|(r, _, _)| r.doc_count())
-                .sum::<usize>()
+            + self.sealed.iter().map(|(ids, _)| ids.len()).sum::<usize>()
             + self.plaid.as_ref().map_or(0, |p| p.doc_num() as usize)
             + self
                 .plaid_chunks
@@ -3974,32 +3971,24 @@ impl MultiVectorIndex {
         }
     }
 
-    /// Dumps the memory tail into per-segment files (one `ROW_ID` segment per
-    /// file, the reference's chunk dump) and keeps their mmap readers.
+    /// Publishes the memory tail as one chunk per `ROW_ID` segment: the row ids
+    /// it covers plus, for an uncoded column, the in-memory EMVB prefilter.
+    ///
+    /// The chunk used to be a `seg_*.mvec` file holding a copy of the tokens,
+    /// mapped straight back. The block files already hold them, so a chunk is
+    /// now the list of rows it published and the vectors are read from the
+    /// column at search time (`BlockCursor::tensor_scores`).
     pub(crate) fn seal(&mut self) {
-        // A PLAID column's chunk **is** the index (`write_plaid_index`), which
-        // the reference writes from `PlaidIndexInMem::Dump`; it has no raw-token
-        // file beside it. Writing one here put a second copy of every vector on
-        // disk - the tokens in `.mvec`, the same tokens as centroid ids and
-        // residual codes in the chunk - and the reader then had two structures
-        // for one set of rows, which disagreed as soon as one of them lagged.
-        // The tail is not sealed here either: `build_plaid` owns it, and the
-        // rows it could not take are the ones the search scores exactly.
+        // A PLAID column's chunk **is** the index (`write_plaid_index`); its
+        // tail is `build_plaid`'s input, and the rows the cap left behind are
+        // scored exactly from the column. Publishing them here would count them
+        // twice: `doc_count` adds the mirror's documents and this list.
         if self.plaid_config.is_some() {
             return;
         }
         if self.tail.is_empty() {
             return;
         }
-        // The reference's chunk is the memory index it dumps, so the two that
-        // live in memory (SMVE, and EMVB over the tail) have to be built from
-        // these documents **before** the tail is taken - the chunk writer
-        // serializes them, it does not rebuild from the rows.
-        // Nothing here builds the memory-side indexes: the tail is taken below
-        // and dumped to segment files, and after that the search path reads
-        // `self.sealed` only. Building them first is work whose result is
-        // thrown away one line later (`build_emvb_tail` cost 1.0-1.5 s of a
-        // 20k-row create, and `build_smve` another 4.2 s).
         #[allow(clippy::type_complexity)]
         let mut by_segment: std::collections::BTreeMap<u64, Vec<(u64, Vec<Vec<f32>>)>> =
             Default::default();
@@ -4010,40 +3999,16 @@ impl MultiVectorIndex {
         self.tail_generation += 1;
         for (segment, mut rows) in by_segment {
             rows.sort_by_key(|(seq, _)| *seq);
-            let ids: Vec<u64> = rows.iter().map(|(seq, _)| *seq).collect();
-            let docs: Vec<Vec<Vec<f32>>> = rows.into_iter().map(|(_, doc)| doc).collect();
-            // A dumped chunk belongs in the segment's own directory, the place
-            // its catalog record names; `dir` is the transient spill area.
-            let out_dir = match &self.chunk_root {
-                Some(root) => root.join(format!("seg_{segment}")),
-                None => self.dir.clone(),
-            };
-            if std::fs::create_dir_all(&out_dir).is_err() {
-                continue;
-            }
-            let name = format!("seg_{segment}_{}_{}.mvec", self.next_chunk, docs.len());
-            self.next_chunk += 1;
-            let path = out_dir.join(name);
-            if storage::multivector_segment::write_multivector_segment(&path, self.dims, &docs)
-                .is_err()
-            {
-                continue;
-            }
-            // The reference's EMVB chunk (coarse centroids, document tables and
-            // inverted lists) lives beside the raw-token segment. It is what
-            // `SEARCH MATCH TENSOR` prefilters through before scoring the
-            // survivors from the raw tokens - but only when the query reaches
-            // that path: a PLAID or SMVE index answers from its own structures
-            // and returns before the EMVB chunks are consulted, so building one
-            // for such a column was 1.5 s of a 20k-row create that no query
-            // could read. Build it when nothing more specific will answer.
+            let ids: Arc<Vec<u64>> = Arc::new(rows.iter().map(|(seq, _)| *seq).collect());
+            // The prefilter ranks candidates; it is a PQ code per token, not a
+            // copy of the vectors, so it stays in memory. A PLAID or SMVE index
+            // answers from its own structures and never consults it, which is
+            // why it is only built when nothing more specific will answer.
             let pq = if self.wants_emvb_chunk() {
-                // Borrow the token rows so sealing does not duplicate the
-                // vectors.
-                let emvb: Vec<(u32, &[Vec<f32>])> = docs
+                let emvb: Vec<(u32, &[Vec<f32>])> = rows
                     .iter()
                     .zip(ids.iter())
-                    .map(|(doc, seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
+                    .map(|((_, doc), seq)| ((*seq & 0xffff_ffff) as u32, doc.as_slice()))
                     .collect();
                 let (subspace_num, subspace_bits) = match self.emvb_config {
                     Some(cfg) => (cfg.subspace_num, cfg.subspace_bits),
@@ -4051,35 +4016,32 @@ impl MultiVectorIndex {
                     // makes for a column without one.
                     None => (if self.dims.is_multiple_of(8) { 8 } else { 1 }, 8),
                 };
-                let _ = storage::emvb_segment::write_emvb_segment_refs_with(
-                    &path.with_extension("emvb"),
+                Some(Arc::new(storage::emvb_segment::build_emvb_with(
                     self.dims,
                     (segment & 0xffff_ffff) as u32,
                     &emvb,
                     subspace_num,
                     subspace_bits,
-                );
-                storage::emvb_segment::EmvbReader::open(&path.with_extension("emvb"))
-                    .ok()
-                    .and_then(|r| r.pq_index())
-                    .map(Arc::new)
+                )))
             } else {
                 None
             };
-            if let Ok(reader) = storage::multivector_segment::MultiVectorSegmentReader::open(&path)
-            {
-                self.sealed.push((Arc::new(reader), Arc::new(ids), pq));
-            }
+            self.sealed.push((ids, pq));
         }
     }
 
     /// Top-k over sealed chunks and the memory tail, skipping tombstoned rows.
+    ///
+    /// `exact` scores rows out of the column for the paths that have no coded
+    /// index (the published chunks, an SMVE re-rank). It takes a batch because
+    /// a row is one `&[f32]` slice of a block: scoring them one at a time would
+    /// re-map the same block per candidate.
     pub(crate) fn search(
         &self,
         query: &[Vec<f32>],
         k: usize,
         dead: &common::RowBitmap,
-        exact: Option<&dyn Fn(u64) -> Option<f32>>,
+        mut exact: Option<ExactScorer<'_>>,
         plaid: &PlaidSearchOptions,
         allowed: Option<&std::collections::HashSet<u64>>,
     ) -> Vec<(u64, f32)> {
@@ -4192,13 +4154,23 @@ impl MultiVectorIndex {
                     .iter()
                     .zip(&scores)
                     .filter_map(|(doc, score)| {
-                        self.smve_seqs.get(*doc as usize).map(|seq| {
-                            let rank = exact.and_then(|f| f(*seq)).unwrap_or(*score);
-                            (*seq, rank)
-                        })
+                        self.smve_seqs.get(*doc as usize).map(|seq| (*seq, *score))
                     })
                     .filter(|(seq, _)| !dead.contains(*seq))
                     .collect();
+                // The BMP ranks candidates; the score the caller sees is the
+                // exact one, read from the column.
+                if let Some(rank) = exact.as_mut() {
+                    let rank: ExactScorer<'_> = &mut **rank;
+                    let seqs: Vec<u64> = hits.iter().map(|(seq, _)| *seq).collect();
+                    let scored: std::collections::HashMap<u64, f32> =
+                        rank(&seqs).into_iter().collect();
+                    for (seq, approx) in hits.iter_mut() {
+                        if let Some(exact) = scored.get(seq) {
+                            *approx = *exact;
+                        }
+                    }
+                }
                 // Same rule as the PLAID branch: a short answer means the BMP
                 // candidates did not cover the query, and the exact scans below
                 // are what makes `topn` mean `topn`.
@@ -4218,24 +4190,36 @@ impl MultiVectorIndex {
         // rejects is never a candidate, so the cuts below count rows the query
         // may actually return.
         let keep = |seq: u64| !dead.contains(seq) && allowed.is_none_or(|set| set.contains(&seq));
-        for (reader, ids, pq) in &self.sealed {
-            // The persisted residual codes rank the documents (EMVB stage 2);
-            // the survivors are re-scored exactly from the raw tokens.
+        // A published chunk holds no vectors any more: its prefilter names the
+        // candidates and the column scores them, one batch for every chunk.
+        let mut candidates: Vec<u64> = Vec::new();
+        for (ids, pq) in &self.sealed {
             let admit = |doc: usize| ids.get(doc).copied().is_some_and(keep);
             let docs: Vec<usize> = match pq {
                 // `candidate_docs_filtered`: the filter is part of the prefilter,
                 // not a pass over its answer. Applied afterwards, a chunk of
                 // deleted rows used up the candidate budget and the query came
                 // back short of `k` while live rows were still there.
-                Some(pq) if reader.doc_count() > 256 => {
-                    pq.prefilter_filtered(query, (k * 4).max(64).min(reader.doc_count()), &admit)
+                Some(pq) if ids.len() > 256 => {
+                    let want = (k * 4).max(64).min(ids.len());
+                    pq.view()
+                        .search_filtered(
+                            query,
+                            want,
+                            index::emvb::EmvbSearchOptions::for_topk(want),
+                            &admit,
+                        )
+                        .into_iter()
+                        .map(|(doc, _)| doc as usize)
+                        .collect()
                 }
-                _ => (0..reader.doc_count()).filter(|doc| admit(*doc)).collect(),
+                _ => (0..ids.len()).filter(|doc| admit(*doc)).collect(),
             };
-            for doc in docs {
-                let Some(seq) = ids.get(doc) else { continue };
-                hits.push((*seq, reader.maxsim(query, doc)));
-            }
+            candidates.extend(docs.into_iter().filter_map(|doc| ids.get(doc).copied()));
+        }
+        if let Some(rank) = exact.as_mut() {
+            let rank: ExactScorer<'_> = &mut **rank;
+            hits.extend(rank(&candidates));
         }
         // The memory segment: once the tail holds enough embeddings the
         // reference builds an in-memory `EMVBIndex` and searches it; the

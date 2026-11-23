@@ -5,10 +5,11 @@ edition.workspace = true
 license.workspace = true
 
 [lib]
-# The shared library a host process (rgrep's daemon) loads: the engine runs
-# inside that process, so its lifetime is the host's.
+# The engine a host process links in: `staticlib` is what rgrep's Go binary
+# links (one file to ship, no dlopen, no library search path), `cdylib` stays
+# for a host that prefers to load it at runtime.
 name = "infinity_embedded"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 executor.workspace = true

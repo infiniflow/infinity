@@ -420,14 +420,13 @@ impl Engine {
                     continue;
                 }
                 let key = crate::engine::state::mem_index_key(&table, meta.id);
-                let mut index = MultiVectorIndex::new(
+                let index = MultiVectorIndex::new(
                     self.dir.join("multivector").join(key.replace('/', "_")),
                     dims,
                     self.mv_plaid_config(&table, &meta.name),
                     self.mv_smve_config(&table, &meta.name),
                     self.mv_emvb_config(&table, &meta.name),
                 );
-                self.attach_mv_chunk_root(&table, meta.id, &mut index);
                 self.tables
                     .lock()
                     .unwrap()
@@ -1369,18 +1368,19 @@ impl Engine {
         // upper bound only, and a column of NULL/tensor-invalid cells would
         // make every dump look necessary.
         let rows = if meta.index_type.eq_ignore_ascii_case("PLAID") {
-            let Some(dims) = self
+            // Only the count is needed, and a tensor cell exists exactly when
+            // its slot holds a non-empty tensor - rendering every row to answer
+            // "how many documents" cost ~66 s on a 62 k-row table
+            // (`tensor_row_ids` reads the slot word and the null bitmap).
+            let Some(ci) = self
                 .table_schema(table)
                 .ok()
                 .and_then(|s| s.iter().position(|c| c == &meta.column))
-                .and_then(|ci| self.column_types(table).ok()?.get(ci).cloned())
-                .and_then(|t| crate::type_dim(&t))
             else {
                 return false;
             };
-            self.column_docs(table, &meta.column, dims)
-                .await
-                .map(|docs| docs.len() as u64)
+            self.tensor_row_ids(table, ci)
+                .map(|ids| ids.len() as u64)
                 .unwrap_or(0)
         } else {
             // IVF: the writer's coverage is `column_vectors`, which skips a
@@ -1776,9 +1776,12 @@ impl Engine {
 
     /// Seals one index's memory tail into its spill/chunk files, in the form
     /// its kind dumps it: a secondary tail becomes `seg_{s}_tail{n}.idx`, a
-    /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, a
-    /// multi-vector tail its `.mvec` chunk, an HNSW memory graph a
-    /// `chunk_{id}.idx`, and IVF rewrites its per-segment `chunk_0.idx`.
+    /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, an
+    /// HNSW memory graph a `chunk_{id}.idx`, and IVF rewrites its per-segment
+    /// `chunk_0.idx`.
+    ///
+    /// A multi-vector tail writes **no file**: its chunk is the list of row ids
+    /// it published, and the vectors stay in the column's blocks.
     ///
     /// The dump transaction calls this before `publish_index_chunks`, so the
     /// chunks it publishes are the ones this statement sealed and carry its
@@ -1820,8 +1823,9 @@ impl Engine {
             // load used to append here too, which left a chunk nothing had
             // recorded.
             //
-            // No raw-token `.mvec` beside it: the reference has no such file for
-            // a PLAID column, and one here held a second copy of every vector.
+            // No raw-token file beside it, and none for any other multi-vector
+            // kind either: the chunk *is* the index, and an uncoded column is
+            // scored from its blocks.
             if self.write_plaid_index(&table, &meta.name).await.is_ok() {
                 // A reused instance must not serve the rows the chunk now
                 // holds from its memory tail.

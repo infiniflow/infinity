@@ -470,6 +470,129 @@ impl<'a> BlockCursor<'a> {
         Ok(())
     }
 
+    /// `MaxSim` for the rows `ids` name, scored straight out of the column's
+    /// blocks: one decode per block the ids touch, no text round trip.
+    ///
+    /// This is what lets the multi-vector index keep only the row ids it
+    /// published instead of its own copy of the vectors (the `.mvec` segment
+    /// files it used to write): the column already holds them, and a row's
+    /// tokens are one `&[f32]` slice of the block's outline.
+    pub(crate) fn tensor_scores(
+        &mut self,
+        col: usize,
+        dim: usize,
+        query: &[Vec<f32>],
+        ids: &[u64],
+        out: &mut Vec<(u64, f32)>,
+    ) -> Result<()> {
+        if dim == 0 || ids.is_empty() {
+            return Ok(());
+        }
+        let tensor = crate::blocks::engine::TensorColumn {
+            declared: &self.meta.types,
+            storage: &self.types,
+            col,
+        };
+        // The ids arrive in query order, not row order: group them so each block
+        // is mapped once. The slot is the low 32 bits of the row id modulo the
+        // block capacity (`ROW_ID = segment << 32 | block * capacity + slot`).
+        #[allow(clippy::type_complexity)]
+        let mut by_block: std::collections::BTreeMap<(u32, u16), Vec<(u64, usize)>> =
+            Default::default();
+        for seq in ids {
+            let row = (*seq & 0xffff_ffff) as usize;
+            by_block
+                .entry(((seq >> 32) as u32, (row / DEFAULT_BLOCK_CAPACITY) as u16))
+                .or_default()
+                .push((*seq, row % DEFAULT_BLOCK_CAPACITY));
+        }
+        let db_id = self.engine.database_id_of(&self.table);
+        let table_id = self.meta.id;
+        let mut answered: std::collections::HashSet<u64> =
+            std::collections::HashSet::with_capacity(ids.len());
+        for ((segment, block_id), rows) in by_block {
+            if !self.visible.contains(&(segment, block_id)) {
+                continue;
+            }
+            let id = BlockId {
+                db_id,
+                table_id,
+                segment_id: segment,
+                block_id,
+            };
+            let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                continue;
+            };
+            let version = block.version();
+            let Some((slots, outline, _live)) =
+                self.engine
+                    .block_tensor_body(&self.meta.ids, tensor, version, block.as_ref())
+            else {
+                continue;
+            };
+            for (seq, slot) in rows {
+                if version.deleted.get(slot).copied().unwrap_or(0) != 0 || self.dead.contains(seq) {
+                    continue;
+                }
+                let at = slot * 8;
+                let Some(bytes) = slots.get(at..at + 8) else {
+                    continue;
+                };
+                let Ok(word) = <[u8; 8]>::try_from(bytes) else {
+                    continue;
+                };
+                let word = u64::from_le_bytes(word);
+                let count = (word & 0xffff) as usize;
+                let offset = (word >> 16) as usize;
+                if count == 0 {
+                    continue;
+                }
+                let score = match storage::definition::fixed_f32::tensor_rows_f32(
+                    outline, offset, count, dim,
+                ) {
+                    Some(tokens) => storage::simd::maxsim_f32_rows(query, &tokens),
+                    None => {
+                        // A misaligned outline: decode instead of borrowing.
+                        let Some(owned) = storage::definition::fixed_f32::copy_tensor_rows(
+                            outline, offset, count, dim,
+                        ) else {
+                            continue;
+                        };
+                        let tokens: Vec<&[f32]> = owned.iter().map(Vec::as_slice).collect();
+                        storage::simd::maxsim_f32_rows(query, &tokens)
+                    }
+                };
+                out.push((seq, score));
+                answered.insert(seq);
+            }
+        }
+        // Rows a commit appended since the last checkpoint have no block bytes:
+        // their cell is parsed from the text it was written as, the same value
+        // the seal will one day write into a block.
+        let missing: Vec<u64> = ids
+            .iter()
+            .copied()
+            .filter(|seq| !answered.contains(seq))
+            .collect();
+        if !missing.is_empty() {
+            let wanted: std::collections::HashSet<u64> = missing.into_iter().collect();
+            for (row, values) in self.engine.pending_rows_of(&self.table) {
+                let seq = row as u64;
+                if !wanted.contains(&seq) || self.dead.contains(seq) {
+                    continue;
+                }
+                let Some(Value::Str(text)) = values.get(col) else {
+                    continue;
+                };
+                let Some(doc) = crate::engine::state::parse_multivector_doc(text, dim) else {
+                    continue;
+                };
+                out.push((seq, storage::simd::maxsim_f32(query, &doc)));
+            }
+        }
+        Ok(())
+    }
+
     /// One **block** of the embedding column at a time, as `f32`.
     ///
     /// [`Self::vectors`] materialises the whole column before returning, which

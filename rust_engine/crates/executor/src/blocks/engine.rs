@@ -139,6 +139,20 @@ pub(crate) struct EmbeddingColumn<'a> {
     pub element_type: i32,
 }
 
+/// A `TENSOR`/`MULTIVECTOR` column of one block: the variable-length twin of
+/// [`EmbeddingColumn`]. Its rows are slot/page pairs in the column's `.col` and
+/// their tokens live in `col_{id}_out`, so a reader needs the outline as well
+/// as the body.
+#[derive(Clone, Copy)]
+pub(crate) struct TensorColumn<'a> {
+    /// The declared types (`IndexMeta`/table meta `types`), in column order.
+    pub declared: &'a [String],
+    /// The storage types, in column order.
+    pub storage: &'a [i32],
+    /// Position of the tensor column.
+    pub col: usize,
+}
+
 fn value_cell_text(values: &[Value], col: usize) -> std::borrow::Cow<'_, str> {
     match values.get(col) {
         Some(value) => std::borrow::Cow::Owned(mirror_cell_text(value)),
@@ -5133,6 +5147,51 @@ impl Engine {
         Some((body_data, slots))
     }
 
+    /// A tensor column's slot array and outline, plus the slots that hold a
+    /// non-empty row.
+    ///
+    /// The slot is `u64 { count : 16; offset : 48 }` and the payload is the raw
+    /// concatenation in `col_{id}_out`, so one row's tokens are
+    /// `outline[offset .. offset + count * dim * 4]` - readable as `&[f32]`
+    /// without rendering the row to text.
+    pub(crate) fn block_tensor_body<'a>(
+        &self,
+        ids: &[u64],
+        tensor: TensorColumn<'_>,
+        version: &storage::definition::format::BlockVersionFile,
+        columns: &'a dyn BlockColumns,
+    ) -> Option<(&'a [u8], &'a [u8], Vec<usize>)> {
+        let row_count: usize = version
+            .created
+            .last()
+            .map(|c| c.cumulative_row_count as usize)
+            .unwrap_or(0);
+        let column_id = ids.get(tensor.col).copied().unwrap_or(tensor.col as u64);
+        let (body, outline) = columns.column(column_id)?;
+        let layout = layout_of(
+            tensor.declared.get(tensor.col)?,
+            *tensor.storage.get(tensor.col)?,
+        )?;
+        let (body_data, body_null) =
+            storage::definition::format::split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+        let mut slots: Vec<usize> = Vec::with_capacity(row_count.min(64));
+        for slot in 0..row_count {
+            if version.deleted.get(slot).copied().unwrap_or(0) != 0 {
+                continue;
+            }
+            if body_null.len() > slot / 8 && body_null[slot / 8] & (1 << (slot % 8)) == 0 {
+                continue;
+            }
+            let at = slot.checked_mul(8)?;
+            let word = u64::from_le_bytes(body_data.get(at..at + 8)?.try_into().ok()?);
+            if word & 0xffff == 0 {
+                continue;
+            }
+            slots.push(slot);
+        }
+        Some((body_data, outline, slots))
+    }
+
     pub(crate) fn decode_vectors_of_block(
         ids: &[u64],
         vector: EmbeddingColumn<'_>,
@@ -8623,32 +8682,6 @@ impl Engine {
         options
     }
 
-    /// The tensor documents of `table.column` as `(row id, tokens)`.
-    pub(crate) async fn column_docs(
-        &self,
-        table: &str,
-        column: &str,
-        dims: usize,
-    ) -> Result<Vec<(u32, Vec<Vec<f32>>)>> {
-        let schema = self.table_schema(table)?;
-        let col_idx = schema
-            .iter()
-            .position(|c| c == column)
-            .ok_or_else(|| Error::NotFound(format!("column '{column}' on '{table}'")))?;
-        let mut out = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table).await? {
-            let text = match row.get(col_idx) {
-                Some(Value::Str(s)) => s.clone(),
-                Some(other) => other.to_slt_string(),
-                None => continue,
-            };
-            if let Some(doc) = crate::parse_multivector_doc(&text, dims) {
-                out.push((seq as u32, doc));
-            }
-        }
-        Ok(out)
-    }
-
     /// The row ids of the tensor documents of `table.column`, ascending - the
     /// rows a PLAID chunk's document offsets were dumped from.
     ///
@@ -8691,7 +8724,7 @@ impl Engine {
             };
             // The null bitmap is the tail of the column body, after the data
             // region: splitting is arithmetic, so no column byte is read.
-            let (_, null) = split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
+            let (data, null) = split_body_refs(body, DEFAULT_BLOCK_CAPACITY, layout);
             let version = block.version();
             let created_at = Self::created_at(version, read_ts);
             for slot in 0..created_at {
@@ -8704,6 +8737,18 @@ impl Engine {
                     .get(slot / 8)
                     .is_some_and(|byte| byte & (1 << (slot % 8)) != 0)
                 {
+                    continue;
+                }
+                // A slot that exists always renders, but an empty tensor
+                // (`[]`, count 0) is not a document and the chunk writer never
+                // counted it. The count is the low half of the slot word.
+                let Some(word) = data.get(slot * 8..slot * 8 + 8) else {
+                    continue;
+                };
+                let Ok(word) = <[u8; 8]>::try_from(word) else {
+                    continue;
+                };
+                if u64::from_le_bytes(word) & 0xffff == 0 {
                     continue;
                 }
                 let seq = ((id.segment_id as usize) << 32)
@@ -8724,7 +8769,8 @@ impl Engine {
                 continue;
             };
             let text = text.trim();
-            if text.starts_with('[') && text.ends_with(']') {
+            // `[]` is an empty tensor: the writer never counted it either.
+            if text.len() > 2 && text.starts_with('[') && text.ends_with(']') {
                 out.push(seq as u64);
             }
         }
@@ -8743,13 +8789,24 @@ impl Engine {
     /// the first dump did. Tombstoned slots are skipped, exactly as
     /// `fetch_rows_with_ids` skips them.
     ///
-    /// The walk is what keeps an index build bounded. The previous path
-    /// (`column_docs`) built **every** row of the table as `Value`s, cloned each
-    /// cell's text, parsed it into `Vec<Vec<f32>>` (one allocation per token)
-    /// and then flattened a second full copy - four whole-table images live at
-    /// once, which is where the GBs came from on a tensor table. Here a block is
-    /// decoded, its documents are handed over, and both are dropped before the
-    /// next one.
+    /// The walk is what keeps an index build bounded. The path this replaced
+    /// built **every** row of the table as `Value`s, cloned each cell's text,
+    /// parsed it into `Vec<Vec<f32>>` (one allocation per token) and then
+    /// flattened a second full copy - four whole-table images live at once,
+    /// which is where the GBs came from on a tensor table. Here one block is
+    /// mapped, its documents are handed over as slices of the outline, and both
+    /// are dropped before the next one.
+    ///
+    /// A document is handed over as the **column's own `f32`**, borrowed from
+    /// `col_{id}_out`: a `MULTIVECTOR` block stores one `{count, offset}` slot
+    /// per row and the token vectors back to back, so there is nothing to
+    /// render. The textual path it replaced rendered every float of every row
+    /// (`decode_tensor_value`) and parsed the result back into `Vec<Vec<f32>>`:
+    /// roughly 1.4 GB of text per pass on rgrep's 62 k-row table, and a PLAID
+    /// build makes two passes.
+    ///
+    /// A non-`f32` element type (`BIT` tensors) still renders: its rows are
+    /// bit-packed per token, and no index holds that shape anyway.
     ///
     /// Returns `true` when `each` asked to stop.
     fn for_each_tensor_doc(
@@ -8758,7 +8815,7 @@ impl Engine {
         col: usize,
         dims: usize,
         skip: usize,
-        each: &mut dyn FnMut(u64, Vec<Vec<f32>>) -> bool,
+        each: &mut dyn FnMut(u64, &[&[f32]]) -> bool,
     ) -> bool {
         let table = self.qualified_table(table);
         let Ok(Some(meta)) = self.storage.catalog.get_table_by_name(&table) else {
@@ -8777,6 +8834,11 @@ impl Engine {
         let dead = self.deleted_set(&table);
         let root = self.blocks_root();
         let wanted = [col];
+        // The element type decides the path: a `FLOAT` tensor borrows its
+        // tokens out of the outline, anything else (a `BIT` tensor) still has
+        // to be rendered.
+        let elem = tensor_shape(meta.types.get(col).map(String::as_str).unwrap_or(""))
+            .map(|(_, _, elem)| elem);
         // Rows per block, read once from the block metas. The watermark is a
         // **document** offset, so a block that ends before it contributes nothing
         // and must not be decoded: parsing every mirrored row on every dump is
@@ -8810,6 +8872,66 @@ impl Engine {
                     }
                 }
             }
+            if elem == Some(6) {
+                let Ok(block) = self.block_map(&table, &root, id) else {
+                    continue;
+                };
+                let version = block.version();
+                let Some((slots, outline, live)) = self.block_tensor_body(
+                    &meta.ids,
+                    TensorColumn {
+                        declared: &meta.types,
+                        storage: &types,
+                        col,
+                    },
+                    version,
+                    block.as_ref(),
+                ) else {
+                    continue;
+                };
+                let base = ((id.segment_id as u64) << 32)
+                    | (id.block_id as u64 * crate::blocks::DEFAULT_BLOCK_CAPACITY as u64);
+                for slot in live {
+                    let seq = base + slot as u64;
+                    if dead.contains(seq) {
+                        continue;
+                    }
+                    if seen < skip {
+                        seen += 1;
+                        continue;
+                    }
+                    let Some(word) = slots.get(slot * 8..slot * 8 + 8) else {
+                        continue;
+                    };
+                    let Ok(word) = <[u8; 8]>::try_from(word) else {
+                        continue;
+                    };
+                    let word = u64::from_le_bytes(word);
+                    let count = (word & 0xffff) as usize;
+                    let offset = (word >> 16) as usize;
+                    let owned: Vec<Vec<f32>>;
+                    let rows: Vec<&[f32]> = if let Some(rows) =
+                        storage::definition::fixed_f32::tensor_rows_f32(
+                            outline, offset, count, dims,
+                        ) {
+                        rows
+                    } else {
+                        // A misaligned outline: decode instead of borrowing.
+                        owned = match storage::definition::fixed_f32::copy_tensor_rows(
+                            outline, offset, count, dims,
+                        ) {
+                            Some(rows) => rows,
+                            None => continue,
+                        };
+                        owned.iter().map(Vec::as_slice).collect()
+                    };
+                    seen += 1;
+                    if !each(seq, &rows) {
+                        return true;
+                    }
+                }
+                continue;
+            }
             let Some(cells) =
                 self.decode_block_cells(&table, &root, &meta, &types, id, Some(&wanted))
             else {
@@ -8830,7 +8952,8 @@ impl Engine {
                 }
                 if let Some(doc) = crate::parse_multivector_doc(text, dims) {
                     seen += 1;
-                    if !each(seq as u64, doc) {
+                    let rows: Vec<&[f32]> = doc.iter().map(Vec::as_slice).collect();
+                    if !each(seq as u64, &rows) {
                         return true;
                     }
                 }
@@ -8853,7 +8976,8 @@ impl Engine {
             }
             if let Some(doc) = crate::parse_multivector_doc(&text, dims) {
                 seen += 1;
-                if !each(seq as u64, doc) {
+                let rows: Vec<&[f32]> = doc.iter().map(Vec::as_slice).collect();
+                if !each(seq as u64, &rows) {
                     return true;
                 }
             }
@@ -8894,7 +9018,7 @@ impl Engine {
             sample.reserve(sample_limit * dims);
             let mut rng = 0x9E37_79B9_7F4A_7C15u64;
             self.for_each_tensor_doc(table, col, dims, skip, &mut |_seq, doc| {
-                for token in &doc {
+                for token in doc {
                     total += 1;
                     if token.len() != dims {
                         continue;
@@ -9043,7 +9167,7 @@ impl Engine {
                     self.reclaim_memory(0, true);
                 }
             }
-            for token in &doc {
+            for token in doc {
                 flat.extend_from_slice(token);
             }
             lens.push(doc.len() as u32);

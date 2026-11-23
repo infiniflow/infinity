@@ -5584,62 +5584,6 @@ impl Engine {
         Ok(chunks)
     }
 
-    /// Builds (once) the multi-vector index of a column from its rows: every
-    /// document goes to the memory tail and is dumped immediately, so later
-    /// queries only map the segment files. Subsequent inserts append to the
-    /// tail and `flush()` seals it (the reference's dump).
-    /// Points a multi-vector index at its catalog chunk directory and takes its
-    /// chunk counter from the catalog (`GetAndSetNextChunkID`).
-    pub(crate) fn attach_mv_chunk_root(
-        &self,
-        table: &str,
-        index_id: u64,
-        index: &mut MultiVectorIndex,
-    ) {
-        let qualified = self.qualified_table(table);
-        let Some(meta) = self
-            .storage
-            .catalog
-            .get_table_by_name(&qualified)
-            .ok()
-            .flatten()
-        else {
-            return;
-        };
-        if index_id == 0 {
-            return;
-        }
-        let db_id = self.database_id_of(&qualified);
-        index.chunk_root = Some(
-            self.blocks_root()
-                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
-        );
-        // `GetAndSetNextChunkID` over every segment of this index.
-        let mut next = 0u32;
-        let Ok(layers) = catalog::layout::read_index_chunks(
-            self.storage.catalog.store().as_ref(),
-            &db_id.to_string(),
-            &meta.id.to_string(),
-            &index_id.to_string(),
-        ) else {
-            return;
-        };
-        for (segment, chunks) in layers {
-            let from_tag = self
-                .storage
-                .catalog
-                .next_chunk_id(&db_id.to_string(), &meta.id.to_string(), index_id, segment)
-                .unwrap_or(0);
-            let from_records = chunks
-                .iter()
-                .map(|(id, _)| *id as u32 + 1)
-                .max()
-                .unwrap_or(0);
-            next = next.max(from_tag).max(from_records);
-        }
-        index.next_chunk = u64::from(next);
-    }
-
     /// The multi-vector index a `MATCH TENSOR` on `column` resolves to: the
     /// column's first `PLAID`/`SMVE`/`EMVB` record, or an error when it has
     /// none (`PhysicalMatchTensorScan::PlanWithIndex` leaves such a column to
@@ -5755,7 +5699,6 @@ impl Engine {
                             self.mv_smve_config(table, &index_name),
                             self.mv_emvb_config(table, &index_name),
                         );
-                        self.attach_mv_chunk_root(table, index_id, &mut index);
                         index.scanned_rows = reserved;
                         let mut known: std::collections::HashSet<u64> =
                             std::collections::HashSet::new();
@@ -5877,7 +5820,6 @@ impl Engine {
                             self.mv_smve_config(table, &index_name),
                             self.mv_emvb_config(table, &index_name),
                         );
-                        self.attach_mv_chunk_root(table, index_id, &mut index);
                         index.scanned_rows = reserved;
                         // No `load_sealed` beside PLAID: the chunk the reference
                         // writes for this index is the index itself, and there is no
@@ -5955,11 +5897,11 @@ impl Engine {
                 }
             }
         }
-        // A rebuild rewrites the chunk set; drop stale files so the readers
-        // never mix two builds. `seal` writes under `chunk_root/seg_{n}`, so a
-        // sweep of the transient `dir` alone left every earlier generation in
-        // place - and `load_sealed` loads any `.mvec` whose document count
-        // matches, so a stale generation could be served instead of the new one.
+        // `seal` writes no segment files any more, so a rebuild leaves nothing
+        // of its own behind - but a directory written before that change still
+        // holds the raw-token copies (`seg_*.mvec`) and their EMVB companions.
+        // Nothing reads them now; sweep them so a rebuild does not leave a
+        // second copy of the column on disk.
         let mut roots = vec![dir.clone()];
         if let Some(meta) = self.storage.catalog.get_table_by_name(table).ok().flatten() {
             roots.push(self.blocks_root().join(format!(
@@ -5982,7 +5924,6 @@ impl Engine {
             self.mv_smve_config(table, &index_name),
             self.mv_emvb_config(table, &index_name),
         );
-        self.attach_mv_chunk_root(table, index_id, &mut index);
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -6170,7 +6111,7 @@ impl Engine {
     }
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
-    /// chunk was written in (`plaid_chunk` -> `column_docs`).
+    /// chunk was written in (`plaid_chunk` -> `for_each_tensor_doc`).
     ///
     /// `fetch_rows_with_ids` is the *live* population, which is what the chunk
     /// writer reads: a tombstoned row is not in a chunk, so listing it here
@@ -6324,30 +6265,31 @@ impl Engine {
         Some(cfg)
     }
 
-    /// Exact MaxSim of one row against `query`, read from the row
-    /// (used to re-rank SMVE candidates the way the reference reads the column).
-    pub(crate) fn exact_tensor_score(
+    /// Exact MaxSim for `seqs`, read from the column's blocks.
+    ///
+    /// One block decode per block the rows touch and a `&[f32]` borrow per
+    /// token: this is the scoring path the multi-vector index uses for
+    /// everything it published, and the SMVE re-rank.
+    pub(crate) fn tensor_scores(
         &self,
         table: &str,
         column: &str,
         dims: usize,
         query: &[Vec<f32>],
-        seq: u64,
-    ) -> Option<f32> {
-        let schema = self.table_schema(table).ok()?;
-        let ci = schema.iter().position(|c| c == column)?;
-        let cells = self
-            .fetch_some_rows_with_ids(table, &[seq])
-            .ok()?
-            .into_iter()
-            .next()?
-            .1;
-        let text = match cells.get(ci)? {
-            Value::Str(s) => s.clone(),
-            other => other.to_slt_string(),
-        };
-        let doc = parse_multivector_doc(&text, dims)?;
-        Some(maxsim_tokens(query, &doc))
+        seqs: &[u64],
+    ) -> Result<Vec<(u64, f32)>> {
+        if seqs.is_empty() {
+            return Ok(Vec::new());
+        }
+        let schema = self.table_schema(table)?;
+        let ci = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let mut cursor = crate::blocks::BlockCursor::new(self, table)?;
+        let mut out = Vec::with_capacity(seqs.len());
+        cursor.tensor_scores(ci, dims, query, seqs, &mut out)?;
+        Ok(out)
     }
 
     /// Test-only: the id of the **first secondary** index on `column`.
@@ -10877,8 +10819,9 @@ impl Engine {
                             .unwrap_or(false);
                         if let Some(index) = index.filter(|_| usable) {
                             let dead = self.tombstone_set(table)?;
-                            let rank = |seq: u64| {
-                                self.exact_tensor_score(table, &column, dims, &query, seq)
+                            let mut rank = |seqs: &[u64]| -> Vec<(u64, f32)> {
+                                self.tensor_scores(table, &column, dims, &query, seqs)
+                                    .unwrap_or_default()
                             };
                             let plaid_options = crate::engine::state::plaid_search_options(
                                 |key| option_value(key),
@@ -10898,7 +10841,7 @@ impl Engine {
                                 &query,
                                 topn.max(1),
                                 &dead,
-                                Some(&rank),
+                                Some(&mut rank),
                                 &plaid_options,
                                 allowed.as_ref(),
                             );
@@ -11030,8 +10973,13 @@ impl Engine {
                     });
                     if let Some(index) = index {
                         let dead = self.tombstone_set(table)?;
-                        let rank =
-                            |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
+                        // The index names the candidates; their score is the
+                        // column's. One batch per query, so the blocks are
+                        // mapped once instead of once per candidate.
+                        let mut rank = |seqs: &[u64]| -> Vec<(u64, f32)> {
+                            self.tensor_scores(table, &column, dims, &query, seqs)
+                                .unwrap_or_default()
+                        };
                         let plaid_options = crate::engine::state::plaid_search_options(
                             |key| option_value(key),
                             topn,
@@ -11053,7 +11001,7 @@ impl Engine {
                                 &query,
                                 topn.max(1),
                                 &dead,
-                                Some(&rank),
+                                Some(&mut rank),
                                 &plaid_options,
                                 allowed.as_ref(),
                             )

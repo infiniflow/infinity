@@ -7914,7 +7914,7 @@ mod tests {
             guard
                 .sealed
                 .iter()
-                .map(|(reader, _, _)| reader.doc_count())
+                .map(|(ids, _)| ids.len())
                 .collect::<Vec<_>>()
         );
         assert!(!guard.plaid_dropped, "PLAID was left dropped");
@@ -8038,14 +8038,12 @@ mod tests {
             guard.plaid.is_some() || !guard.plaid_chunks.is_empty(),
             "PLAID was not restored"
         );
-        // The restored id lists have to line up with the chunks that carry
-        // them; a tombstoned row in the list would shift every later id.
+        // Every published chunk is a row-id list now: there is no second copy of
+        // the vectors to fall back to, so a chunk with no rows would be a chunk
+        // that answers nothing.
         assert!(
-            guard
-                .sealed
-                .iter()
-                .all(|(reader, ids, _)| reader.doc_count() == ids.len()),
-            "the sealed fallback was loaded with a stale row list"
+            guard.sealed.iter().all(|(ids, _)| !ids.is_empty()),
+            "a published chunk with no rows"
         );
         assert_eq!(
             guard.plaid_seqs.len(),
@@ -9256,6 +9254,67 @@ mod tests {
         assert_eq!(
             rows(&e, q).await,
             vec![vec!["1".to_string()], vec!["2".to_string()]]
+        );
+    }
+
+    /// An uncoded multi-vector index publishes its dumped rows as a row-id list
+    /// and scores them out of the column.
+    ///
+    /// The chunk used to be a `seg_*.mvec` file holding a copy of the tokens,
+    /// mapped straight back. The block files already hold them, so a dump writes
+    /// **no** multi-vector file and the answer comes from the blocks.
+    #[tokio::test]
+    async fn an_uncoded_multivector_chunk_scores_from_the_column() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        e.execute("CREATE TABLE mvc (id INT, v TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        e.execute(
+            "CREATE INDEX mvc_v ON mvc (v) USING EMVB \
+             WITH (pq_subspace_num = 1, pq_subspace_bits = 8);",
+        )
+        .await
+        .unwrap();
+        e.execute(
+            "INSERT INTO mvc VALUES (1, [[1.0,0.0],[0.0,1.0]]), \
+             (2, [[0.2,0.2]]), (3, [[0.9,0.1]]);",
+        )
+        .await
+        .unwrap();
+        let q = "SELECT id FROM mvc SEARCH MATCH TENSOR \
+                 (v, [1.0,0.0], 'float', 'maxsim', 'topn=3');";
+        let before = rows(&e, q).await;
+        assert_eq!(before.len(), 3, "the tail answers before any dump");
+        // Checkpoint the rows into blocks, then publish the index chunk: the
+        // chunk is what is left of the index once the vectors are the column's.
+        e.checkpoint().await.unwrap();
+        e.dump_all_memory_indexes().await;
+        let index = e
+            .tables
+            .lock()
+            .unwrap()
+            .values()
+            .find_map(|t| t.mv.values().next().cloned())
+            .unwrap();
+        let (published, tail_empty) = {
+            let guard = index.read().unwrap();
+            (
+                guard.sealed.iter().map(|(ids, _)| ids.len()).sum::<usize>(),
+                guard.tail.is_empty(),
+            )
+        };
+        assert!(tail_empty, "the dump took the tail");
+        assert_eq!(published, 3, "the chunk published every dumped row");
+        // The same rows, now scored out of the column's blocks.
+        assert_eq!(rows(&e, q).await, before);
+        assert!(
+            e.index_files("mvc", "mvc_v")
+                .iter()
+                .all(|p| p.extension().is_none_or(|x| x != "mvec" && x != "emvb")),
+            "an uncoded multi-vector chunk writes no segment file"
         );
     }
 
@@ -12384,7 +12443,7 @@ mod tests {
             let idx = mv.read().unwrap();
             idx.sealed
                 .first()
-                .map(|(_, _, pq)| pq.is_some())
+                .map(|(_, pq)| pq.is_some())
                 .unwrap_or(false)
         };
         assert!(has_codes, "the sealed chunk carries residual codes");

@@ -176,7 +176,6 @@ pub use invertedindex::fst::registry as fst_registry;
 pub use io::{chunk_store, s3, virtual_store};
 pub use knn_index::emvb::emvb_segment;
 pub use knn_index::knn_format;
-pub use knn_index::multivector::multivector_segment;
 pub use knn_index::sparse::{bmp, bmp_segment};
 pub use new_txn::{mvcc, txn_kv};
 pub use secondary_index::{

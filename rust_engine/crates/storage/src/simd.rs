@@ -64,6 +64,13 @@ pub fn dot_f32(a: &[f32], b: &[f32]) -> f32 {
 /// A token whose width differs from the query's is skipped, matching the
 /// scalar loop the callers used before (`t.len() != q.len()`).
 pub fn maxsim_f32(query: &[Vec<f32>], doc: &[Vec<f32>]) -> f32 {
+    let rows: Vec<&[f32]> = doc.iter().map(Vec::as_slice).collect();
+    maxsim_f32_rows(query, &rows)
+}
+
+/// [`maxsim_f32`] over tokens the caller only borrows — a column's `&[f32]`
+/// rows straight out of the map, with no `Vec` per token.
+pub fn maxsim_f32_rows(query: &[Vec<f32>], doc: &[&[f32]]) -> f32 {
     let mut total = 0.0f32;
     for q in query {
         let mut best = f32::NEG_INFINITY;
