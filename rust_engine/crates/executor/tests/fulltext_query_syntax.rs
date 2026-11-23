@@ -205,4 +205,22 @@ async fn rank_features_score_a_grammar_query() {
     // difference is exactly the feature weight.
     assert!((score_of(&ranked, "1") - score_of(&base, "1") - 1.0).abs() < 1e-4);
     assert!((score_of(&ranked, "2") - score_of(&base, "2") - 2.0).abs() < 1e-4);
+
+    // A cold handle has to answer both questions the analyzer decides: it must
+    // accept the `rankfeatures` column (the maps are written only by `CREATE
+    // INDEX`, so a restarted process reads them from the catalog now), and an
+    // index it rebuilds from the persisted rows must keep the payload.
+    drop(engine);
+    let reopened = Engine::open_async(dir.path(), Default::default())
+        .await
+        .unwrap();
+    let cold = reopened
+        .execute(
+            "SELECT id, SCORE() FROM rg SEARCH MATCH TEXT \
+             ('doc','(apple OR banana)','topn=10;rank_features=feat^Tag1^1');",
+        )
+        .await
+        .expect("a cold handle must accept a rankfeatures column");
+    assert!((score_of(&cold, "1") - score_of(&ranked, "1")).abs() < 1e-4);
+    assert!((score_of(&cold, "2") - score_of(&ranked, "2")).abs() < 1e-4);
 }

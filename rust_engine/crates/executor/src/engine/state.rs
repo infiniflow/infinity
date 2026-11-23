@@ -4957,6 +4957,7 @@ impl Default for TableEntry {
             analyzers: Default::default(),
             imports: None,
             analyzers_by_index: Default::default(),
+            analyzers_loaded: false,
             column_index_analyzers: Default::default(),
             comments: Default::default(),
             hnsw_mem: Default::default(),
@@ -5363,6 +5364,12 @@ pub(crate) struct TableEntry {
     pub(crate) imports: Option<Vec<(u32, u64, u64)>>,
     /// Analyzer per index name: two indexes on one column may differ.
     pub(crate) analyzers_by_index: HashMap<String, String>,
+    /// Whether the three analyzer maps above were reconciled with the catalog.
+    ///
+    /// `CREATE INDEX` is their only writer, so a reopened process has them empty
+    /// until the first `CREATE INDEX`; [`Self::hydrate_analyzers`] fills them once
+    /// per table from the index records' `options`.
+    pub(crate) analyzers_loaded: bool,
     /// Every full-text index of a column, index name → analyzer, sorted by
     /// index name (`SearchDriver::GetAnalyzerName` walks exactly this shape).
     pub(crate) column_index_analyzers: HashMap<String, std::collections::BTreeMap<String, String>>,

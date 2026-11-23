@@ -2338,6 +2338,7 @@ impl Engine {
     /// The analyzer recorded for the index named `index_name` on `table`, i.e.
     /// the analyzer of the column that index covers.
     pub(crate) fn analyzer_of_index(&self, table: &str, index_name: &str) -> Option<String> {
+        self.hydrate_analyzers(table);
         let key = self.table_key(table);
         if let Some(a) = self
             .tables
@@ -2374,6 +2375,7 @@ impl Engine {
         table: &str,
         index_name: &str,
     ) -> Option<String> {
+        self.hydrate_analyzers(table);
         let key = self.table_key(table);
         self.tables
             .lock()
