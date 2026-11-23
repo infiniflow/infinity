@@ -152,6 +152,24 @@ impl KnnProbe {
     }
 }
 
+/// The index's answer, or `None` when it has nothing to say.
+///
+/// `None` sends the statement to the exact scan. An index that names no row at
+/// all - a segment whose publication is in flight, a graph whose build holds the
+/// lock, a probe that landed between two dumps - must not be read as "the table
+/// has no matches". A search that answers nothing for a table that has rows is
+/// the one failure a caller cannot notice or repair, so the empty answer is
+/// handed back as "the index cannot help" and the rows are scored directly.
+fn answered(candidates: HashSet<usize>, uncovered: Vec<usize>) -> Option<KnnProbe> {
+    if candidates.is_empty() && uncovered.is_empty() {
+        return None;
+    }
+    Some(KnnProbe {
+        candidates,
+        uncovered,
+    })
+}
+
 /// Whether the index covers every live row.
 ///
 /// The HNSW path asks this as a *count*: labels are disjoint across segments
@@ -384,10 +402,7 @@ impl Engine {
             // leaf's slot page - tens of milliseconds at 200k rows and ~1 s at
             // 2M - and this is the state of a table nobody deletes from.
             if all_covered(q, members) {
-                return Some(KnnProbe {
-                    candidates,
-                    uncovered: Vec::new(),
-                });
+                return answered(candidates, Vec::new());
             }
             // The counts disagree: the tree's own row list says exactly which
             // rows it holds, and the rest are scored by the exact scan.
@@ -397,10 +412,7 @@ impl Engine {
                 covered.extend(tail.row_ids().into_iter().map(|id| id as usize));
             }
             let uncovered = self.uncovered_rows(q, &covered);
-            return Some(KnnProbe {
-                candidates,
-                uncovered,
-            });
+            return answered(candidates, uncovered);
         }
         let ivf = {
             let tables = self.tables.lock().unwrap();
@@ -442,16 +454,10 @@ impl Engine {
             // Rows written after the mirror are not covered; only those are
             // read by the exact scan, not the table.
             if covers_set(q, &covered) {
-                return Some(KnnProbe {
-                    candidates,
-                    uncovered: Vec::new(),
-                });
+                return answered(candidates, Vec::new());
             }
             let uncovered = self.uncovered_rows(q, &covered);
-            return Some(KnnProbe {
-                candidates,
-                uncovered,
-            });
+            return answered(candidates, uncovered);
         }
         // Sealed segments. `CREATE INDEX` builds the graph into the memory
         // segment (`hnsw_mem`) and a checkpoint seals it into a chunk, so a
@@ -560,10 +566,7 @@ impl Engine {
             .map(|r| r as usize)
             .collect();
         if all_covered(q, labelled) {
-            return Some(KnnProbe {
-                candidates,
-                uncovered: Vec::new(),
-            });
+            return answered(candidates, Vec::new());
         }
         // The counts disagree, so which rows are missing has to be answered with
         // the labels themselves: a delete leaves its row in the graph (the
@@ -579,10 +582,7 @@ impl Engine {
             }
         }
         let uncovered = self.uncovered_rows(q, &covered);
-        Some(KnnProbe {
-            candidates,
-            uncovered,
-        })
+        answered(candidates, uncovered)
     }
 }
 
