@@ -603,6 +603,21 @@ impl EmvbPqIndex {
     /// Approximate MaxSim ranking through the reference's three search stages
     /// (`EMVBIndex::GetQueryResult`). Returns **document indices** best-first.
     pub fn prefilter(&self, query: &[Vec<f32>], k: usize) -> Vec<usize> {
+        self.prefilter_filtered(query, k, &|_| true)
+    }
+
+    /// [`Self::prefilter`] with the scan's filter applied to the **candidates**,
+    /// before the `k` cut (`EMVBIndex::GetQueryResult`'s
+    /// `candidate_docs_filtered`). `keep` sees a dense document id, the same id
+    /// this returns, so a caller can resolve it to a row id without a mapping
+    /// table. Returns the best `k` *kept* documents, not the best `k` documents
+    /// with the rejected ones dropped - the difference is the whole point.
+    pub fn prefilter_filtered(
+        &self,
+        query: &[Vec<f32>],
+        k: usize,
+        keep: &dyn Fn(usize) -> bool,
+    ) -> Vec<usize> {
         if self.doc_lens.is_empty() || k == 0 || self.dims == 0 {
             return Vec::new();
         }
@@ -625,7 +640,8 @@ impl EmvbPqIndex {
             centroids_to_docid: &self.centroids_to_docid,
             rotation: Some(&self.rotation),
         };
-        let mut hits = view.search(query, k, index::emvb::EmvbSearchOptions::for_topk(k));
+        let mut hits =
+            view.search_filtered(query, k, index::emvb::EmvbSearchOptions::for_topk(k), keep);
         hits.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
                 .unwrap_or(std::cmp::Ordering::Equal)

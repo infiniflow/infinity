@@ -470,6 +470,129 @@ impl<'a> BlockCursor<'a> {
         Ok(())
     }
 
+    /// `MaxSim` for the rows `ids` name, scored straight out of the column's
+    /// blocks: one decode per block the ids touch, no text round trip.
+    ///
+    /// This is what lets the multi-vector index keep only the row ids it
+    /// published instead of its own copy of the vectors (the `.mvec` segment
+    /// files it used to write): the column already holds them, and a row's
+    /// tokens are one `&[f32]` slice of the block's outline.
+    pub(crate) fn tensor_scores(
+        &mut self,
+        col: usize,
+        dim: usize,
+        query: &[Vec<f32>],
+        ids: &[u64],
+        out: &mut Vec<(u64, f32)>,
+    ) -> Result<()> {
+        if dim == 0 || ids.is_empty() {
+            return Ok(());
+        }
+        let tensor = crate::blocks::engine::TensorColumn {
+            declared: &self.meta.types,
+            storage: &self.types,
+            col,
+        };
+        // The ids arrive in query order, not row order: group them so each block
+        // is mapped once. The slot is the low 32 bits of the row id modulo the
+        // block capacity (`ROW_ID = segment << 32 | block * capacity + slot`).
+        #[allow(clippy::type_complexity)]
+        let mut by_block: std::collections::BTreeMap<(u32, u16), Vec<(u64, usize)>> =
+            Default::default();
+        for seq in ids {
+            let row = (*seq & 0xffff_ffff) as usize;
+            by_block
+                .entry(((seq >> 32) as u32, (row / DEFAULT_BLOCK_CAPACITY) as u16))
+                .or_default()
+                .push((*seq, row % DEFAULT_BLOCK_CAPACITY));
+        }
+        let db_id = self.engine.database_id_of(&self.table);
+        let table_id = self.meta.id;
+        let mut answered: std::collections::HashSet<u64> =
+            std::collections::HashSet::with_capacity(ids.len());
+        for ((segment, block_id), rows) in by_block {
+            if !self.visible.contains(&(segment, block_id)) {
+                continue;
+            }
+            let id = BlockId {
+                db_id,
+                table_id,
+                segment_id: segment,
+                block_id,
+            };
+            let Ok(block) = self.engine.block_map(&self.table, &self.root, id) else {
+                continue;
+            };
+            let version = block.version();
+            let Some((slots, outline, _live)) =
+                self.engine
+                    .block_tensor_body(&self.meta.ids, tensor, version, block.as_ref())
+            else {
+                continue;
+            };
+            for (seq, slot) in rows {
+                if version.deleted.get(slot).copied().unwrap_or(0) != 0 || self.dead.contains(seq) {
+                    continue;
+                }
+                let at = slot * 8;
+                let Some(bytes) = slots.get(at..at + 8) else {
+                    continue;
+                };
+                let Ok(word) = <[u8; 8]>::try_from(bytes) else {
+                    continue;
+                };
+                let word = u64::from_le_bytes(word);
+                let count = (word & 0xffff) as usize;
+                let offset = (word >> 16) as usize;
+                if count == 0 {
+                    continue;
+                }
+                let score = match storage::definition::fixed_f32::tensor_rows_f32(
+                    outline, offset, count, dim,
+                ) {
+                    Some(tokens) => storage::simd::maxsim_f32_rows(query, &tokens),
+                    None => {
+                        // A misaligned outline: decode instead of borrowing.
+                        let Some(owned) = storage::definition::fixed_f32::copy_tensor_rows(
+                            outline, offset, count, dim,
+                        ) else {
+                            continue;
+                        };
+                        let tokens: Vec<&[f32]> = owned.iter().map(Vec::as_slice).collect();
+                        storage::simd::maxsim_f32_rows(query, &tokens)
+                    }
+                };
+                out.push((seq, score));
+                answered.insert(seq);
+            }
+        }
+        // Rows a commit appended since the last checkpoint have no block bytes:
+        // their cell is parsed from the text it was written as, the same value
+        // the seal will one day write into a block.
+        let missing: Vec<u64> = ids
+            .iter()
+            .copied()
+            .filter(|seq| !answered.contains(seq))
+            .collect();
+        if !missing.is_empty() {
+            let wanted: std::collections::HashSet<u64> = missing.into_iter().collect();
+            for (row, values) in self.engine.pending_rows_of(&self.table) {
+                let seq = row as u64;
+                if !wanted.contains(&seq) || self.dead.contains(seq) {
+                    continue;
+                }
+                let Some(Value::Str(text)) = values.get(col) else {
+                    continue;
+                };
+                let Some(doc) = crate::engine::state::parse_multivector_doc(text, dim) else {
+                    continue;
+                };
+                out.push((seq, storage::simd::maxsim_f32(query, &doc)));
+            }
+        }
+        Ok(())
+    }
+
     /// One **block** of the embedding column at a time, as `f32`.
     ///
     /// [`Self::vectors`] materialises the whole column before returning, which
@@ -2874,7 +2997,11 @@ mod tests {
     /// `CREATE INDEX … USING PLAID` over `plaid_rows(0, first)` plus a second
     /// batch, flushed between the batches.
     async fn plaid_mirror_with_two_chunks(dir: &std::path::Path) -> Engine {
+        // Each dump opens its own chunk, so two dumps make two chunks whatever
+        // the target is. The target is set anyway: the fold tests below reuse
+        // this mirror and drive the optimize plans with it.
         let engine = Engine::open_async(dir, Default::default()).await.unwrap();
+        engine.set_plaid_chunk_target_rows(200);
         engine
             .execute("CREATE TABLE pc (id INT, t TENSOR(FLOAT,2));")
             .await
@@ -2928,7 +3055,23 @@ mod tests {
         engine.flush().await.unwrap();
         let chunks = engine.read_plaid_index_chunks("pc", "pidx").unwrap();
         assert_eq!(chunks.len(), 2);
-        // The read path merges the chunks back into one index.
+        // The search probes **each** chunk, the way `PhysicalMatchTensorScan`
+        // does; it does not need them folded first. Only the second chunk holds
+        // rows 200..260, so a filter that admits just those rows answers only if
+        // that chunk was searched.
+        let second_only = row_strings(
+            &engine,
+            "SELECT id FROM pc SEARCH MATCH TENSOR \
+             (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5;filter=id >= 200');",
+        )
+        .await;
+        assert_eq!(
+            second_only.len(),
+            5,
+            "the second chunk was not searched: {second_only:?}"
+        );
+        // `read_plaid_index` still folds the chain for the optimize pass and for
+        // readers outside the query path.
         let merged = engine.read_plaid_index("pc", "pidx").unwrap();
         assert_eq!(merged.doc_num(), 260);
         assert_eq!(merged.total_embedding_num(), 780);
@@ -2964,6 +3107,10 @@ mod tests {
         assert_eq!(expected.len(), 260);
         let token_offset = chunks[0].total_embedding_num();
 
+        // Two 200/60-row chunks are not worth folding under the small-chunk rule
+        // (`60 * 16 >= 260`): the cap is what makes an optimize pass fold them,
+        // so the test pins it at one chunk.
+        engine.set_max_open_chunks_per_index(1);
         engine.optimize_indexes().await.unwrap();
         let merged = engine.read_plaid_index_chunks("pc", "pidx").unwrap();
         assert_eq!(
@@ -3019,6 +3166,161 @@ mod tests {
             before_rows,
             "the search path answers the same rows after the merge"
         );
+    }
+
+    /// The optimize pass only starts on a plan: over the cap everything folds,
+    /// under the cap only a chunk small enough to be pure overhead does.
+    #[test]
+    fn the_fold_plan_folds_at_the_cap_and_for_a_small_chunk() {
+        use crate::blocks::index_chunk::plaid_fold_plan;
+        // One chunk: nothing to fold, whatever its size.
+        assert_eq!(plaid_fold_plan(&[10], 8), None);
+        // Two comparable chunks: leave them, the loader's merge is cheap enough.
+        assert_eq!(plaid_fold_plan(&[200, 60], 8), None);
+        // Over the cap: everything into one, or every open merges the chain.
+        assert_eq!(
+            plaid_fold_plan(&[10, 10, 10, 10, 10, 10, 10, 10, 10], 8),
+            Some((0..9).collect())
+        );
+        // Under the cap but a chunk below 1/16 of the mirror: it folds into its
+        // neighbour, and only that pair - folding all of them would rewrite the
+        // mirror for a 10-row chunk.
+        assert_eq!(plaid_fold_plan(&[200, 60, 10], 8), Some(vec![1, 2]));
+        assert_eq!(plaid_fold_plan(&[10, 200, 200], 8), Some(vec![0, 1]));
+    }
+
+    /// A dump opens a **new** chunk; it does not extend the newest one.
+    ///
+    /// `DumpMemIndex` writes a fresh chunk id and advances
+    /// `current_begin_row_id_` past the rows it wrote; folding the two is
+    /// `OptimizePlaidIndex`'s job, on its own transaction. Extending the tail
+    /// here rewrote the newest chunk on every dump and hid the growth from the
+    /// loader.
+    #[tokio::test]
+    async fn a_dump_opens_a_new_chunk_instead_of_extending_the_tail() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE TABLE pa (id INT, t TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        engine
+            .execute(&format!("INSERT INTO pa VALUES {};", plaid_rows(0, 200)))
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE INDEX paidx ON pa (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pa", "paidx").await.unwrap();
+        let first = engine.read_plaid_index_chunks("pa", "paidx").unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].doc_num(), 200);
+
+        engine
+            .execute(&format!("INSERT INTO pa VALUES {};", plaid_rows(200, 260)))
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pa", "paidx").await.unwrap();
+
+        // A second chunk for the 60 new rows, starting where the first ended.
+        let chunks = engine.read_plaid_index_chunks("pa", "paidx").unwrap();
+        assert_eq!(chunks.len(), 2, "the dump extended the tail chunk");
+        assert_eq!(chunks[0].doc_num(), 200);
+        assert_eq!(chunks[1].doc_num(), 60);
+        let records = engine.plaid_chunk_records("pa", "paidx").unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(
+            records[1].1, 200,
+            "the new chunk starts past the dumped rows"
+        );
+
+        // Both chunks answer, and the mirror still reloads.
+        let query = "SELECT id FROM pa SEARCH MATCH TENSOR \
+                     (t, [[0.5,0.0],[1.0,-1.0]], 'float', 'maxsim', 'topn=5');";
+        assert_eq!(row_strings(&engine, query).await.len(), 5);
+        drop(engine);
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        let merged = engine.read_plaid_index("pa", "paidx").unwrap();
+        assert_eq!(merged.doc_num(), 260);
+    }
+
+    /// Under the cap, a chunk below 1/16 of the mirror is folded into its
+    /// neighbour by the optimize pass - and it keeps every row.
+    #[tokio::test]
+    async fn a_small_chunk_folds_into_its_neighbour() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = plaid_mirror_with_two_chunks(dir.path()).await;
+        // 200 + 60 already. A target of 64 rows leaves no room for the 10-row
+        // dump either, so it becomes a third chunk - the one the fold rule has to
+        // pick up, since nothing else in this mirror is worth folding.
+        engine.set_plaid_chunk_target_rows(64);
+        engine
+            .execute(&format!("INSERT INTO pc VALUES {};", plaid_rows(260, 270)))
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pc", "pidx").await.unwrap();
+        // The dump itself folds it: `fold_dumped_mirror` runs on the cheap plan,
+        // so an embedder with no optimize tick still converges. The 10-row chunk
+        // joins its 60-row neighbour; the 200-row one is left alone.
+        let after: Vec<u32> = engine
+            .read_plaid_index_chunks("pc", "pidx")
+            .unwrap()
+            .iter()
+            .map(|chunk| chunk.doc_num())
+            .collect();
+        assert_eq!(after, vec![200, 70], "the small chunk folded on the dump");
+
+        // An explicit pass has nothing left to do, and must not touch the mirror.
+        engine.optimize_indexes().await.unwrap();
+        let again: Vec<u32> = engine
+            .read_plaid_index_chunks("pc", "pidx")
+            .unwrap()
+            .iter()
+            .map(|chunk| chunk.doc_num())
+            .collect();
+        assert_eq!(again, vec![200, 70]);
+
+        let merged = engine.read_plaid_index("pc", "pidx").unwrap();
+        assert_eq!(merged.doc_num(), 270, "no row was lost by the fold");
+        // Documents are addressed by row order: the folded chunk must not move
+        // the rows of the chunk after it.
+        assert_eq!(merged.doc_offsets()[200], 200 * 3);
+    }
+
+    /// The trigger's cheap check: no fold candidate means no optimize task.
+    #[tokio::test]
+    async fn the_optimize_trigger_skips_a_mirror_that_needs_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE TABLE pt (id INT, t TENSOR(FLOAT,2));")
+            .await
+            .unwrap();
+        engine
+            .execute(&format!("INSERT INTO pt VALUES {};", plaid_rows(0, 200)))
+            .await
+            .unwrap();
+        engine
+            .execute("CREATE INDEX ptidx ON pt (t) USING PLAID WITH (nbits = 4, n_centroids = 8);")
+            .await
+            .unwrap();
+        engine.flush().await.unwrap();
+        engine.dump_index_transaction("pt", "ptidx").await.unwrap();
+        assert!(
+            !engine.needs_index_optimize(),
+            "one chunk is nothing to fold, the tick must not queue a pass"
+        );
+        assert!(!engine.submit_optimize_indexes(), "no processor, no task");
     }
 
     /// A checkpoint rewrites the whole C++ layout from its own read-back
@@ -3158,5 +3460,51 @@ mod tests {
         let mut sorted = parallel.clone();
         sorted.sort_by_key(|(seq, _)| *seq);
         assert_eq!(parallel, sorted);
+    }
+
+    /// A `create` may not name an append whose rows the write did not reach.
+    ///
+    /// The journal is filled in a commit's top half; the segment map that
+    /// decides which rows a write walks moves in its bottom. A checkpoint that
+    /// lands between the two sees an append it will not write, and stamping
+    /// that append's ts here is not cosmetic: the `version` creates are the row
+    /// floor a reopen derives from the files (`Engine::recover_blocks` ->
+    /// `newest`), so the WAL replay would skip exactly that batch and a
+    /// `kill -9` would lose it - the `restart_test` checkpoint race, 8192 rows
+    /// short after a restart.
+    #[tokio::test]
+    async fn a_create_never_names_an_append_the_write_did_not_cover() {
+        let dir = tempdir().unwrap();
+        let e = Engine::open_async(dir.path(), Default::default())
+            .await
+            .unwrap();
+        // Two appends of four rows each; the write covers only the first.
+        let totals = vec![4u64, 8];
+        let ts = vec![10u64, 20];
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 4, 4),
+            vec![(10, 4)],
+            "the uncovered append's ts must not reach the file"
+        );
+        // A write that stops inside the second append gives its rows no create
+        // naming 20 either: the rest of that append is in no block.
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 6, 6),
+            vec![(10, 4), (10, 2)]
+        );
+        // Once the journal and the segment map agree, the ts is the append's
+        // own - the pre-existing shape, unchanged.
+        assert_eq!(
+            e.block_version_batches(&totals, &ts, 0, 8, 8),
+            vec![(10, 4), (20, 4)]
+        );
+        // A journal that stops short of the rows present (an append the
+        // previous process lost) keeps its old shape: one create at the newest
+        // known ts, which is also the newest ts this write covers.
+        assert_eq!(
+            e.block_version_batches(&[4], &[10], 0, 6, 6),
+            vec![(10, 6)],
+            "the disagreeing journal falls back to the covered ts"
+        );
     }
 }

@@ -473,16 +473,11 @@ impl Engine {
             }
         }
         for index in multi_indexes {
-            let dir = index.read().map(|g| g.dir.clone()).ok();
-            if let Some(dir) = dir {
-                if let Ok(entries) = std::fs::read_dir(&dir) {
-                    for entry in entries.flatten() {
-                        let p = entry.path();
-                        if p.extension().is_some_and(|x| x == "mvec" || x == "emvb") {
-                            let _ = storage::chunk_store::remove_file(p);
-                        }
-                    }
-                }
+            if let Ok(dir) = index.read().map(|g| g.dir.clone()) {
+                // Nothing writes under it any more (a multi-vector chunk is a
+                // row-id list); the tree may still hold `seg_*.mvec` files from
+                // before that change.
+                storage::chunk_store::remove_tree(dir);
             }
         }
         self.recompute_memindex_total();

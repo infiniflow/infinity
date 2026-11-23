@@ -446,6 +446,13 @@ impl PlaidQuantizer {
         }
     }
 
+    /// The byte length [`Self::to_bytes`] produces, without building it: a
+    /// caller sizing a chunk (`PlaidIndex::calc_size`) must not allocate the
+    /// bytes just to measure them.
+    pub fn byte_len(&self) -> usize {
+        16 + self.bucket_cutoffs.len() * 4 + 4 + self.bucket_weights.len() * 4
+    }
+
     /// C++: `PlaidQuantizer::Save` / `SaveToPtr`.
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut out =

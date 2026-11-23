@@ -1182,7 +1182,26 @@ impl PlaidIndex {
             }
         }
         if centroid_score_threshold != 0.0 {
+            // Same rule as the standard path: an all-discarding cut is the
+            // threshold being below the data's scale, so the nearest centroid
+            // of each token stays.
+            let nearest: Vec<u32> = {
+                let mut seen = vec![false; k];
+                let mut out = Vec::new();
+                for heap in &heaps {
+                    if let Some(&(_, cid)) = heap.first() {
+                        if !seen[cid as usize] {
+                            seen[cid as usize] = true;
+                            out.push(cid);
+                        }
+                    }
+                }
+                out
+            };
             probed.retain(|&cid| centroid_max_score[cid as usize] >= centroid_score_threshold);
+            if probed.is_empty() {
+                probed = nearest;
+            }
         }
         // Sparse scores, layout [n_sparse, n_query_tokens].
         let mut sparse = vec![0f32; probed.len() * n_query_tokens];
@@ -1240,6 +1259,9 @@ impl PlaidIndex {
         // Per-token top `n_ivf_probe`, then the union.
         let mut selected = vec![false; k];
         let mut probed = Vec::new();
+        // The nearest centroid of each query token, kept aside: see the comment
+        // on the threshold below.
+        let mut nearest = Vec::new();
         for q in 0..n_query_tokens {
             let mut ranked: Vec<(f32, u32)> =
                 (0..k).map(|c| (scores[q * k + c], c as u32)).collect();
@@ -1252,6 +1274,11 @@ impl PlaidIndex {
                 ranked.truncate(take);
             }
             ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+            if let Some(&(_, cid)) = ranked.first() {
+                if !nearest.contains(&cid) {
+                    nearest.push(cid);
+                }
+            }
             for &(_, cid) in ranked.iter().take(n_ivf_probe) {
                 if !selected[cid as usize] {
                     selected[cid as usize] = true;
@@ -1266,6 +1293,17 @@ impl PlaidIndex {
                     .fold(f32::MIN, f32::max)
                     >= centroid_score_threshold
             });
+            // A cut that discards **every** probed centroid is the threshold
+            // being below the data's scale, not "nothing is relevant": the
+            // score is `q·c - ½‖c‖²`, which for an un-normalized row sits far
+            // under the reference's `-0.1` even at the nearest centroid. The
+            // reference would answer with nothing here; answering from the
+            // nearest centroid at least keeps a complete index from looking
+            // empty, and it never widens the candidate set beyond one list per
+            // query token.
+            if probed.is_empty() {
+                probed = nearest;
+            }
         }
 
         let mut marker = vec![false; self.n_docs as usize];
@@ -1284,8 +1322,6 @@ impl PlaidIndex {
         if candidates.is_empty() {
             return PlaidQueryResult::default();
         }
-        candidates.sort_unstable();
-
         let mut doc_scores: Vec<(f32, u32)> = candidates
             .iter()
             .map(|&doc_id| {
@@ -1297,11 +1333,15 @@ impl PlaidIndex {
             .collect();
 
         if self.colbertsar_mode {
+            select_best(&mut doc_scores, top_n);
             return self.finish(doc_scores, top_n);
         }
 
-        sort_desc(&mut doc_scores);
         let n_rerank = n_full_scores.min(n_doc_to_score).min(doc_scores.len());
+        if n_rerank == 0 {
+            return PlaidQueryResult::default();
+        }
+        select_best(&mut doc_scores, n_rerank);
         let rerank_ids: Vec<u32> = doc_scores[..n_rerank].iter().map(|x| x.1).collect();
         let exact = self.exact_score_batch(query, n_query_tokens, &rerank_ids);
         let mut final_scores: Vec<(f32, u32)> = exact.into_iter().zip(rerank_ids).collect();
@@ -1347,7 +1387,6 @@ impl PlaidIndex {
         if candidates.is_empty() {
             return PlaidQueryResult::default();
         }
-        candidates.sort_unstable();
         let mut doc_scores: Vec<(f32, u32)> = candidates
             .iter()
             .map(|&doc_id| {
@@ -1361,10 +1400,14 @@ impl PlaidIndex {
             })
             .collect();
         if self.colbertsar_mode {
+            select_best(&mut doc_scores, top_n);
             return self.finish(doc_scores, top_n);
         }
-        sort_desc(&mut doc_scores);
         let n_rerank = n_full_scores.min(n_doc_to_score).min(doc_scores.len());
+        if n_rerank == 0 {
+            return PlaidQueryResult::default();
+        }
+        select_best(&mut doc_scores, n_rerank);
         let rerank_ids: Vec<u32> = doc_scores[..n_rerank].iter().map(|x| x.1).collect();
         let exact = self.exact_score_batch(query, n_query_tokens, &rerank_ids);
         let mut final_scores: Vec<(f32, u32)> = exact.into_iter().zip(rerank_ids).collect();
@@ -1632,55 +1675,88 @@ impl PlaidIndex {
         Ok(k_update)
     }
 
-    /// C++: `PlaidIndex::CalcSize` / `SaveIndexInner`.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::new();
+    /// C++: `PlaidIndex::SaveIndexInner`, streamed into `w`.
+    ///
+    /// The serialized form is the index's own buffers concatenated, so writing
+    /// it needs no copy of the whole image: [`Self::to_bytes`] built one, which
+    /// put a second full-size allocation beside the index at the moment a chunk
+    /// was written - the peak a large dump could not afford.
+    pub fn write_to<W: std::io::Write + ?Sized>(&self, w: &mut W) -> std::io::Result<()> {
+        /// Little-endian `u32`s, one write per run rather than one per value:
+        /// a `centroid_ids` run is `n_total_embeddings` long.
+        fn write_u32s<W: std::io::Write + ?Sized>(
+            w: &mut W,
+            values: &[u32],
+        ) -> std::io::Result<()> {
+            let mut chunk = Vec::with_capacity(16 * 1024);
+            for value in values {
+                chunk.extend_from_slice(&value.to_le_bytes());
+                if chunk.len() >= 16 * 1024 {
+                    w.write_all(&chunk)?;
+                    chunk.clear();
+                }
+            }
+            w.write_all(&chunk)
+        }
+        fn write_f32s<W: std::io::Write + ?Sized>(
+            w: &mut W,
+            values: &[f32],
+        ) -> std::io::Result<()> {
+            let mut chunk = Vec::with_capacity(16 * 1024);
+            for value in values {
+                chunk.extend_from_slice(&value.to_le_bytes());
+                if chunk.len() >= 16 * 1024 {
+                    w.write_all(&chunk)?;
+                    chunk.clear();
+                }
+            }
+            w.write_all(&chunk)
+        }
+
         let format_version: u32 = u32::from(self.colbertsar_mode) + 1;
-        out.extend_from_slice(&format_version.to_le_bytes());
-        out.extend_from_slice(&self.start_segment_offset.to_le_bytes());
-        out.extend_from_slice(&self.embedding_dimension.to_le_bytes());
-        out.extend_from_slice(&self.nbits.to_le_bytes());
-        out.extend_from_slice(&self.n_centroids.to_le_bytes());
-        out.extend_from_slice(&self.n_docs.to_le_bytes());
-        out.extend_from_slice(&self.n_total_embeddings.to_le_bytes());
+        w.write_all(&format_version.to_le_bytes())?;
+        w.write_all(&self.start_segment_offset.to_le_bytes())?;
+        w.write_all(&self.embedding_dimension.to_le_bytes())?;
+        w.write_all(&self.nbits.to_le_bytes())?;
+        w.write_all(&self.n_centroids.to_le_bytes())?;
+        w.write_all(&self.n_docs.to_le_bytes())?;
+        w.write_all(&self.n_total_embeddings.to_le_bytes())?;
 
-        for v in self.centroids_data() {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        for v in self.centroid_norms_neg_half() {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
+        write_f32s(w, self.centroids_data())?;
+        write_f32s(w, self.centroid_norms_neg_half())?;
 
-        out.extend_from_slice(&(self.doc_lens.len() as u32).to_le_bytes());
-        for &v in &self.doc_lens {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        out.extend_from_slice(&(self.doc_offsets.len() as u32).to_le_bytes());
-        for &v in &self.doc_offsets {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
-        out.extend_from_slice(&(self.centroid_ids.len() as u32).to_le_bytes());
-        for &v in &self.centroid_ids {
-            out.extend_from_slice(&v.to_le_bytes());
-        }
+        w.write_all(&(self.doc_lens.len() as u32).to_le_bytes())?;
+        write_u32s(w, &self.doc_lens)?;
+        w.write_all(&(self.doc_offsets.len() as u32).to_le_bytes())?;
+        write_u32s(w, &self.doc_offsets)?;
+        w.write_all(&(self.centroid_ids.len() as u32).to_le_bytes())?;
+        write_u32s(w, &self.centroid_ids)?;
         for i in 0..self.n_centroids {
             let list = self.ivf_list(i);
-            out.extend_from_slice(&(list.len() as u32).to_le_bytes());
-            for &v in list {
-                out.extend_from_slice(&v.to_le_bytes());
-            }
+            w.write_all(&(list.len() as u32).to_le_bytes())?;
+            write_u32s(w, list)?;
         }
         if !self.colbertsar_mode {
-            out.extend_from_slice(&(self.packed().len() as u32).to_le_bytes());
-            out.extend_from_slice(self.packed());
-            out.extend_from_slice(
+            let packed = self.packed();
+            w.write_all(&(packed.len() as u32).to_le_bytes())?;
+            w.write_all(packed)?;
+            w.write_all(
                 &self
                     .quantizer
                     .as_ref()
                     .expect("PLAID mode has a quantizer")
                     .to_bytes(),
-            );
+            )?;
         }
+        Ok(())
+    }
+
+    /// C++: `PlaidIndex::CalcSize` / `SaveIndexInner`.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.calc_size());
+        // Writing into a `Vec` cannot fail; the image is the same bytes
+        // `write_to` streams to a file.
+        self.write_to(&mut out).expect("a Vec write cannot fail");
         out
     }
 
@@ -1812,12 +1888,37 @@ impl PlaidIndex {
         Ok((index, at))
     }
 
-    /// C++: `PlaidIndex::CalcSize` (the serialized length).
-    pub fn calc_size(&self) -> usize {
-        self.to_bytes().len()
+    /// Total IVF references, i.e. the sum of the serialized lists' lengths.
+    fn ivf_ref_count(&self) -> usize {
+        (0..self.n_centroids).map(|i| self.ivf_list(i).len()).sum()
     }
 
-    /// C++: `PlaidIndex::MemUsage`.
+    /// C++: `PlaidIndex::CalcSize` (the serialized length), computed from the
+    /// buffer lengths.
+    ///
+    /// It used to serialize the index and measure the result, so a caller that
+    /// asked for the size - every `mem_usage` accounting pass - paid a full copy
+    /// of the image.
+    pub fn calc_size(&self) -> usize {
+        let mut size = 7 * 4;
+        size += self.centroids_data().len() * 4;
+        size += self.centroid_norms_neg_half().len() * 4;
+        size += 4 + self.doc_lens.len() * 4;
+        size += 4 + self.doc_offsets.len() * 4;
+        size += 4 + self.centroid_ids.len() * 4;
+        size += self.ivf_ref_count() * 4 + self.n_centroids as usize * 4;
+        if !self.colbertsar_mode {
+            size += 4 + self.packed().len();
+            if let Some(quantizer) = self.quantizer.as_ref() {
+                size += quantizer.byte_len();
+            }
+        }
+        size
+    }
+
+    /// C++: `PlaidIndex::MemUsage`. The chunk's serialized size is what a
+    /// loaded index holds (its packed codes may be file-backed, so this is an
+    /// upper bound rather than an allocator measurement).
     pub fn mem_usage(&self) -> usize {
         self.calc_size()
     }
@@ -1825,6 +1926,24 @@ impl PlaidIndex {
 
 fn sort_desc(scores: &mut [(f32, u32)]) {
     scores.sort_by(|a, b| b.0.total_cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+}
+
+/// Keeps the best `keep` entries of `scores`, in the `sort_desc` order.
+///
+/// The candidate list of a probe is a large fraction of the table (every
+/// document that shares a probed centroid), while only `n_full_scores` of them
+/// are ever read: sorting all of it to look at a hundred was the query's second
+/// cost after the candidate scan itself. `select_nth_unstable_by` partitions in
+/// O(n) and the `keep` survivors - a hundred - are the only part that gets
+/// sorted.
+fn select_best(scores: &mut Vec<(f32, u32)>, keep: usize) {
+    if keep < scores.len() {
+        // Same comparator as the sort, so the partition keeps exactly the prefix
+        // `sort_desc` would have produced.
+        scores.select_nth_unstable_by(keep, |a, b| b.0.total_cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+        scores.truncate(keep);
+    }
+    sort_desc(scores);
 }
 
 /// Reservoir sampling of `count` embedding indices (`RandomPermutatePartially` +

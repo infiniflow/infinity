@@ -43,6 +43,63 @@ pub fn fixed_f32_slot(body_data: &[u8], slot: usize, dim: usize) -> Option<&[f32
     Some(unsafe { std::slice::from_raw_parts(bytes.as_ptr().cast::<f32>(), dim) })
 }
 
+/// One `TENSOR`/`MULTIVECTOR` row's tokens, borrowed from the column's outline
+/// file — the variable-length twin of [`fixed_f32_slot`].
+///
+/// A tensor slot is `u64 { count : 16; offset : 48 }` (`varlen_count_offset_slot`)
+/// and the outline is the raw concatenation of every row's payload, so a row's
+/// tokens are `count` consecutive `dim * 4`-byte groups at `offset`. Returning
+/// them as `&[f32]` keeps a search from rendering the row to text and parsing it
+/// back, which is what the row-shaped API (`decode_tensor_value`) does.
+///
+/// `None` when the range is out of bounds or does not start on an `f32`
+/// boundary; the caller then falls back to [`copy_tensor_rows`].
+#[allow(unsafe_code)]
+pub fn tensor_rows_f32(
+    outline: &[u8],
+    offset: usize,
+    count: usize,
+    dim: usize,
+) -> Option<Vec<&[f32]>> {
+    let width = dim.checked_mul(std::mem::size_of::<f32>())?;
+    let end = offset.checked_add(count.checked_mul(width)?)?;
+    let bytes = outline.get(offset..end)?;
+    if !(bytes.as_ptr() as usize).is_multiple_of(std::mem::align_of::<f32>()) {
+        return None;
+    }
+    // SAFETY: the pointer is aligned for `f32` (checked immediately above), the
+    // slice is `count * dim * 4` bytes long (its bounds were checked above), it
+    // borrows `outline` for the returned lifetime, and every bit pattern is a
+    // valid `f32`. Each row is a sub-slice of that region, so the same argument
+    // repeats per row without a second check.
+    let flat = unsafe { std::slice::from_raw_parts(bytes.as_ptr().cast::<f32>(), count * dim) };
+    Some(flat.chunks_exact(dim).collect())
+}
+
+/// [`tensor_rows_f32`]'s fallback: the rows decoded into owned `f32`s.
+pub fn copy_tensor_rows(
+    outline: &[u8],
+    offset: usize,
+    count: usize,
+    dim: usize,
+) -> Option<Vec<Vec<f32>>> {
+    let width = dim.checked_mul(std::mem::size_of::<f32>())?;
+    let end = offset.checked_add(count.checked_mul(width)?)?;
+    let bytes = outline.get(offset..end)?;
+    Some(
+        bytes
+            .chunks_exact(width)
+            .map(|row| {
+                row.as_chunks::<{ std::mem::size_of::<f32>() }>()
+                    .0
+                    .iter()
+                    .map(|c| f32::from_le_bytes(*c))
+                    .collect()
+            })
+            .collect(),
+    )
+}
+
 /// [`fixed_f32_slot`]'s fallback: the slot decoded into owned `f32`s.
 pub fn copy_f32_slot(body_data: &[u8], slot: usize, dim: usize) -> Option<Vec<f32>> {
     let width = dim.checked_mul(std::mem::size_of::<f32>())?;
@@ -61,6 +118,7 @@ pub fn copy_f32_slot(body_data: &[u8], slot: usize, dim: usize) -> Option<Vec<f3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::definition::format::pack_tensor_body;
 
     fn body(rows: usize, dim: usize) -> Vec<u8> {
         let mut out = Vec::with_capacity(rows * dim * 4);
@@ -84,6 +142,35 @@ mod tests {
         // Past the last row of a short (tail) block: no read past the body.
         assert!(fixed_f32_slot(&bytes, 2, dim).is_none());
         assert!(copy_f32_slot(&bytes, 2, dim).is_none());
+    }
+
+    #[test]
+    fn a_tensor_row_borrows_its_tokens_out_of_the_outline() {
+        let dim = 2;
+        // Two documents of one and two tokens, laid out as `encode_tensor_slot`
+        // writes them: the outline is the raw concatenation.
+        let mut outline = Vec::new();
+        let one: Vec<Vec<f64>> = vec![vec![1.0, 2.0]];
+        let two: Vec<Vec<f64>> = vec![vec![3.0, 4.0], vec![5.0, 6.0]];
+        let first = pack_tensor_body(&one, dim, 6);
+        let second = pack_tensor_body(&two, dim, 6);
+        let at_second = first.len();
+        outline.extend_from_slice(&first);
+        outline.extend_from_slice(&second);
+
+        let rows =
+            tensor_rows_f32(&outline, at_second, 2, dim).expect("an aligned outline borrows");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0], &[3.0, 4.0]);
+        assert_eq!(rows[1], &[5.0, 6.0]);
+        // The same bytes, owned.
+        assert_eq!(
+            copy_tensor_rows(&outline, at_second, 2, dim).unwrap(),
+            vec![vec![3.0, 4.0], vec![5.0, 6.0]]
+        );
+        // Past the end: no read past the outline (three tokens were written).
+        assert!(tensor_rows_f32(&outline, 0, 4, dim).is_none());
+        assert!(copy_tensor_rows(&outline, 0, 4, dim).is_none());
     }
 
     #[test]

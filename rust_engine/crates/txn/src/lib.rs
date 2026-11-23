@@ -1665,6 +1665,14 @@ impl TxnManager {
     /// cleanup — so the deletion lives here rather than in the checkpoint path.
     /// The caller must pass a timestamp whose records have been fsynced.
     ///
+    /// That timestamp is the **lower** of the two floors, not the checkpoint
+    /// frame: the frame covers what the KV store holds, while rows live in the
+    /// block mirror, which is written for a bounded range. A segment can hold an
+    /// `INSERT` whose rows are in no block - committed while the mirror ran, or
+    /// replayed into the buffer at open - and dropping it loses them on the next
+    /// crash. `Engine::cleanup` passes `min(applied_ts, mirrored_ts)` for that
+    /// reason.
+    ///
     /// The segment that holds the newest checkpoint frame is never dropped, even
     /// when its records are covered: see [`Self::checkpoint_frame_segments`].
     pub async fn drop_sealed_wal_up_to(&self, applied: TxnTimeStamp) -> Result<bool> {

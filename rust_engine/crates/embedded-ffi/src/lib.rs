@@ -123,6 +123,20 @@ pub unsafe extern "C" fn inf_embedded_start(
                 .block_on(Engine::open_async(&data_dir, Default::default()))
                 .map_err(|e| format!("open {data_dir}: {e}"))?,
         );
+        // `[buffer] memindex_memory_quota`, which the CLI sets and this host did
+        // not: `0` disables the dump trigger, so a tail was never sealed and
+        // every query rebuilt the index from the rows instead of mapping a
+        // chunk. A multi-vector row is ~48 KB, so a 62 k-unit table kept 3 GiB
+        // of vectors resident and one query peaked at 8.2 GiB and still had to
+        // brute-force its way through, because the structure that would have
+        // pruned it is what the dump builds.
+        //
+        // 1 GiB is a laptop's answer, not the reference's 4 GiB default: it
+        // bounds the tail at ~20 k units and pays the same build work the query
+        // would have paid, once per dump, during the import instead of on the
+        // first search. The chunks it writes are what later opens and queries
+        // map.
+        engine.set_memindex_quota(1 << 30);
         // `install_engine_handle` records the running runtime, so the bind has
         // to happen inside its context.
         let _guard = runtime.enter();
@@ -154,28 +168,41 @@ pub unsafe extern "C" fn inf_embedded_start(
                     // seals (`flush_storage`), which is what keeps the log at
                     // the size of one checkpoint.
                     if engine.has_work_since_checkpoint().await {
-                        // A checkpoint alone leaves every memory index in RAM,
-                        // and the next open rebuilds those tails from the rows
-                        // (`NewTxn::RecoverMemIndex`) - measured at 10.3 s of a
-                        // 10.3 s open for 4.6 k rows, because a multi-vector
-                        // row is ~96 KB. The operator's `FLUSH DATA` does not
-                        // dump either (the reference's flush leaves the tails
-                        // alone), but this host has no background trigger to
-                        // dump later, so the dump belongs here: pay it once on
-                        // the way down instead of on every open.
+                        // Seal the tails the checkpoint leaves in memory, now that
+                        // they are bounded: this host sets a memory quota, so what
+                        // is left is at most one watermark (~64 MiB of vectors,
+                        // seconds to dump) instead of the whole table. Without the
+                        // seal the rows written since the last quota dump have no
+                        // chunk, and the next query rebuilds the multi-vector index
+                        // from the rows rather than mapping the chunks - 248 s for
+                        // 62 k units against milliseconds once they are all there.
                         engine.set_flush_dumps_mem_index(true);
                         if let Err(e) = engine.flush().await {
                             eprintln!("embedded engine: final checkpoint failed: {e}");
                         }
-                        // `WalManager::Cleanup` is the only path that removes a
-                        // sealed segment, and it is the background trigger that
-                        // normally runs it. This host has none, so the stop does
-                        // it: without that step the log keeps every segment it
-                        // ever wrote, which is the disk half of the same
-                        // problem the replay half had.
-                        if let Err(e) = engine.cleanup().await {
-                            eprintln!("embedded engine: final cleanup failed: {e}");
-                        }
+                    }
+                    // The secondary tails, always: a dump is a key-to-rows map
+                    // (no row is read to write it) and sealing it is what lets
+                    // the next open skip a scan of the whole table - measured
+                    // at 94.5 s of a 102 s open for 62 k units with one
+                    // `path` index and nothing sealed. Not gated on the
+                    // checkpoint flag: a checkpoint the append budget already
+                    // ran leaves those tails unsealed, and an empty one is
+                    // skipped inside `dump_index_transaction`.
+                    //
+                    // The vector tails are the other trade and stay put:
+                    // sealing one rebuilds that index from the rows, ~64 ms per
+                    // unit, against the ~1-2 ms per unit `RecoverMemIndex`
+                    // spends rebuilding the same rows on the next open.
+                    engine.dump_secondary_indexes().await;
+                    // `WalManager::Cleanup` is the only path that removes a
+                    // sealed segment, and it is the background trigger that
+                    // normally runs it. This host has none, so the stop does
+                    // it: without that step the log keeps every segment it
+                    // ever wrote, which is the disk half of the same
+                    // problem the replay half had.
+                    if let Err(e) = engine.cleanup().await {
+                        eprintln!("embedded engine: final cleanup failed: {e}");
                     }
                 });
                 // The select drops `serve` mid-listen; the socket file is ours

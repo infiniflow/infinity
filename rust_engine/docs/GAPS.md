@@ -36,7 +36,9 @@
 升序区间）与块内行求差，只把没被 chunk 覆盖的行喂回内存索引。各 kind 的恢复路径：HNSW / IVF 直接插回内存段；fulltext
 走 `text_index_for`（`load_sealed` 映射已有 chunk，再从第一个未覆盖行重建）；二级索引走 `load_secondary_index`，
 同样映射已发布的 chunk、只索引未被覆盖的行（只有 `id == 0` 的手写记录没有目录可映射，才回退到 `build_index` 全量重建）；
-多值与稀疏没有独立的 chunk 映射，在首次查询时整表重建 —— 这是重启后唯一仍为 O(表行数) 的一条路径。
+稀疏索引没有独立的 chunk 映射，在首次查询时整表重建。多值索引的 PLAID 列按参考的形态恢复：每个 `chunk_{id}.idx`
+单独 mmap，寄存器里是「一份内存 `PlaidIndexInMem` + 一串磁盘 chunk」，查询逐 chunk `SearchWithBitmask` 后归并 top-k
+（`PhysicalMatchTensorScan` 的做法），不把 chunk 折成一个索引；dump 只写新 chunk，折叠留给 `OptimizePlaidIndex`。
 
 **影响**：flush 之后索引尾巴仍在内存里（只由配额、按批容量或显式 `DumpIndex` 落盘），崩溃不丢行（行在块和 WAL 里），
 代价是重启时多做一次 gap 重建。checkpoint 的索引镜像（`flush_blocks`）会写 chunk 文件却没有 ts 可写，这类「有文件、

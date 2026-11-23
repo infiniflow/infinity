@@ -528,6 +528,9 @@ impl Engine {
                 // checkpoint uses as a segment's layer cap, so the value
                 // `SHOW INDEX` prints is the one that decides a rebuild.
                 max_open_chunks_per_index: std::sync::atomic::AtomicUsize::new(8),
+                plaid_chunk_target_rows: std::sync::atomic::AtomicUsize::new(
+                    crate::blocks::index_chunk::PLAID_CHUNK_TARGET_ROWS,
+                ),
                 memory_limit: std::sync::atomic::AtomicU64::new(0),
                 memory_checked_at: std::sync::atomic::AtomicU64::new(0),
                 memory_pressure_level: std::sync::atomic::AtomicU8::new(0),
@@ -558,6 +561,7 @@ impl Engine {
                 .unwrap_or_else(|| dir_for.clone().join("snapshot")),
             persistence,
             index_epoch: std::sync::atomic::AtomicU64::new(0),
+            mirrored_ts: std::sync::atomic::AtomicU64::new(0),
             result_cache: Mutex::new(HashMap::new()),
             plan_cache: Arc::new(planner::result_cache::SharedCache::new()),
             current_db: Mutex::new("default_db".to_string()),
@@ -917,15 +921,92 @@ impl Engine {
     /// The rows an indexed predicate names, for the columnar select.
     ///
     /// `col = v` probes the key (memory tail + sealed chunks); a conjunction of
-    /// bounds on one column becomes one range read. `None` means the predicate
-    /// is neither, or the index cannot order the key (a hashed varchar), and the
-    /// caller scans the table instead.
+    /// bounds on one column becomes one range read; an `AND` of two predicates on
+    /// different columns intersects their row sets, so `lang = ? AND kind = ?`
+    /// narrows through both indexes instead of neither. `None` means no part of
+    /// the predicate is answerable (or the index cannot order the key, a hashed
+    /// varchar), and the caller scans the table instead.
+    ///
+    /// The set is a **narrowing hint**: a conjunct no index answers is left out,
+    /// so the caller still evaluates the whole predicate over the rows it reads.
+    ///
+    /// The bounded comparisons are widened to inclusive intervals (`>` becomes
+    /// `>=`), which only ever admits more rows, never fewer - the same reason the
+    /// residual predicate is never skipped.
     pub(crate) fn indexed_predicate_rows(
         &self,
         table: &str,
         schema: &[String],
         expr: &Expr,
     ) -> Option<Vec<u64>> {
+        self.indexed_rows(table, schema, expr).0
+    }
+
+    /// The rows an indexed predicate names, only when the index answers the
+    /// **whole** predicate.
+    ///
+    /// This is the form a caller may trust on its own - a search's candidate
+    /// mask, which nothing re-checks afterwards. A partially answered predicate
+    /// returns `None` even when [`Self::indexed_predicate_rows`] could narrow it.
+    pub(crate) fn indexed_predicate_exact_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        expr: &Expr,
+    ) -> Option<Vec<u64>> {
+        let (rows, complete) = self.indexed_rows(table, schema, expr);
+        if complete {
+            rows
+        } else {
+            None
+        }
+    }
+
+    /// One `col <op> literal` from the index: the rows, and whether that set is
+    /// the comparison's own answer.
+    fn indexed_axis_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        pos: usize,
+        op: parser::CmpOp,
+        value: &Value,
+    ) -> (Option<Vec<u64>>, bool) {
+        let Some(column) = schema.get(pos) else {
+            return (None, false);
+        };
+        // An inclusive bound is the key's own answer; an exclusive one is
+        // widened to `>=`/`<=`, so the row on the bound is admitted too and the
+        // predicate has to be re-evaluated.
+        let (rows, exclusive) = match op {
+            parser::CmpOp::Eq => (
+                self.index_lookup(table, column, &value_to_literal(value.clone())),
+                false,
+            ),
+            parser::CmpOp::Ge | parser::CmpOp::Gt => (
+                self.index_range_lookup(table, column, &[(value.clone(), Value::Int(i64::MAX))]),
+                op == parser::CmpOp::Gt,
+            ),
+            parser::CmpOp::Le | parser::CmpOp::Lt => (
+                self.index_range_lookup(table, column, &[(Value::Int(i64::MIN), value.clone())]),
+                op == parser::CmpOp::Lt,
+            ),
+            _ => return (None, false),
+        };
+        let complete = rows.is_some() && !exclusive;
+        (rows, complete)
+    }
+
+    /// `(rows, complete)` for one predicate tree.
+    ///
+    /// `complete` says the row set *is* the predicate's answer rather than a
+    /// superset of it.
+    fn indexed_rows(
+        &self,
+        table: &str,
+        schema: &[String],
+        expr: &Expr,
+    ) -> (Option<Vec<u64>>, bool) {
         // `col <op> literal`; a literal on the left is left to the scan.
         fn axis(expr: &Expr) -> Option<(usize, parser::CmpOp, &Value)> {
             match expr {
@@ -937,42 +1018,88 @@ impl Engine {
             }
         }
         if let Some((pos, op, value)) = axis(expr) {
-            let column = schema.get(pos)?;
-            if op == parser::CmpOp::Eq {
-                let literal = value_to_literal(value.clone());
-                return self.index_lookup(table, column, &literal);
-            }
-            let (lo, hi) = match op {
-                parser::CmpOp::Gt | parser::CmpOp::Ge => (value.clone(), Value::Int(i64::MAX)),
-                parser::CmpOp::Lt | parser::CmpOp::Le => (Value::Int(i64::MIN), value.clone()),
-                _ => return None,
-            };
-            return self.index_range_lookup(table, column, &[(lo, hi)]);
+            return self.indexed_axis_rows(table, schema, pos, op, value);
         }
-        // `a >= lo AND a < hi` (either order, either bound): one interval.
+        // `a >= lo AND a < hi` (either order, either bound): one interval read
+        // instead of two, and exact when both bounds were inclusive.
         if let Expr::And(left, right) = expr {
-            let (lpos, lop, lvalue) = axis(left)?;
-            let (rpos, rop, rvalue) = axis(right)?;
-            if lpos != rpos {
-                return None;
-            }
-            let column = schema.get(lpos)?;
-            let mut lo = Value::Int(i64::MIN);
-            let mut hi = Value::Int(i64::MAX);
-            for (op, value) in [(lop, lvalue), (rop, rvalue)] {
-                match op {
-                    parser::CmpOp::Gt | parser::CmpOp::Ge => lo = value.clone(),
-                    parser::CmpOp::Lt | parser::CmpOp::Le => hi = value.clone(),
-                    parser::CmpOp::Eq => {
-                        lo = value.clone();
-                        hi = value.clone();
+            if let (Some((lpos, lop, lvalue)), Some((rpos, rop, rvalue))) =
+                (axis(left), axis(right))
+            {
+                if lpos == rpos {
+                    if let Some(column) = schema.get(lpos) {
+                        let mut lo = Value::Int(i64::MIN);
+                        let mut hi = Value::Int(i64::MAX);
+                        let mut exclusive = false;
+                        for (op, value) in [(lop, lvalue), (rop, rvalue)] {
+                            match op {
+                                parser::CmpOp::Gt | parser::CmpOp::Ge => {
+                                    exclusive |= op == parser::CmpOp::Gt;
+                                    lo = value.clone();
+                                }
+                                parser::CmpOp::Lt | parser::CmpOp::Le => {
+                                    exclusive |= op == parser::CmpOp::Lt;
+                                    hi = value.clone();
+                                }
+                                parser::CmpOp::Eq => {
+                                    lo = value.clone();
+                                    hi = value.clone();
+                                }
+                                _ => {
+                                    exclusive = true;
+                                }
+                            }
+                        }
+                        let rows = self.index_range_lookup(table, column, &[(lo, hi)]);
+                        let complete = rows.is_some() && !exclusive;
+                        return (rows, complete);
                     }
-                    _ => return None,
                 }
             }
-            return self.index_range_lookup(table, column, &[(lo, hi)]);
+            // Two conjuncts that answer on their own columns: intersect. The
+            // result is exact only when both were - the other conjunct was not
+            // checked against these rows.
+            let (left_rows, left_complete) = self.indexed_rows(table, schema, left);
+            let (right_rows, right_complete) = self.indexed_rows(table, schema, right);
+            return match (left_rows, right_rows) {
+                (Some(mut a), Some(mut b)) => {
+                    // Both lookups already return ascending ids; the sort is the
+                    // guard that keeps a future caller from turning this
+                    // intersection into a silent row filter.
+                    b.sort_unstable();
+                    a.retain(|seq| b.binary_search(seq).is_ok());
+                    (Some(a), left_complete && right_complete)
+                }
+                (Some(a), None) => (Some(a), false),
+                (None, Some(b)) => (Some(b), false),
+                (None, None) => (None, false),
+            };
         }
-        None
+        (None, false)
+    }
+
+    /// The row ids `filters` admit, when every one of them is answerable from a
+    /// secondary index alone.
+    ///
+    /// Nothing re-checks a search's candidate mask, so a partially answered
+    /// filter cannot be used: `None` means "decode the rows" (the caller's
+    /// columnar or row path), which is exact by construction.
+    pub(crate) fn indexed_filter_rows(
+        &self,
+        table: &str,
+        filters: &[&Expr],
+    ) -> Option<std::collections::HashSet<u64>> {
+        let schema = self.table_schema(table).ok()?;
+        let mut out: Option<std::collections::HashSet<u64>> = None;
+        for filter in filters {
+            let ids = self.indexed_predicate_exact_rows(table, &schema, filter)?;
+            let set: std::collections::HashSet<u64> = ids.into_iter().collect();
+            out = Some(match out {
+                None => set,
+                Some(prev) => prev.intersection(&set).copied().collect(),
+            });
+        }
+        out
     }
 
     pub(crate) fn fetch_rows_by_ids(&self, table: &str, ids: &[u64]) -> Result<Vec<Vec<Value>>> {
@@ -3779,13 +3906,29 @@ impl Engine {
         table: &str,
         first: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
+        self.fetch_rows_including_deleted_wanted(table, first, None)
+    }
+
+    /// [`Self::fetch_rows_including_deleted_from`] for a **column subset**.
+    ///
+    /// A caller that wants one column (an index recovery projecting the column
+    /// it indexes) must say so: the unprojected walk decodes every column of
+    /// every row, and a MULTIVECTOR column is rendered float by float - three
+    /// secondary indexes reopening over the full walk cost 1.4 GB of tensor
+    /// text each on rgrep's 62 k-row table.
+    pub(crate) fn fetch_rows_including_deleted_wanted(
+        &self,
+        table: &str,
+        first: usize,
+        wanted: Option<&[usize]>,
+    ) -> Result<Vec<(usize, Vec<Value>)>> {
         let name = self.table_key(table);
         // The blocks hold every row a segment ever held, tombstoned slots
         // included - which is what the index mirrors count. The append buffer
         // adds the rows above the last checkpoint, exactly as it does for a
         // visible scan.
         let mut rows: Vec<(usize, Vec<Value>)> = self
-            .read_blocks_including_deleted_from(&name, first)
+            .read_blocks_including_deleted_wanted(&name, first, wanted)
             .into_iter()
             .map(|(seq, cells)| (seq, cells.iter().map(|c| parse_value(c)).collect()))
             .collect();
@@ -3802,13 +3945,44 @@ impl Engine {
     /// Every row id the table holds, tombstoned slots included, ascending.
     ///
     /// The ids alone: a recovery that only needs to know which rows an index
-    /// is missing must not decode the rows to find out.
+    /// is missing must not decode the rows to find out. This used to go through
+    /// [`Self::read_blocks_including_deleted_from`], which renders **every cell
+    /// of every column** and then dropped all of it for the `seq` - a
+    /// MULTIVECTOR cell is one `fmt_f32_cpp` per float it holds, so on rgrep's
+    /// index (62 k rows, 1.4 GB of tensor text) a reopen spent minutes here
+    /// before the first query could start (sampled: all of it inside
+    /// `fmt_f32_cpp` under `recover_mem_index`).
+    ///
+    /// How many rows a block holds is its `version` file's answer - the same
+    /// number `decode_rows_of_values` walks (`created.last()`), so the ids are
+    /// the ones a decode would have produced, and no column is read.
     pub(crate) fn row_ids_including_deleted(&self, table: &str) -> Result<Vec<usize>> {
-        Ok(self
-            .read_blocks_including_deleted_from(&self.qualified_table(table), 0)
-            .into_iter()
-            .map(|(seq, _)| seq)
-            .collect())
+        let table = self.qualified_table(table);
+        let root = self.blocks_root();
+        let mut out = Vec::new();
+        for id in self.visible_block_ids(&table) {
+            let Ok(block) = self.block_map(&table, &root, id) else {
+                continue;
+            };
+            let rows = block
+                .version()
+                .created
+                .last()
+                .map(|c| c.cumulative_row_count.max(0) as usize)
+                .unwrap_or(0);
+            let base = ((id.segment_id as usize) << 32)
+                | (id.block_id as usize * storage::format::DEFAULT_BLOCK_CAPACITY);
+            out.extend(base..base + rows);
+        }
+        // The tail above the last checkpoint is the append buffer's. Its ids are
+        // taken as ids - materialising the rows to read their first field would
+        // clone every buffered tensor.
+        if let Some(entry) = self.tables.lock().unwrap().get(&self.table_key(&table)) {
+            out.extend((0..entry.pending_rows.len()).map(|k| entry.pending_rows.row_id(k)));
+        }
+        out.sort_unstable();
+        out.dedup();
+        Ok(out)
     }
 
     /// Full rows from the C++ block mirror.
@@ -5410,57 +5584,6 @@ impl Engine {
         Ok(chunks)
     }
 
-    /// Builds (once) the multi-vector index of a column from its rows: every
-    /// document goes to the memory tail and is dumped immediately, so later
-    /// queries only map the segment files. Subsequent inserts append to the
-    /// tail and `flush()` seals it (the reference's dump).
-    /// Points a multi-vector index at its catalog chunk directory and takes its
-    /// chunk counter from the catalog (`GetAndSetNextChunkID`).
-    fn attach_mv_chunk_root(&self, table: &str, index_id: u64, index: &mut MultiVectorIndex) {
-        let qualified = self.qualified_table(table);
-        let Some(meta) = self
-            .storage
-            .catalog
-            .get_table_by_name(&qualified)
-            .ok()
-            .flatten()
-        else {
-            return;
-        };
-        if index_id == 0 {
-            return;
-        }
-        let db_id = self.database_id_of(&qualified);
-        index.chunk_root = Some(
-            self.blocks_root()
-                .join(format!("db_{db_id}/tbl_{}/idx_{index_id}", meta.id)),
-        );
-        // `GetAndSetNextChunkID` over every segment of this index.
-        let mut next = 0u32;
-        let Ok(layers) = catalog::layout::read_index_chunks(
-            self.storage.catalog.store().as_ref(),
-            &db_id.to_string(),
-            &meta.id.to_string(),
-            &index_id.to_string(),
-        ) else {
-            return;
-        };
-        for (segment, chunks) in layers {
-            let from_tag = self
-                .storage
-                .catalog
-                .next_chunk_id(&db_id.to_string(), &meta.id.to_string(), index_id, segment)
-                .unwrap_or(0);
-            let from_records = chunks
-                .iter()
-                .map(|(id, _)| *id as u32 + 1)
-                .max()
-                .unwrap_or(0);
-            next = next.max(from_tag).max(from_records);
-        }
-        index.next_chunk = u64::from(next);
-    }
-
     /// The multi-vector index a `MATCH TENSOR` on `column` resolves to: the
     /// column's first `PLAID`/`SMVE`/`EMVB` record, or an error when it has
     /// none (`PhysicalMatchTensorScan::PlanWithIndex` leaves such a column to
@@ -5517,7 +5640,7 @@ impl Engine {
             let tables = self.tables.lock().unwrap();
             tables.get(&tkey).and_then(|e| e.mv.get(&index_id)).cloned()
         };
-        if let Some(idx) = cached {
+        if let Some(idx) = cached.clone() {
             // `doc_count` counts parsed documents only: a column with a NULL or
             // unparseable tensor row would then never look complete and every
             // search would rebuild the index (PLAID training included). The
@@ -5552,41 +5675,233 @@ impl Engine {
         // re-adds every embedding. The chunk's document order is the row order,
         // so a light column scan recovers the row ids.
         if record.index_type.eq_ignore_ascii_case("PLAID") {
-            if let Ok(loaded) = self.read_plaid_index(table, &index_name) {
-                let seqs = self.multivector_row_ids(table, ci, dims).await?;
-                if !seqs.is_empty() && loaded.doc_num() as usize == seqs.len() {
-                    let mut index = MultiVectorIndex::new(
-                        dir.clone(),
-                        dims,
-                        self.mv_plaid_config(table, &index_name),
-                        self.mv_smve_config(table, &index_name),
-                        self.mv_emvb_config(table, &index_name),
-                    );
-                    self.attach_mv_chunk_root(table, index_id, &mut index);
-                    index.scanned_rows = reserved;
-                    // The sealed scan is the fallback when a filter excludes
-                    // every PLAID candidate; without the readers a filtered
-                    // search would answer nothing at all.
-                    index.load_sealed(&seqs);
-                    index.plaid_seqs = seqs;
-                    index.plaid = Some(loaded);
-                    let shared = Arc::new(std::sync::RwLock::new(index));
-                    self.tables
-                        .lock()
-                        .unwrap()
-                        .entry(tkey)
-                        .or_default()
-                        .mv
-                        .insert(index_id, shared.clone());
-                    return Ok(shared);
+            let mirror_read = self.read_plaid_chunks(table, &index_name);
+            if let Ok(loaded) = mirror_read {
+                // An **empty** chunk list is not a mirror: no dump ever ran, so
+                // there is nothing to load and the rebuild below is the only way
+                // to produce the first chunk. Treating it as a zero-document
+                // mirror put every row into the tail and marked the index
+                // complete, so the optimise/build step never ran and the column
+                // was served by the exact scan forever.
+                if !loaded.is_empty() {
+                    // A chunk that names its own rows (`rows_{id}.bin`, written
+                    // by every dump and fold) is loaded as-is. The record's
+                    // document offsets describe the table as it was at dump
+                    // time, so they stop lining up the moment a row is deleted -
+                    // and every cold start then retrained the whole index
+                    // (minutes, per launch, on rgrep's 62 k units). The list
+                    // does not move when later writes land.
+                    if let Some(listed) = self.plaid_chunk_rows(table, &index_name) {
+                        let mut index = MultiVectorIndex::new(
+                            dir.clone(),
+                            dims,
+                            self.mv_plaid_config(table, &index_name),
+                            self.mv_smve_config(table, &index_name),
+                            self.mv_emvb_config(table, &index_name),
+                        );
+                        index.scanned_rows = reserved;
+                        let mut known: std::collections::HashSet<u64> =
+                            std::collections::HashSet::new();
+                        // `listed` already dropped the chunks a newer chunk
+                        // covers (a fold whose deprecation did not land), so a
+                        // chunk it does not name is not live.
+                        for chunk in loaded {
+                            let Some(rows) = listed.get(&chunk.id) else {
+                                continue;
+                            };
+                            if rows.len() != chunk.index.doc_num() as usize {
+                                continue;
+                            }
+                            known.extend(rows.iter().copied());
+                            index.plaid_chunks.push(PlaidChunk {
+                                row_ids: rows.clone(),
+                                index: Arc::new(chunk.index),
+                            });
+                        }
+                        // The rows no chunk names - written after the last dump
+                        // - stay in the tail, where the search scores them
+                        // exactly. Only those rows are decoded: reading every
+                        // row to find them re-rendered the whole tensor column.
+                        if let Some(all) = self.tensor_row_ids(table, ci) {
+                            let set: std::collections::HashSet<usize> = all
+                                .into_iter()
+                                .filter(|seq| !known.contains(seq))
+                                .map(|seq| seq as usize)
+                                .collect();
+                            if !set.is_empty() {
+                                for (seq, cells) in self
+                                    .read_blocks_candidates_values(table, &[ci], &set)
+                                    .await?
+                                    .1
+                                {
+                                    let Some(cell) = cells.get(ci) else {
+                                        continue;
+                                    };
+                                    let text = match cell {
+                                        Value::Str(s) => s.clone(),
+                                        other => other.to_slt_string(),
+                                    };
+                                    if let Some(doc) = parse_multivector_doc(&text, dims) {
+                                        index.insert(seq as u64, doc);
+                                    }
+                                }
+                                for (seq, values) in self.pending_rows_of(table) {
+                                    if !set.contains(&seq) {
+                                        continue;
+                                    }
+                                    let Some(Value::Str(text)) = values.get(ci) else {
+                                        continue;
+                                    };
+                                    if let Some(doc) = parse_multivector_doc(text, dims) {
+                                        index.insert(seq as u64, doc);
+                                    }
+                                }
+                            }
+                        }
+                        // Rows written since the last dump live in the registered
+                        // index's tail; they are buffered here too, or replacing
+                        // the registration without this dropped them from every
+                        // answer.
+                        if let Some(previous) = cached.as_ref() {
+                            let rows = previous.read().map(|p| p.tail_rows()).unwrap_or_default();
+                            for (seq, doc) in rows {
+                                index.insert(seq, doc);
+                            }
+                        }
+                        let shared = Arc::new(std::sync::RwLock::new(index));
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .mv
+                            .insert(index_id, shared.clone());
+                        return Ok(shared);
+                    }
+                    // Every document the chunk set holds, in chunk order - that
+                    // order is the order rows were dumped in, and each chunk's
+                    // `base_row_id` is the offset it starts at.
+                    let docs = loaded
+                        .iter()
+                        .map(|chunk| chunk.index.doc_num() as usize)
+                        .sum::<usize>();
+                    // The row ids those documents came from. With no tombstone and a
+                    // document count that matches the live rows, every row is one
+                    // document and the ids are `0..docs` - the scan below exists to
+                    // recover *which* rows the documents came from, and there is
+                    // nothing to recover. Scanning anyway materialised every row's
+                    // tensor (204k rows: 3.9 s of a cold first query).
+                    let seqs: Vec<u64> =
+                        if docs == reserved as usize && self.deleted_set(table).is_empty() {
+                            (0..docs as u64).collect()
+                        } else {
+                            self.multivector_row_ids(table, ci, dims).await?
+                        };
+                    // A mirror that covers a **prefix** of the rows is usable: the
+                    // next dump appends the rows past the ones already mirrored, so
+                    // the chunks hold the first `docs` row ids. The rows past them
+                    // are buffered exactly as an unbuilt `PlaidIndexInMem` buffers
+                    // them - the search scores that range from the column.
+                    //
+                    // This used to require an exact document count, so a checkpoint
+                    // that landed after the last dump made the next open rescan the
+                    // table and retrain the centroids - minutes of work on the first
+                    // query of a large table (measured on 62 k units: past the 120 s
+                    // RPC timeout). Tombstones keep the strict path: `seqs` would no
+                    // longer be `0..docs`, and the mirror's order is the row order it
+                    // was written in, not the surviving rows.
+                    let prefix_ok = self.deleted_set(table).is_empty();
+                    if !seqs.is_empty() && (docs == seqs.len() || (prefix_ok && docs < seqs.len()))
+                    {
+                        let mut index = MultiVectorIndex::new(
+                            dir.clone(),
+                            dims,
+                            self.mv_plaid_config(table, &index_name),
+                            self.mv_smve_config(table, &index_name),
+                            self.mv_emvb_config(table, &index_name),
+                        );
+                        index.scanned_rows = reserved;
+                        // No `load_sealed` beside PLAID: the chunk the reference
+                        // writes for this index is the index itself, and there is no
+                        // raw-token file to map.
+                        //
+                        // The chunks are **not** folded together. `PlaidIndexInMem`
+                        // is one object, and the dumps it made are separate objects
+                        // that a search probes one by one
+                        // (`PhysicalMatchTensorScan`); folding them here decoded every
+                        // chunk and rebuilt the IVF on the read path, for a merge the
+                        // optimize pass may never need.
+                        for chunk in loaded {
+                            // `base_row_id` is the **document** offset the dump
+                            // started at, and `seqs` is the same document sequence,
+                            // so the slice names exactly the rows the chunk holds.
+                            let begin = chunk.base_row_id as usize;
+                            let n = chunk.index.doc_num() as usize;
+                            if begin + n > seqs.len() {
+                                break;
+                            }
+                            index.plaid_chunks.push(PlaidChunk {
+                                row_ids: seqs[begin..begin + n].to_vec(),
+                                index: Arc::new(chunk.index),
+                            });
+                        }
+                        // The rows the dump has not reached yet stay in the buffer:
+                        // `insert` finds no memory index and keeps them in the tail,
+                        // where the search scores them exactly.
+                        if docs < seqs.len() {
+                            for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
+                                if seq < docs {
+                                    continue;
+                                }
+                                let Some(cell) = cells.get(ci) else {
+                                    continue;
+                                };
+                                let text = match cell {
+                                    Value::Str(s) => s.clone(),
+                                    other => other.to_slt_string(),
+                                };
+                                if let Some(doc) = parse_multivector_doc(&text, dims) {
+                                    index.insert(seq as u64, doc);
+                                }
+                            }
+                            index.scanned_rows = reserved;
+                        }
+                        // Rows written since the last dump live in the registered
+                        // index's tail; they are buffered here too, or replacing the
+                        // registration without this dropped them from every answer.
+                        if let Some(previous) = cached.as_ref() {
+                            let rows = previous.read().map(|p| p.tail_rows()).unwrap_or_default();
+                            for (seq, doc) in rows {
+                                index.insert(seq, doc);
+                            }
+                        }
+                        let shared = Arc::new(std::sync::RwLock::new(index));
+                        self.tables
+                            .lock()
+                            .unwrap()
+                            .entry(tkey)
+                            .or_default()
+                            .mv
+                            .insert(index_id, shared.clone());
+                        // The appended rows are **not** written back here. A load is
+                        // a read; the mirror is published by a dump or a checkpoint
+                        // (`write_plaid_index`), the way the reference's
+                        // `DumpMemIndex` is the only writer of a chunk. Writing from
+                        // the load path made the mirror grow on a query, and the
+                        // growth was invisible to the process that wrote it: the
+                        // chunk records it created are only visible after the next
+                        // checkpoint, so a second cold start read the old mirror and
+                        // answered with fewer rows than the first.
+                        return Ok(shared);
+                    }
                 }
             }
         }
-        // A rebuild rewrites the chunk set; drop stale files so the readers
-        // never mix two builds. `seal` writes under `chunk_root/seg_{n}`, so a
-        // sweep of the transient `dir` alone left every earlier generation in
-        // place - and `load_sealed` loads any `.mvec` whose document count
-        // matches, so a stale generation could be served instead of the new one.
+        // `seal` writes no segment files any more, so a rebuild leaves nothing
+        // of its own behind - but a directory written before that change still
+        // holds the raw-token copies (`seg_*.mvec`) and their EMVB companions.
+        // Nothing reads them now; sweep them so a rebuild does not leave a
+        // second copy of the column on disk.
         let mut roots = vec![dir.clone()];
         if let Some(meta) = self.storage.catalog.get_table_by_name(table).ok().flatten() {
             roots.push(self.blocks_root().join(format!(
@@ -5609,7 +5924,6 @@ impl Engine {
             self.mv_smve_config(table, &index_name),
             self.mv_emvb_config(table, &index_name),
         );
-        self.attach_mv_chunk_root(table, index_id, &mut index);
         let mut scanned = 0usize;
         for (seq, cells) in self.fetch_rows_with_ids_projected_all(table, ci)? {
             scanned += 1;
@@ -5623,8 +5937,8 @@ impl Engine {
             }
         }
         // A row whose tensor does not parse still counts as seen: the reference
-        // indexes the rows it is given, and the search falls back to the sealed
-        // chunks for the rest.
+        // indexes the rows it is given, and the search falls back to the exact
+        // scan for the rest.
         index.scanned_rows = scanned;
         // The reference trains `PlaidGlobalCentroids` and builds
         // `PlaidIndexInMem` while the embeddings are buffered, before the dump.
@@ -5639,12 +5953,59 @@ impl Engine {
             .or_default()
             .mv
             .insert(index_id, shared.clone());
+        // Make the rebuild durable. The PLAID chunk is the only artifact here -
+        // `seal` writes nothing for this column - and it is what
+        // `read_plaid_index` needs to skip the retraining; without it a rebuild
+        // left nothing behind and the next process paid it again (248 s, twice,
+        // on one 62 k-unit directory). Best effort, and safe if it under-covers:
+        // the fast path compares the chunk's document count with the rows it can
+        // read and falls back to a rebuild when they disagree.
+        if record.index_type.eq_ignore_ascii_case("PLAID") {
+            let _ = self.write_plaid_index(table, &index_name).await;
+        }
         Ok(shared)
+    }
+
+    /// The in-memory multi-vector index of `(table, index_id)`, if this process
+    /// has one. Unlike [`Self::multivector_index_by_id`] it never builds: the
+    /// checkpoint publishes what is already there, and a table whose index was
+    /// never touched has nothing to publish.
+    pub(crate) fn cached_multivector_index(
+        &self,
+        table: &str,
+        index_id: u64,
+    ) -> Option<Arc<std::sync::RwLock<MultiVectorIndex>>> {
+        let qualified = self.qualified_table(table);
+        let tkey = self.table_key(&qualified);
+        let tables = self.tables.lock().unwrap();
+        tables.get(&tkey).and_then(|e| e.mv.get(&index_id)).cloned()
     }
 
     /// The rows a `SEARCH MATCH …` filter admits. The reference computes a
     /// per-block bitmask (`CalculateFilterBitmask`) and passes it to the index;
     /// this evaluates the same predicates once over the rows.
+    /// The row ids `filters` admit, for an index's candidate mask.
+    ///
+    /// Columnar when the predicates allow it ([`Self::columnar_mask_rows`]: only
+    /// the named columns are decoded, a column at a time), the row path
+    /// otherwise. The row path decodes every column of every row, which costs
+    /// ~130 ms over 2e5 rows - more than the indexed search the mask guards, so
+    /// using it here made a filtered query fifteen times slower than the same
+    /// query without a filter.
+    async fn filter_row_ids(
+        &self,
+        table: &str,
+        filters: &[&Expr],
+    ) -> Result<std::collections::HashSet<u64>> {
+        if filters.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
+        match self.columnar_mask_rows(table, filters).await {
+            Some(mask) => Ok(mask.iter().collect()),
+            None => self.match_filter_rows(table, filters).await,
+        }
+    }
+
     async fn match_filter_rows(
         &self,
         table: &str,
@@ -5665,6 +6026,10 @@ impl Engine {
     /// The rows `filters` admit, as a row-id set, or `None` when their shapes
     /// are not columnar-evaluable.
     ///
+    /// A secondary index answers first where it can: `lang = ?` is a bitmap
+    /// read, a range on an ordered key a slice, and a conjunction of them is
+    /// intersected - no row is decoded ([`Self::indexed_filter_rows`]).
+    ///
     /// [`Self::match_filter_rows`] decodes every column of every row; this
     /// decodes only the columns the predicates name and evaluates them a column
     /// at a time ([`crate::columnar_filter::predicate_mask`]). That is what
@@ -5683,6 +6048,15 @@ impl Engine {
     async fn columnar_mask_rows(&self, table: &str, filters: &[&Expr]) -> Option<common::RowMask> {
         if filters.is_empty() {
             return None;
+        }
+        // A secondary index answers a predicate without any column being decoded:
+        // `lang = ?` is a bitmap read, a range on an ordered key a slice, and a
+        // conjunction of them is intersected. That is the cheap mask; decoding
+        // the named columns is the fallback for everything else. The answer has
+        // to be the filter's own, not a subset, or a search would lose rows -
+        // see `indexed_filter_rows`.
+        if let Some(rows) = self.indexed_filter_rows(table, filters) {
+            return Some(common::RowMask::from_rows(rows.into_iter().collect()));
         }
         let mut wanted: Vec<usize> = Vec::new();
         for filter in filters {
@@ -5737,21 +6111,43 @@ impl Engine {
     }
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
-    /// chunk was written in (`plaid_chunk` -> `column_docs`).
+    /// chunk was written in (`plaid_chunk` -> `for_each_tensor_doc`).
     ///
     /// `fetch_rows_with_ids` is the *live* population, which is what the chunk
     /// writer reads: a tombstoned row is not in a chunk, so listing it here
     /// would make the count disagree with `doc_num()` and every reopen would
     /// retrain the index instead of mapping it.
     async fn multivector_row_ids(&self, table: &str, ci: usize, dims: usize) -> Result<Vec<u64>> {
+        let _ = dims;
+        // A tensor column answers the question from its null bitmap without
+        // rendering a single tensor: `fetch_rows_with_ids` below builds every
+        // row of the table as `Value`s, and that decodes a MULTIVECTOR cell by
+        // formatting each float it holds (~1.4 GB of text, 66 s, on rgrep's
+        // 62 k rows) only to look at the first and last byte of it.
+        if let Some(ids) = self.tensor_row_ids(table, ci) {
+            return Ok(ids);
+        }
         let mut out = Vec::new();
         for (seq, row) in self.fetch_rows_with_ids(table).await? {
             let text = match row.get(ci) {
-                Some(Value::Str(s)) => s.clone(),
-                Some(other) => other.to_slt_string(),
+                Some(Value::Str(s)) => s.as_str(),
+                Some(other) => {
+                    // A non-string cell in a tensor column reaches the parser as
+                    // its text form; it cannot be a document either way.
+                    let _ = other;
+                    continue;
+                }
                 None => continue,
             };
-            if parse_multivector_doc(&text, dims).is_some() {
+            // Only the *shape* is asked for here: this list exists to line row
+            // ids up with the chunk's documents, and parsing the tensor to prove
+            // it holds a document decoded ~12 k floats per row - 9.7 s of a
+            // 9.7 s query at 1.6 k units, all of it conversion. A cell that
+            // merely looks like a tensor but does not parse makes the count
+            // disagree with `doc_num()`, which sends the caller to the exact
+            // rebuild rather than to a wrong answer.
+            let trimmed = text.trim();
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
                 out.push(seq as u64);
             }
         }
@@ -5869,30 +6265,31 @@ impl Engine {
         Some(cfg)
     }
 
-    /// Exact MaxSim of one row against `query`, read from the row
-    /// (used to re-rank SMVE candidates the way the reference reads the column).
-    pub(crate) fn exact_tensor_score(
+    /// Exact MaxSim for `seqs`, read from the column's blocks.
+    ///
+    /// One block decode per block the rows touch and a `&[f32]` borrow per
+    /// token: this is the scoring path the multi-vector index uses for
+    /// everything it published, and the SMVE re-rank.
+    pub(crate) fn tensor_scores(
         &self,
         table: &str,
         column: &str,
         dims: usize,
         query: &[Vec<f32>],
-        seq: u64,
-    ) -> Option<f32> {
-        let schema = self.table_schema(table).ok()?;
-        let ci = schema.iter().position(|c| c == column)?;
-        let cells = self
-            .fetch_some_rows_with_ids(table, &[seq])
-            .ok()?
-            .into_iter()
-            .next()?
-            .1;
-        let text = match cells.get(ci)? {
-            Value::Str(s) => s.clone(),
-            other => other.to_slt_string(),
-        };
-        let doc = parse_multivector_doc(&text, dims)?;
-        Some(maxsim_tokens(query, &doc))
+        seqs: &[u64],
+    ) -> Result<Vec<(u64, f32)>> {
+        if seqs.is_empty() {
+            return Ok(Vec::new());
+        }
+        let schema = self.table_schema(table)?;
+        let ci = schema
+            .iter()
+            .position(|c| c == column)
+            .ok_or_else(|| Error::NotFound(format!("column '{column}'")))?;
+        let mut cursor = crate::blocks::BlockCursor::new(self, table)?;
+        let mut out = Vec::with_capacity(seqs.len());
+        cursor.tensor_scores(ci, dims, query, seqs, &mut out)?;
+        Ok(out)
     }
 
     /// Test-only: the id of the **first secondary** index on `column`.
@@ -6340,6 +6737,11 @@ impl Engine {
     }
 
     /// [`Self::fetch_rows_with_ids_projected_all`] from row id `first` on.
+    ///
+    /// The projection reaches the block reader (`wanted`), so the columns this
+    /// caller does not name are never decoded - `cells.get(idx)` below used to
+    /// be the only thing keeping a whole-table decode, tensor column included,
+    /// alive.
     pub(crate) fn fetch_rows_with_ids_projected_from(
         &self,
         table: &str,
@@ -6347,7 +6749,7 @@ impl Engine {
         first: usize,
     ) -> Result<Vec<(usize, Vec<Value>)>> {
         Ok(self
-            .fetch_rows_including_deleted_from(table, first)?
+            .fetch_rows_including_deleted_wanted(table, first, Some(&[idx]))?
             .into_iter()
             .map(|(seq, cells)| {
                 let value = cells.get(idx).cloned().unwrap_or(Value::Null);
@@ -7761,7 +8163,9 @@ impl Engine {
 
     /// The rows a `SEARCH MATCH TEXT` may score, ascending: the `WHERE`, the
     /// `FILTER (…)` clause and the `filter=…` option evaluated once over the
-    /// table, minus the tombstones. `None` when the query carries no filter.
+    /// table ([`Self::filter_row_ids`]: from a secondary index where it answers
+    /// them, from the named columns otherwise), minus the tombstones. `None`
+    /// when the query carries no filter.
     ///
     /// The result travels to the scorers as row ids rather than as a predicate
     /// closure because both of them **seek** with it: the block-max WAND moves
@@ -7778,21 +8182,23 @@ impl Engine {
         if pred.is_none() && in_filter.is_none() && opt_filter.is_none() {
             return Ok(None);
         }
-        let mut rows: Vec<u64> = Vec::new();
-        for (seq, row) in self.fetch_rows_with_ids(table).await? {
-            let row_id = seq as u64;
-            // A tombstone can never be scored, so it is not an admitted row
-            // either: leaving it out makes the seek skip deletes too.
-            if dead.contains(row_id) {
-                continue;
-            }
-            let ok = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true)
-                && in_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true)
-                && opt_filter.map(|p| p.eval_predicate(&row)).unwrap_or(true);
-            if ok {
-                rows.push(row_id);
-            }
-        }
+        // One implementation of "which rows do the predicates admit": a
+        // secondary index answers them where it can (a probe or a key range, no
+        // row decoded), the columnar mask decodes only the named columns
+        // otherwise, and only a shape neither handles falls back to the row
+        // path. This used to decode every column of every row here.
+        let filters: Vec<&Expr> = [pred, in_filter, opt_filter]
+            .into_iter()
+            .flatten()
+            .collect();
+        // A tombstone can never be scored, so it is not an admitted row either:
+        // leaving it out makes the seek skip deletes too.
+        let mut rows: Vec<u64> = self
+            .filter_row_ids(table, &filters)
+            .await?
+            .into_iter()
+            .filter(|row_id| !dead.contains(*row_id))
+            .collect();
         // The row cache the fetch may answer from is not ordered by row id, and
         // the pushdown needs `partition_point` to work.
         rows.sort_unstable();
@@ -10383,10 +10789,7 @@ impl Engine {
                 && tensor_elem_type(&decl_up) != ElemType::Bit
             {
                 if let Some(dims) = type_dim(&decl_up) {
-                    let q_flat: Vec<f32> = query_items
-                        .iter()
-                        .filter_map(|x| x.trim().parse::<f32>().ok())
-                        .collect();
+                    let q_flat: Vec<f32> = query_floats(&query_items);
                     if dims > 0 && !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
                         let query: Vec<Vec<f32>> =
                             q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
@@ -10395,10 +10798,30 @@ impl Engine {
                         // scan reads the blocks, so a missing record falls
                         // through to the exact scan below.
                         let index = self.multivector_index_for(table, &column, dims).await.ok();
-                        if let Some(index) = index {
+                        // Does the index hold anything to answer from? A PLAID
+                        // index below its build threshold holds no document at
+                        // all - the reference's `PlaidIndexInMem::SearchWithBitmask`
+                        // returns its row range for the caller to score from the
+                        // column, and the operator does exactly that. Falling
+                        // through to the exact scan below is that path; without
+                        // it a small column whose index never got enough
+                        // embeddings answered nothing.
+                        let usable = index
+                            .as_ref()
+                            .and_then(|index| {
+                                index.read().ok().map(|guard| {
+                                    guard.plaid.is_some()
+                                        || !guard.plaid_chunks.is_empty()
+                                        || !guard.tail.is_empty()
+                                        || !guard.sealed.is_empty()
+                                })
+                            })
+                            .unwrap_or(false);
+                        if let Some(index) = index.filter(|_| usable) {
                             let dead = self.tombstone_set(table)?;
-                            let rank = |seq: u64| {
-                                self.exact_tensor_score(table, &column, dims, &query, seq)
+                            let mut rank = |seqs: &[u64]| -> Vec<(u64, f32)> {
+                                self.tensor_scores(table, &column, dims, &query, seqs)
+                                    .unwrap_or_default()
                             };
                             let plaid_options = crate::engine::state::plaid_search_options(
                                 |key| option_value(key),
@@ -10412,16 +10835,17 @@ impl Engine {
                                 if filters.is_empty() {
                                     None
                                 } else {
-                                    Some(self.match_filter_rows(table, &filters).await?)
+                                    Some(self.filter_row_ids(table, &filters).await?)
                                 };
                             let hits = index.read().unwrap().search(
                                 &query,
                                 topn.max(1),
                                 &dead,
-                                Some(&rank),
+                                Some(&mut rank),
                                 &plaid_options,
                                 allowed.as_ref(),
                             );
+
                             let scored: Vec<(u64, f64)> = hits
                                 .into_iter()
                                 .map(|(seq, score)| (seq, f64::from(score)))
@@ -10529,10 +10953,7 @@ impl Engine {
         {
             let dims = types.get(col_idx).and_then(|t| type_dim(t));
             if let Some(dims) = dims.filter(|d| *d > 0) {
-                let q_flat: Vec<f32> = query_items
-                    .iter()
-                    .filter_map(|x| x.trim().parse::<f32>().ok())
-                    .collect();
+                let q_flat: Vec<f32> = query_floats(&query_items);
                 if !q_flat.is_empty() && q_flat.len().is_multiple_of(dims) {
                     let query: Vec<Vec<f32>> =
                         q_flat.chunks_exact(dims).map(|c| c.to_vec()).collect();
@@ -10552,8 +10973,13 @@ impl Engine {
                     });
                     if let Some(index) = index {
                         let dead = self.tombstone_set(table)?;
-                        let rank =
-                            |seq: u64| self.exact_tensor_score(table, &column, dims, &query, seq);
+                        // The index names the candidates; their score is the
+                        // column's. One batch per query, so the blocks are
+                        // mapped once instead of once per candidate.
+                        let mut rank = |seqs: &[u64]| -> Vec<(u64, f32)> {
+                            self.tensor_scores(table, &column, dims, &query, seqs)
+                                .unwrap_or_default()
+                        };
                         let plaid_options = crate::engine::state::plaid_search_options(
                             |key| option_value(key),
                             topn,
@@ -10566,7 +10992,7 @@ impl Engine {
                         {
                             None
                         } else {
-                            Some(self.match_filter_rows(table, &filters).await?)
+                            Some(self.filter_row_ids(table, &filters).await?)
                         };
                         let hits: Vec<(u64, f32)> = index
                             .read()
@@ -10575,7 +11001,7 @@ impl Engine {
                                 &query,
                                 topn.max(1),
                                 &dead,
-                                Some(&rank),
+                                Some(&mut rank),
                                 &plaid_options,
                                 allowed.as_ref(),
                             )
@@ -11237,10 +11663,7 @@ impl Engine {
             if dims == 0 {
                 return HashMap::new();
             }
-            let q_flat: Vec<f32> = query_items
-                .iter()
-                .filter_map(|x| x.trim().parse::<f32>().ok())
-                .collect();
+            let q_flat: Vec<f32> = query_floats(&query_items);
             if q_flat.is_empty() || !q_flat.len().is_multiple_of(dims) {
                 return HashMap::new();
             }
@@ -11618,7 +12041,52 @@ impl Engine {
     /// Queues an [`OptimizeTask`]. Returns `false` when no processor is
     /// attached or it is shutting down.
     pub fn submit_optimize_indexes(&self) -> bool {
+        // **The tick only decides, the task rewrites.** An optimize pass opens a
+        // transaction and, when a mirror is over the fold threshold, rewrites it;
+        // firing that unconditionally on a timer is what made a 10s interval
+        // rewrite the whole index every 10s. This check reads chunk headers and
+        // the merge manifest and nothing else, so an idle interval costs a few
+        // directory reads.
+        if !self.needs_index_optimize() {
+            return false;
+        }
         self.submit_task(|engine| Box::new(OptimizeTask { engine }))
+    }
+
+    /// Whether an optimize pass has anything to fold, decided without decoding a
+    /// chunk.
+    ///
+    /// PLAID and HNSW are decided from their chunk lists; any other kind
+    /// (`FULLTEXT`, secondary, sparse) still asks for the pass, because their
+    /// merges derive their records from the files and a wrong "nothing to do"
+    /// there would keep a merge waiting forever.
+    pub(crate) fn needs_index_optimize(&self) -> bool {
+        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            return true;
+        };
+        for im in indexes {
+            if im.index_type.eq_ignore_ascii_case("PLAID") {
+                if self
+                    .plaid_fold_candidates(&im.table, &im.name)
+                    .map(|candidates| !candidates.plan.is_empty())
+                    .unwrap_or(true)
+                {
+                    return true;
+                }
+                continue;
+            }
+            if im.index_type.eq_ignore_ascii_case("HNSW") {
+                let Some(dir) = self.hnsw_dir(&im.table, &im.name) else {
+                    return true;
+                };
+                if self.live_chunk_files(&im.table, &im.name, 0, &dir).len() > 1 {
+                    return true;
+                }
+                continue;
+            }
+            return true;
+        }
+        false
     }
 
     /// Queues the rebuild of one spann segment. Returns `false` when no
@@ -12229,9 +12697,16 @@ impl Engine {
         // (`background_process_impl.cpp:109`); only `kAdmin` is rejected.
         self.ensure_cleanup_allowed()?;
         // `WalManager::Cleanup`: the sealed `wal.log.<ts>` segments whose
-        // records the KV store holds are reclaimed here, not at a checkpoint.
+        // records both floors hold are reclaimed here, not at a checkpoint.
+        //
+        // The frame covers the KV store, not the rows: a segment may hold an
+        // `INSERT` the crash left there, replayed into the buffer at open and
+        // not in any block until the next mirror writes it. Pruning by the frame
+        // alone dropped those segments, so a second crash lost rows this process
+        // had already answered from (`Engine::mirrored_ts`).
         if let Ok(applied) = self.txn.applied_ts().await {
-            let _ = self.txn.drop_sealed_wal_up_to(applied).await;
+            let mirrored = self.mirrored_ts.load(std::sync::atomic::Ordering::Relaxed);
+            let _ = self.txn.drop_sealed_wal_up_to(applied.min(mirrored)).await;
         }
         self.reclaim_deprecated_segments()?;
         // The column files an `ALTER TABLE … DROP COLUMN` left behind: the

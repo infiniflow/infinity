@@ -915,6 +915,21 @@ pub(crate) fn is_secondary_kind(index_type: &str) -> bool {
         || t.eq_ignore_ascii_case("SECONDARYFUNCTIONAL")
 }
 
+/// A multi-vector index: `PLAID`, or one of the memory-side kinds a `TENSOR`
+/// column is searched through.
+///
+/// Its memory index holds the raw token vectors of the rows written since the
+/// last chunk, which is why the write hook has to register it and the quota has
+/// to be able to seal it - the two things that made an import leave no chunk
+/// behind and the first query rebuild the whole index from the rows.
+pub(crate) fn is_multivector_kind(index_type: &str) -> bool {
+    let t = index_type.trim();
+    t.eq_ignore_ascii_case("PLAID")
+        || t.eq_ignore_ascii_case("SMVE")
+        || t.eq_ignore_ascii_case("EMVB")
+        || t.eq_ignore_ascii_case("MULTIVECTOR")
+}
+
 /// Wide values of these columns are kept in the row sidecar instead of the KV
 /// row (Gate C memory).
 pub(crate) fn is_blob_type(t: &str) -> bool {

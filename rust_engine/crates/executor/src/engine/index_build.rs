@@ -63,7 +63,9 @@ impl Engine {
             e.ivf.clear();
             e.ivf_mem.clear();
         }
+        let profile = std::env::var_os("INFINITY_PROFILE_OPEN").is_some();
         for im in self.storage.catalog.list_indexes()? {
+            let started = std::time::Instant::now();
             if is_secondary_kind(&im.index_type) {
                 // A functional index's column is its expression: restore how to
                 // evaluate it from the record (`FUNC`/`FUNC_COLUMN`/`FUNC_RETURN`,
@@ -139,6 +141,15 @@ impl Engine {
                         .ivf
                         .insert(im.id, segments.into_iter().map(Arc::new).collect());
                 }
+            }
+            if profile {
+                eprintln!(
+                    "rebuild index {} ({}) on {}: {:?}",
+                    im.name,
+                    im.index_type,
+                    im.column,
+                    started.elapsed()
+                );
             }
         }
         Ok(())
@@ -263,6 +274,21 @@ impl Engine {
         covered: &std::collections::BTreeMap<u32, std::collections::BTreeSet<u32>>,
     ) {
         let tkey = self.table_key(table);
+        // Nothing to index when the chunks already hold every row.
+        //
+        // Without this the check itself was the cost: establishing "no gap" by
+        // fetching the rows one at a time reads every block of the table, vector
+        // column included - measured at 94.5 s of a 102 s open for 62 k units,
+        // i.e. every `rgrep` command paid a full table scan at startup to learn
+        // it had nothing to do. The fast path is four cheap facts: every row is
+        // in a block (no append-buffer row left), and for each segment the
+        // chunk offsets are dense from 0 up to the block row count. Anything
+        // else - a row written since the last dump, a compaction, a hole in the
+        // offsets - fails the test and falls through to the per-row scan, which
+        // stays exact.
+        if self.chunks_cover_every_row(table, covered) {
+            return;
+        }
         let Ok(rows) = self.fetch_rows_with_ids_projected_all(table, ci) else {
             return;
         };
@@ -303,6 +329,42 @@ impl Engine {
         }
     }
 
+    /// Whether the published chunks already hold every row of `table`, judged
+    /// from catalog and block metadata alone.
+    ///
+    /// Two facts make it exact without reading a cell: offsets inside a segment
+    /// are allocated densely from 0 (`block * capacity + created` is the extent
+    /// the blocks reserve), and a chunk's offset set is per segment. A segment
+    /// counts as fully covered when every offset in `0..reserved` is in the
+    /// chunk set. The whole test is refused when the live row count exceeds the
+    /// reserved one, which is the signature of a row still in the append buffer
+    /// - `reserved` comes from blocks, and a buffered row has none.
+    fn chunks_cover_every_row(
+        &self,
+        table: &str,
+        covered: &std::collections::BTreeMap<u32, std::collections::BTreeSet<u32>>,
+    ) -> bool {
+        let counts = self.block_segment_row_counts(table);
+        let reserved: u64 = counts.iter().map(|(_, rows)| *rows).sum();
+        let Ok(live) = self.row_count(table) else {
+            return false;
+        };
+        if live as u64 > reserved {
+            return false;
+        }
+        counts.iter().all(|(segment, rows)| {
+            if *rows == 0 {
+                return true;
+            }
+            let Some(offsets) = covered.get(segment) else {
+                return false;
+            };
+            // `range(..rows)` counts only the offsets inside the segment's
+            // extent, so an offset past it cannot make up a hole below it.
+            offsets.range(..*rows as u32).count() as u64 == *rows
+        })
+    }
+
     /// `NewTxn::RecoverMemIndex`: rebuilds an index's memory tail from the rows
     /// its sealed chunks do not cover.
     ///
@@ -313,10 +375,11 @@ impl Engine {
     /// appends only the rows no chunk covers (`AppendIndex`), so the tail comes
     /// back without re-indexing the table.
     ///
-    /// The multi-vector and sparse indexes have no chunk mapping of their own:
-    /// `multivector_index_for` / `sparse_index_for` rebuild them from the rows
-    /// on first use, which closes their gap there. A secondary index is rebuilt
-    /// from every row by `rebuild_indexes`, which already covers the gap.
+    /// A multi-vector index is registered here empty and its chunks are mapped
+    /// by the first search (`multivector_index_by_id`), which appends the rows
+    /// the tail collected meanwhile; the sparse indexes are rebuilt from the
+    /// rows on first use; a secondary index is rebuilt from every row by
+    /// `rebuild_indexes`, which already covers the gap.
     pub(crate) async fn recover_mem_index(&self) -> Result<()> {
         let indexes = self.storage.catalog.list_indexes()?;
         if indexes.is_empty() {
@@ -324,6 +387,55 @@ impl Engine {
         }
         for meta in indexes {
             let kind = meta.index_type.trim();
+            let table = self.qualified_table(&meta.table);
+            let Ok(schema) = self.table_schema(&table) else {
+                continue;
+            };
+            let Some(ci) = schema.iter().position(|c| c == &meta.column) else {
+                continue;
+            };
+            // A multi-vector index's memory index is registered here, **empty**.
+            //
+            // Two things depend on the registry entry existing: the write hook
+            // (`update_multivector_indexes`) looks the index up and returns when
+            // it is absent, and the quota can only seal a tail that was filled.
+            // Without this registration an import into a fresh process never
+            // filled one, so nothing was ever dumped - and the first query then
+            // rebuilt the whole index from the rows while the chunks it should
+            // have mapped sat on disk (measured: 248 s and 8.4 GiB for one query
+            // over 62 k units, one 776-document chunk, empty tail).
+            //
+            // No row is read here. The tail fills from the write path, the quota
+            // seals it in batches, and the first search loads the chunks and
+            // appends whatever the tail still holds.
+            if is_multivector_kind(kind) {
+                let Some(dims) = self
+                    .column_types(&table)
+                    .ok()
+                    .and_then(|types| types.get(ci).and_then(|t| crate::type_dim(t)))
+                else {
+                    continue;
+                };
+                if dims == 0 {
+                    continue;
+                }
+                let key = crate::engine::state::mem_index_key(&table, meta.id);
+                let index = MultiVectorIndex::new(
+                    self.dir.join("multivector").join(key.replace('/', "_")),
+                    dims,
+                    self.mv_plaid_config(&table, &meta.name),
+                    self.mv_smve_config(&table, &meta.name),
+                    self.mv_emvb_config(&table, &meta.name),
+                );
+                self.tables
+                    .lock()
+                    .unwrap()
+                    .entry(self.table_key(&table))
+                    .or_default()
+                    .mv
+                    .insert(meta.id, std::sync::Arc::new(std::sync::RwLock::new(index)));
+                continue;
+            }
             // A secondary index is rebuilt from the rows by `rebuild_indexes`
             // (`build_index`), which rewrites its chunk files; adding the
             // chunk-gap rows to the tail here as well would count them twice.
@@ -334,14 +446,7 @@ impl Engine {
             if !handled {
                 continue;
             }
-            let table = self.qualified_table(&meta.table);
             let Some(table_meta) = self.storage.catalog.get_table_by_name(&table)? else {
-                continue;
-            };
-            let Ok(schema) = self.table_schema(&table) else {
-                continue;
-            };
-            let Some(ci) = schema.iter().position(|c| c == &meta.column) else {
                 continue;
             };
             // A full-text index is built here **whether or not** its chunks
@@ -1263,18 +1368,19 @@ impl Engine {
         // upper bound only, and a column of NULL/tensor-invalid cells would
         // make every dump look necessary.
         let rows = if meta.index_type.eq_ignore_ascii_case("PLAID") {
-            let Some(dims) = self
+            // Only the count is needed, and a tensor cell exists exactly when
+            // its slot holds a non-empty tensor - rendering every row to answer
+            // "how many documents" cost ~66 s on a 62 k-row table
+            // (`tensor_row_ids` reads the slot word and the null bitmap).
+            let Some(ci) = self
                 .table_schema(table)
                 .ok()
                 .and_then(|s| s.iter().position(|c| c == &meta.column))
-                .and_then(|ci| self.column_types(table).ok()?.get(ci).cloned())
-                .and_then(|t| crate::type_dim(&t))
             else {
                 return false;
             };
-            self.column_docs(table, &meta.column, dims)
-                .await
-                .map(|docs| docs.len() as u64)
+            self.tensor_row_ids(table, ci)
+                .map(|ids| ids.len() as u64)
                 .unwrap_or(0)
         } else {
             // IVF: the writer's coverage is `column_vectors`, which skips a
@@ -1431,7 +1537,44 @@ impl Engine {
                 Ok(())
             })
         })
-        .await
+        .await?;
+        self.fold_dumped_mirror(&table, index).await
+    }
+
+    /// Folds a PLAID mirror this dump grew past `max_open_chunks_per_index`.
+    ///
+    /// The reference leaves the merge to the periodic optimize trigger
+    /// (`OptimizationProcessor`). A server runs that trigger; an embedder and a
+    /// `--maintenance` server do not - there every dump left one more chunk
+    /// behind, and `read_plaid_index` has to merge the whole chain onto the heap
+    /// on **every** load (a single chunk is mapped instead). Folding from the
+    /// dump is what keeps that from happening without the background task.
+    ///
+    /// Under the cap this is a no-op: a few chunks are cheaper to append than to
+    /// rewrite, and the trigger still folds them later.
+    async fn fold_dumped_mirror(&self, table: &str, index: &str) -> Result<()> {
+        let table = self.qualified_table(table);
+        // Only PLAID keeps an append-only chain; every other kind has its own
+        // fold (`optimize_merges_secondary_chunks`, the HNSW merge), and asking
+        // `plaid_mirror` about an `INTEGER` column's secondary index is an
+        // error, not an empty chain.
+        let Some(im) = self.storage.catalog.index_by_name(&table, index)? else {
+            return Ok(());
+        };
+        if !im.index_type.eq_ignore_ascii_case("PLAID") {
+            return Ok(());
+        }
+        // Cheap first: chunk headers and the merge manifest, no chunk decoded.
+        // The plan is what decides - over the cap, or one chunk small enough that
+        // folding it pays for itself - and an empty plan must not start the pass
+        // that rewrites the mirror.
+        let Ok(candidates) = self.plaid_fold_candidates(&table, index) else {
+            return Ok(());
+        };
+        if candidates.plan.is_empty() {
+            return Ok(());
+        }
+        self.optimize_index_chunks().await
     }
 
     /// The `DumpIndex` payload of an explicit dump
@@ -1633,9 +1776,12 @@ impl Engine {
 
     /// Seals one index's memory tail into its spill/chunk files, in the form
     /// its kind dumps it: a secondary tail becomes `seg_{s}_tail{n}.idx`, a
-    /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, a
-    /// multi-vector tail its `.mvec` chunk, an HNSW memory graph a
-    /// `chunk_{id}.idx`, and IVF rewrites its per-segment `chunk_0.idx`.
+    /// full-text tail `ft_{first_row:016x}.*`, a BMP tail its `.bmp` chunk, an
+    /// HNSW memory graph a `chunk_{id}.idx`, and IVF rewrites its per-segment
+    /// `chunk_0.idx`.
+    ///
+    /// A multi-vector tail writes **no file**: its chunk is the list of row ids
+    /// it published, and the vectors stay in the column's blocks.
     ///
     /// The dump transaction calls this before `publish_index_chunks`, so the
     /// chunks it publishes are the ones this statement sealed and carry its
@@ -1669,16 +1815,17 @@ impl Engine {
                 rows.clear();
             }
         } else if meta.index_type.eq_ignore_ascii_case("PLAID") {
-            // `DumpSegmentMemIndex`'s `kPLAID` case: the memory index is dumped
-            // into one new chunk under the id the dump transaction's
-            // `GetAndSetNextChunkID` handed out. The checkpoint writes blocks
-            // only, so this is the one place the chunk appears.
+            // `DumpSegmentMemIndex`'s `kPLAID` case: the chunk is the index
+            // (`PlaidIndexInMem::Dump`), written from the rows in one new chunk
+            // under the id the dump transaction's `GetAndSetNextChunkID` handed
+            // out. The checkpoint writes blocks only, so this is the one place
+            // the chunk appears - and the only writer, as in the reference: a
+            // load used to append here too, which left a chunk nothing had
+            // recorded.
             //
-            // The raw-token tail is sealed as well: the port's search path
-            // re-scores PLAID survivors from those `.mvec` documents, and the
-            // chunk writer serializes what the memory index holds rather than
-            // rebuilding it.
-            self.seal_multivector_index(&table, meta.id).await;
+            // No raw-token file beside it, and none for any other multi-vector
+            // kind either: the chunk *is* the index, and an uncoded column is
+            // scored from its blocks.
             if self.write_plaid_index(&table, &meta.name).await.is_ok() {
                 // A reused instance must not serve the rows the chunk now
                 // holds from its memory tail.
@@ -4785,6 +4932,32 @@ impl Engine {
         }
         // The dumps released tails: fold that into the engine-wide total so the
         // quota sees it without a second scan.
+        self.recompute_memindex_total();
+    }
+
+    /// Dumps only the secondary indexes' tails, one `DumpMemIndex` transaction
+    /// each.
+    ///
+    /// The trade is the opposite of a vector index's, which is why this is not
+    /// [`Self::dump_all_memory_indexes`]. A secondary tail is a key-to-rows map
+    /// (kilobytes for tens of thousands of keys, no row is read to seal it),
+    /// and sealing it is what lets the next open skip
+    /// [`Self::index_secondary_gap`]'s scan of the whole table. A multi-vector
+    /// tail costs ~64 ms per unit to seal because the dump rebuilds that index
+    /// from the rows, against ~1-2 ms per unit for
+    /// [`Self::recover_mem_index`] to rebuild the same rows on the next open, so
+    /// those tails stay in memory.
+    ///
+    /// A host that never dumps anything - an embedded engine whose lifetime is
+    /// one command - therefore has one shutdown step that is cheap and one
+    /// that is not, and only the cheap one belongs on the way out.
+    pub async fn dump_secondary_indexes(&self) {
+        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        for im in indexes {
+            if is_secondary_kind(&im.index_type) {
+                let _ = self.dump_index_transaction(&im.table, &im.name).await;
+            }
+        }
         self.recompute_memindex_total();
     }
 

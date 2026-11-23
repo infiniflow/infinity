@@ -583,6 +583,27 @@ impl EmvbView<'_> {
         top_n: usize,
         options: EmvbSearchOptions,
     ) -> Vec<(u32, f32)> {
+        self.search_filtered(query, top_n, options, &|_| true)
+    }
+
+    /// [`Self::search`] with the reference's `Bitmask`.
+    ///
+    /// `keep` sees a **dense document id** (the internal `0..n_docs` the caller
+    /// maps back with its own row list) and decides whether the document may
+    /// take part at all. It runs where the reference runs
+    /// `candidate_docs_filtered` (`emvb_search_impl.cpp:397-417`): after the
+    /// centroid probe, **before** `compute_hit_frequency`, `second_stage_filtering`
+    /// and the `k` cut. A rejected document therefore never occupies a result
+    /// slot, which is what makes the answer hold `top_n` *live* rows whenever
+    /// they exist - filtering after the cut returned fewer rows than the exact
+    /// scan for the same query.
+    pub fn search_filtered(
+        &self,
+        query: &[Vec<f32>],
+        top_n: usize,
+        options: EmvbSearchOptions,
+        keep: &dyn Fn(usize) -> bool,
+    ) -> Vec<(u32, f32)> {
         let n_centroids = self.n_centroids();
         let n_docs = self.doc_lens.len();
         if top_n == 0 || n_docs == 0 || query.is_empty() || n_centroids == 0 {
@@ -644,7 +665,9 @@ impl EmvbView<'_> {
             }
         }
 
-        // Candidate documents: the union of the selected centroids' doc lists.
+        // Candidate documents: the union of the selected centroids' doc lists,
+        // minus everything `keep` rejects - the filter runs here, on the
+        // candidates, so the stages below only ever rank live documents.
         let mut seen_centroid = vec![false; n_centroids];
         let mut seen_doc = vec![false; n_docs];
         let mut candidates: Vec<u32> = Vec::new();
@@ -658,7 +681,7 @@ impl EmvbView<'_> {
                 if let Some(docs) = self.centroids_to_docid.get(c) {
                     for &doc in docs {
                         let doc = doc as usize;
-                        if doc < n_docs && !seen_doc[doc] {
+                        if doc < n_docs && !seen_doc[doc] && keep(doc) {
                             seen_doc[doc] = true;
                             candidates.push(doc as u32);
                         }
@@ -952,6 +975,56 @@ mod tests {
         assert_eq!(got[0].0, 0);
         assert!((got[0].1 - 1.5).abs() < 1e-6, "score = {}", got[0].1);
         assert_eq!(got[1].0, 1);
+    }
+
+    /// The `Bitmask` of `EMVBSearch::GetQueryResult` is a **candidate** filter
+    /// (`candidate_docs_filtered`), so a rejected document never occupies a slot
+    /// in the `top_n` cut. Applied to the answer instead, a cut of one would
+    /// come back empty here even though two documents are still live.
+    #[test]
+    fn a_filtered_search_returns_top_n_kept_documents() {
+        // Three documents on centroid 0, residuals `0.5`, `0.2`, `0.0` against
+        // the query `(1, 0)`, so the scores are 1.5, 1.2 and 1.0.
+        let codebook = vec![0.0f32, 0.0, 0.5, 0.5, 0.2, 0.2];
+        let f = Fixture {
+            centroids: vec![1.0, 0.0, 0.0, 1.0],
+            codebook,
+            codes: vec![1, 2, 0],
+            assignments: vec![0, 0, 0],
+            doc_lens: vec![1, 1, 1],
+            doc_segment_offsets: vec![0, 1, 2],
+            centroids_to_docid: vec![vec![0, 1, 2], vec![]],
+        };
+        // Three codewords, so not the two `view()` pins.
+        let v = EmvbView {
+            dims: 2,
+            subspace_num: 1,
+            sub_dim: 2,
+            k: 3,
+            centroids: &f.centroids,
+            codebook: &f.codebook,
+            codes: &f.codes,
+            assignments: &f.assignments,
+            doc_lens: &f.doc_lens,
+            doc_segment_offsets: &f.doc_segment_offsets,
+            centroids_to_docid: &f.centroids_to_docid,
+            rotation: None,
+        };
+        let query = [vec![1.0f32, 0.0]];
+        let unfiltered = v.search(&query[..], 1, EmvbSearchOptions::for_topk(1));
+        assert_eq!(unfiltered.len(), 1);
+        assert_eq!(unfiltered[0].0, 0);
+
+        let filtered = v.search_filtered(&query[..], 1, EmvbSearchOptions::for_topk(1), &|doc| {
+            doc != 0
+        });
+        assert_eq!(filtered.len(), 1, "the cut counted a filtered document");
+        assert_eq!(filtered[0].0, 1, "doc 1 is the best kept document");
+
+        // Rejecting the whole segment leaves nothing, and does not panic.
+        assert!(v
+            .search_filtered(&query[..], 2, EmvbSearchOptions::for_topk(2), &|_| false)
+            .is_empty());
     }
 
     #[test]
