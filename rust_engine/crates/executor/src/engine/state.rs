@@ -4053,15 +4053,6 @@ impl MultiVectorIndex {
         // per dumped chunk. `PhysicalMatchTensorScan` does the same: one
         // `SearchWithBitmask` per `chunk_index_meta`, every hit added to the
         // same top-k, and no merge of the chunks on the read path.
-        if std::env::var_os("INFINITY_DEBUG_MV").is_some() {
-            eprintln!(
-                "DEBUG mv search plaid={} chunks={} exact={} k={}",
-                self.plaid.is_some(),
-                self.plaid_chunks.len(),
-                exact.is_some(),
-                k
-            );
-        }
         let flat: Vec<f32> = query.iter().flatten().copied().collect();
         let topn = k.max(1);
         let n_doc = plaid.n_doc_to_score.max(topn);
