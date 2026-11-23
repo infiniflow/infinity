@@ -8553,10 +8553,35 @@ impl Engine {
             // and every value yields the same result set. The tree path scores
             // every candidate, which is `batch`/`false`; accepting the option
             // keeps `compare` and the BMW spellings usable on a parsed query.
+            //
+            // A zero share is also accepted: `0%` means "any clause may match",
+            // which is precisely what the tree's boolean structure already
+            // computes. Rejecting it turned a query the engine can answer into
+            // an error for every caller that spells out the default - RAGFlow
+            // sends `minimum_should_match=0%` on its English retrieval path.
+            // A positive share does change the result set (it counts matched
+            // clauses, which only the WAND path computes) and stays rejected.
+            let zero_share = params
+                .split(';')
+                .filter_map(|p| p.split_once('='))
+                .find(|(k, _)| k.trim().eq_ignore_ascii_case("minimum_should_match"))
+                .map(|(_, v)| {
+                    v.trim()
+                        .trim_end_matches('%')
+                        .trim()
+                        .parse::<i64>()
+                        .map(|n| n == 0)
+                        .unwrap_or(false)
+                })
+                .unwrap_or(true);
             for name in ["minimum_should_match", "rank_features"] {
-                if given(name) {
-                    return Err(unsupported(name));
+                if !given(name) {
+                    continue;
                 }
+                if name == "minimum_should_match" && zero_share {
+                    continue;
+                }
+                return Err(unsupported(name));
             }
             // The predicate / `filter=` / `IN (…)` narrow the candidates before
             // the tree ranks and truncates, exactly like the WAND path.
