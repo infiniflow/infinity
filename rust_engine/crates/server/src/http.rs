@@ -422,6 +422,10 @@ fn parse_json(text: &str) -> Option<Json> {
                         _ => return None,
                     }
                 }
+                // RFC 8259 requires U+0000..=U+001F inside a string to be an
+                // escape. Copying one through (`out.push(c)`) accepted a body
+                // that is not JSON, and `/query` then executed its SQL.
+                c if c < 0x20 => return None,
                 _ => out.push(c),
             }
         }
@@ -3602,6 +3606,16 @@ mod tests {
             parse_json("{\"body\":\"x\"}  \n\t").is_some(),
             "trailing whitespace is still a valid body"
         );
+        // A raw control byte inside a string is not JSON: RFC 8259 requires
+        // U+0000..=U+001F to be escaped. Accepting one let `/query` run SQL
+        // from a body that no reader would have accepted.
+        assert!(
+            parse_json("{\"a\":\"x\u{1}y\"}").is_none(),
+            "a raw control byte must be rejected"
+        );
+        // The escaped spelling is still fine.
+        assert!(parse_json("{\"a\":\"x\\u0001y\"}").is_some());
+
         // Unknown escape letters are rejected: `\q` is not a JSON escape, and
         // copying the byte through turned it into a plain `q`.
         assert!(
