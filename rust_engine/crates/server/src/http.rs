@@ -154,8 +154,13 @@ fn rows_json(columns: &[String], rows: &[Vec<String>]) -> String {
 /// non-ASCII code point. Parsing the document keeps `\uXXXX`, the surrogate
 /// pairs and the ordinary escapes on the one code path that already handles
 /// them.
-fn extract_sql(body: &str) -> Option<String> {
-    match parse_json(body)? {
+/// The string-valued `sql` field of an already-parsed document.
+///
+/// Separate from `parse_json` so the route can tell "this body is not JSON"
+/// from "this JSON has no `sql` string" - `parse_json` now also fails on an
+/// unpaired surrogate, which is a malformed body rather than a missing field.
+fn sql_of(doc: Json) -> Option<String> {
+    match doc {
         Json::Obj(fields) => {
             fields
                 .into_iter()
@@ -1482,7 +1487,16 @@ pub async fn route(
         return (200, "ok".to_string());
     }
     if method == "POST" && path == "/query" {
-        return match extract_sql(body) {
+        // Two different faults, two different messages: a body that is not JSON
+        // at all (which now includes an unpaired surrogate, since `parse_json`
+        // rejects those) and a well-formed document without a string `sql`
+        // field. Reporting "missing sql" for the first sent the client looking
+        // for a field it had already sent.
+        let doc = match parse_json(body) {
+            Some(doc) => doc,
+            None => return (400, "{\"error\":\"bad json\"}".to_string()),
+        };
+        return match sql_of(doc) {
             None => (400, "{\"error\":\"missing sql\"}".to_string()),
             Some(sql) => match engine.execute(&sql).await {
                 Ok(results) => {
@@ -3468,15 +3482,34 @@ mod tests {
     fn the_query_route_decodes_unicode_escapes() {
         // The exact byte sequence a default `json.dumps({"sql": ...})` sends.
         let body = "{\"sql\":\"SELECT 'Arkt\\u00far' AS x;\"}";
-        assert_eq!(extract_sql(body).as_deref(), Some("SELECT 'Arktúr' AS x;"));
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("SELECT 'Arktúr' AS x;")
+        );
         // A non-BMP character arrives as a surrogate pair inside the SQL text.
         let body = "{\"sql\":\"SELECT '\\ud83d\\ude00';\"}";
-        assert_eq!(extract_sql(body).as_deref(), Some("SELECT '😀';"));
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("SELECT '😀';")
+        );
         // Ordinary escapes still work, and a missing field is still None.
         let body = "{\"sql\":\"a\\nb\"}";
-        assert_eq!(extract_sql(body).as_deref(), Some("a\nb"));
-        assert!(extract_sql("{}").is_none());
-        assert!(extract_sql("not json").is_none());
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("a\nb")
+        );
+        assert!(sql_of(parse_json("{}").expect("json")).is_none());
+        assert!(parse_json("not json").is_none());
+
+        // The route tells the two faults apart: a body `parse_json` rejects is
+        // "bad json", a well-formed one without a `sql` string is "missing sql".
+        // An unpaired surrogate belongs to the first case even though a `sql`
+        // field is present.
+        assert!(
+            parse_json("{\"sql\":\"SELECT '\\ud83d';\"}").is_none(),
+            "an unpaired surrogate is malformed JSON, not a missing field"
+        );
+        assert!(sql_of(parse_json("{}").expect("json")).is_none());
     }
 
     /// A surrogate half with no partner is not a character. Rejecting the body

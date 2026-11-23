@@ -8780,11 +8780,10 @@ impl Engine {
             // The iterator, its scores and the reference's `threshold_` are all
             // `f32`, so the bar is rounded to `f32` **once** and that same value
             // is what the final filter uses. Two bars for one query make
-            // `block_max` decide the answer: with `threshold=0.99999999` the
-            // bar rounds to `1.0`, so `block_max=false` scores a document and
-            // compares it against `0.99999999` (keeping it), while this path
-            // keeps it through the `1.0` pruning bar and then drops it against
-            // the original `f64` - the same query, two different row sets.
+            // `block_max` decide the answer: `threshold=0.99999999` rounds to
+            // `1.0`, so a document scoring exactly `1.0` clears the pruning bar
+            // and was then dropped by the `f64` comparison, while
+            // `block_max=false` - which applies only that comparison - kept it.
             let threshold_f32 = threshold.map(|t| t as f32);
             if let Some(t) = threshold_f32 {
                 iterator = iterator.with_threshold(t);
