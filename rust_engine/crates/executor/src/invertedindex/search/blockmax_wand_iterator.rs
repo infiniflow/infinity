@@ -39,6 +39,22 @@ use std::collections::{BinaryHeap, HashSet};
 use crate::WAND_BLOCK;
 use crate::{WandField, WandStream, WandUnit};
 
+/// The next `f64` above `x` (toward `+inf`), used where a bound must never be
+/// rounded down. `x.next_up()` is not stable, and the step only has to cover one
+/// ulp, so the bits are walked directly.
+fn round_up(x: f64) -> f64 {
+    if !x.is_finite() || x == f64::INFINITY {
+        return x;
+    }
+    let bits = x.to_bits();
+    // For a non-negative value the next representable float is `bits + 1`.
+    if x >= 0.0 {
+        f64::from_bits(bits + 1)
+    } else {
+        f64::from_bits(bits - 1)
+    }
+}
+
 /// MAX_DOC_PER_RECORD (index_defines.cppm:43): the fixed run of documents that
 /// forms one posting block, i.e. the granularity of block_max_tf /
 /// block_max_percentage. SkipListReader returns one entry per block.
@@ -459,7 +475,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         for cursor in &cursors {
             if let Some(doc) = cursor.cur {
                 heap.push(Reverse((doc, cursor.ord)));
-                total_upper += f64::from(cursor.upper_bound);
+                total_upper = round_up(total_upper + f64::from(cursor.upper_bound));
             }
         }
         Self {
@@ -515,12 +531,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
         // The pruning bound is the sum over the cursors that still have a
         // document; a retired cursor contributes nothing.
-        self.total_upper = self
-            .cursors
-            .iter()
-            .filter(|c| c.cur.is_some())
-            .map(|c| f64::from(c.upper_bound))
-            .sum();
+        self.recompute_upper_bound();
         self.ranker = ranker;
         self
     }
@@ -679,8 +690,27 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap_ops += 1;
                 self.heap.push(Reverse((doc, cursor.ord)))
             }
-            None => self.total_upper -= f64::from(cursor.upper_bound),
+            None => self.recompute_upper_bound(),
         }
+    }
+
+    /// Recomputes the live bound from the cursors still in play.
+    ///
+    /// Retiring a cursor used to subtract its bound from the running ledger,
+    /// which loses precision in the direction that matters: `2^53 + 1` is
+    /// `2^53` even in `f64`, so removing the `2^53` bound left `0` while
+    /// another cursor still contributed `1`, and the search stopped early.
+    /// Summing what is left avoids the subtraction entirely; each addition is
+    /// rounded up so the total can only ever be too large, never too small.
+    fn recompute_upper_bound(&mut self) {
+        let mut total = 0.0f64;
+        for cursor in &self.cursors {
+            if cursor.cur.is_none() {
+                continue;
+            }
+            total = round_up(total + f64::from(cursor.upper_bound));
+        }
+        self.total_upper = total;
     }
 
     /// Keeps the candidate if it survives minimum_should_match, the tombstone
@@ -830,12 +860,16 @@ impl<'a> BlockMaxWandIterator<'a> {
             // cursor whose block ends before the candidate contributes nothing
             // (it has no posting there); one that has to move first gets a
             // block-level seek, which then decides which of the two it is.
-            let mut sum_at_doc: f32 = 0.0;
+            // Summed in `f64` with each step rounded up: this is the same
+            // document-order sum as the pivot and, like it, stands in for a
+            // score that `score_prefix` accumulates in creation order.
+            let mut sum_at_doc: f64 = 0.0;
             for k in 0..self.prefix.len() {
                 let i = self.prefix[k];
                 if self.cursors[i].cur != Some(doc) {
                     if self.cursors[i].block_last() >= doc {
-                        sum_at_doc += self.cursors[i].block_max(self.mode);
+                        let bound = self.cursors[i].block_max(self.mode);
+                        sum_at_doc = round_up(sum_at_doc + f64::from(bound));
                         continue;
                     }
                     self.cursors[i].seek(doc);
@@ -844,7 +878,8 @@ impl<'a> BlockMaxWandIterator<'a> {
                         continue;
                     }
                 }
-                sum_at_doc += self.cursors[i].block_max(self.mode);
+                let bound = self.cursors[i].block_max(self.mode);
+                sum_at_doc = round_up(sum_at_doc + f64::from(bound));
             }
             // (3) Decision, the same shape as the reference's: score only when
             // every prefix cursor is parked on the candidate, and only return a
@@ -858,8 +893,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // comparison is widened by `n * EPSILON` for the same reason as the
             // termination bar; the bounds themselves are exact `f32` values.
             let parked = self.prefix.len();
-            let widened_at_doc =
-                f64::from(sum_at_doc) * (1.0 + parked as f64 * f64::from(f32::EPSILON));
+            let widened_at_doc = sum_at_doc * (1.0 + parked as f64 * f64::from(f32::EPSILON));
             if widened_at_doc > f64::from(self.threshold) {
                 if self
                     .prefix
@@ -1274,6 +1308,44 @@ mod tests {
             "the ledger stopped a document whose f32 score clears the threshold"
         );
         assert_eq!(pruned.len(), 1, "document 0 qualifies");
+    }
+
+    /// Retiring a cursor must not lose a bound that `f64` cannot represent
+    /// beside the retired one.
+    ///
+    /// The ledger is maintained by subtracting the retired cursor's bound, and
+    /// even `f64` rounds: `2^53 + 1` is `2^53`, so removing the `2^53` bound
+    /// leaves `0` where the other cursor still contributes `1`. A `BOOST` far
+    /// from 1 is what makes the large bound reachable.
+    #[test]
+    fn retiring_a_huge_cursor_keeps_the_remaining_bound() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let a: &[(u64, u32)] = &[(0, 1)];
+        let b: &[(u64, u32)] = &[(1, 1)];
+        let make = || {
+            vec![
+                field(&[("a", a)], &doc_len, 2, vec![2f32.powi(53)]),
+                field(&[("b", b)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the ledger lost the small bound when the huge cursor retired"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 must survive");
+        assert_eq!(pruned[0].0, 1);
     }
 
     /// The pivot sum has to be as conservative as the score it stands in for.
