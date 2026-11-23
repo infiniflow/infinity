@@ -403,61 +403,6 @@ impl PlaidQuantizer {
         result
     }
 
-    /// Squared L2 norm of the reconstruction `centroid + bucket_weight(code)`.
-    ///
-    /// [`Self::dequantize`] L2-normalizes every reconstructed token, and the
-    /// reference implementation (next-plaid `residual_lut.rs`) calls the same
-    /// normalization load-bearing: its LUT path divides by `1/‖recon‖` and
-    /// dropping that costs up to 0.17 NDCG@10 at `nbits=1`. [`Self::single_ip_distance_from_lut`]
-    /// has no way to express the division - it accumulates a dot product over
-    /// packed bytes - so the caller computes the norm here and scales the score.
-    ///
-    /// Without it a token whose code reconstructs a *longer* vector than the
-    /// original wins the MaxSim purely on magnitude, which is what made an
-    /// unrelated unit outrank the answer at `n_centroids = 1024`.
-    pub fn reconstruction_norm_sq(
-        &self,
-        embedding_id: usize,
-        centroid: &[f32],
-        packed_residuals: &[u8],
-    ) -> f32 {
-        let dim = self.embedding_dim as usize;
-        let packed_dim = self.packed_dim as usize;
-        let keys_per_byte = (8 / self.nbits) as usize;
-        let packed = &packed_residuals[embedding_id * packed_dim..(embedding_id + 1) * packed_dim];
-        let mut sum = 0.0f32;
-        let mut residual_idx = 0usize;
-        for &byte_val in packed {
-            let reversed = self.byte_reversed_bits_map[byte_val as usize];
-            let indices = &self.bucket_weight_indices_lookup[reversed as usize * keys_per_byte
-                ..reversed as usize * keys_per_byte + keys_per_byte];
-            for &bucket in indices {
-                if residual_idx >= dim {
-                    break;
-                }
-                let value = centroid[residual_idx] + self.bucket_weights[bucket as usize];
-                sum += value * value;
-                residual_idx += 1;
-            }
-        }
-        sum
-    }
-
-    /// `1/‖centroid + bucket_weight(code)‖`, the factor the LUT path is missing.
-    pub fn reconstruction_scale(
-        &self,
-        embedding_id: usize,
-        centroid: &[f32],
-        packed_residuals: &[u8],
-    ) -> f32 {
-        let norm_sq = self.reconstruction_norm_sq(embedding_id, centroid, packed_residuals);
-        if norm_sq > 1e-12 {
-            1.0 / norm_sq.sqrt()
-        } else {
-            1.0
-        }
-    }
-
     /// C++: `PlaidQuantizer::GetSingleIPDistance`.
     pub fn single_ip_distance(
         &self,

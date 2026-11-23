@@ -992,8 +992,6 @@ impl PlaidIndex {
         total_tokens_in_c_scores: usize,
         luts: &[f32],
     ) -> f32 {
-        let dim = self.embedding_dimension as usize;
-        let centroids = self.centroids_data();
         let doc_len = self.doc_lens[doc_id as usize] as usize;
         let packed_dim = self.packed_dim() as usize;
         let quantizer = self.quantizer.as_ref().expect("PLAID mode has a quantizer");
@@ -1006,13 +1004,14 @@ impl PlaidIndex {
                 let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
                 let centroid_part =
                     c_scores[q * total_tokens_in_c_scores + doc_start_in_c_scores + d];
-                let cid = self.centroid_ids[emb] as usize;
-                let scale = quantizer.reconstruction_scale(
-                    emb,
-                    &centroids[cid * dim..(cid + 1) * dim],
-                    self.packed(),
-                );
-                max_score = max_score.max((centroid_part + r) * scale);
+                // No `1/‖recon‖` factor: this port's scores are the
+                // un-normalized MaxSim, the same scale `batched_ivf_probe`
+                // builds its centroid cut on (`q·c - ½‖c‖²`). Dividing by the
+                // reconstruction's norm ranked a short-norm token above the
+                // exact winner. The quantization error such a division was
+                // meant to absorb is removed by re-scoring from the column
+                // instead (`ExactScorer` in the executor).
+                max_score = max_score.max(centroid_part + r);
             }
             if max_score > f32::MIN {
                 total += max_score;
@@ -1116,10 +1115,7 @@ impl PlaidIndex {
                     for d in 0..doc_len {
                         let emb = doc_offset + d;
                         let r = quantizer.single_ip_distance_from_lut(emb, lut, self.packed());
-                        let cent = &gathered[(start + d) * dim..(start + d + 1) * dim];
-                        let scale = quantizer.reconstruction_scale(emb, cent, self.packed());
-                        max_score =
-                            max_score.max((c_scores[q * total_tokens + start + d] + r) * scale);
+                        max_score = max_score.max(c_scores[q * total_tokens + start + d] + r);
                     }
                     if max_score > f32::MIN {
                         total += max_score;
