@@ -349,7 +349,18 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     heap: BinaryHeap<Reverse<(u64, usize)>>,
     /// Sum of upper_bound over the cursors in the heap, i.e. the whole query's
     /// upper bound minus everything already retired.
-    total_upper: f32,
+    ///
+    /// Kept in `f64` although every `upper_bound` is an `f32`: this number is a
+    /// *pruning* ledger, and pruning may only ever be too generous. The ledger
+    /// is maintained by adding a cursor's bound at birth and subtracting the
+    /// same bound at retirement, and an `f32` sum does not cancel - adding
+    /// `16777216f32` and `1f32` yields `16777216f32`, so retiring the big
+    /// cursor leaves `0` where `1` is still owed and the search stops before a
+    /// live document that qualifies on its own. Summing the (exact) `f32`
+    /// bounds in `f64` makes the addition and the subtraction exact for any
+    /// realistic cursor count, so a retired cursor removes exactly what it
+    /// contributed.
+    total_upper: f64,
     /// The cursors the last pivot parked on the candidate, in doc order. This is
     /// the reference's [0, pivot_] slice: what offer() counts matches over and
     /// what the next round repositions.
@@ -444,11 +455,11 @@ impl<'a> BlockMaxWandIterator<'a> {
             }
         }
         let mut heap = BinaryHeap::with_capacity(cursors.len());
-        let mut total_upper = 0.0;
+        let mut total_upper: f64 = 0.0;
         for cursor in &cursors {
             if let Some(doc) = cursor.cur {
                 heap.push(Reverse((doc, cursor.ord)));
-                total_upper += cursor.upper_bound;
+                total_upper += f64::from(cursor.upper_bound);
             }
         }
         Self {
@@ -508,7 +519,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             .cursors
             .iter()
             .filter(|c| c.cur.is_some())
-            .map(|c| c.upper_bound)
+            .map(|c| f64::from(c.upper_bound))
             .sum();
         self.ranker = ranker;
         self
@@ -668,7 +679,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap_ops += 1;
                 self.heap.push(Reverse((doc, cursor.ord)))
             }
-            None => self.total_upper -= cursor.upper_bound,
+            None => self.total_upper -= f64::from(cursor.upper_bound),
         }
     }
 
@@ -751,8 +762,10 @@ impl<'a> BlockMaxWandIterator<'a> {
             self.prefix.clear();
             // '<' (not '<='): a document that ties the k-th score can still win
             // on the smaller doc id, and the heap is already doc-ordered, so
-            // this needs no extra bookkeeping.
-            if self.total_upper < self.threshold {
+            // this needs no extra bookkeeping. Both sides are widened to `f64`:
+            // the ledger is `f64` (see `total_upper`), and comparing it against
+            // the `f32` threshold in `f32` would round the ledger down.
+            if self.total_upper < f64::from(self.threshold) {
                 break;
             }
             // (1) FindPivotOptimized: the pivot is the first prefix whose upper
@@ -1181,6 +1194,86 @@ mod tests {
             from = last + 1;
             cursor.seek(from);
         }
+    }
+
+    /// A rounded threshold must not make the pruning switch change the answer.
+    ///
+    /// `threshold=0.99999999` rounds to `1.0f32`, exactly the score of a
+    /// document matching one boolean term. The pruned and the naive path must
+    /// still agree on which documents survive.
+    ///
+    /// This covers the iterator only; the end-to-end version, where the
+    /// caller's filter is the second half of the bug, is
+    /// `threshold_is_a_strict_lower_bound_and_prunes_the_scan` in `tests_ut`.
+    #[test]
+    fn a_rounded_threshold_prunes_and_filters_identically() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = common::RowBitmap::new();
+        let t: &[(u64, u32)] = &[(0, 1), (1, 1)];
+        // Two identical fields: a document matching both scores `2.0`, and one
+        // matching a single field scores `1.0` - exactly the rounded bar.
+        let make = || {
+            vec![
+                field(&[("t", t)], &doc_len, 2, vec![1.0]),
+                field(&[("t", t)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let bar = 0.99999999f32;
+        assert_eq!(bar, 1.0, "the bar must round up to 1.0 for this test");
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(bar)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(bar)
+            .with_naive()
+            .run();
+        assert_eq!(pruned, naive, "block_max must not change the result set");
+        assert_eq!(pruned.len(), 2, "score 2.0 clears the rounded bar");
+    }
+
+    /// A retired cursor must not shrink the remaining-bound ledger below the
+    /// true bound of the cursors that are still live.
+    ///
+    /// `total_upper` is maintained incrementally: it starts as the sum of every
+    /// cursor's bound and subtracts a cursor's bound when that cursor runs out.
+    /// With `f32` the sum rounds, and subtracting the already-rounded addend
+    /// does not cancel exactly - `16777216f32 + 1f32` is `16777216f32`, so the
+    /// retirement of the big cursor leaves `0` where `1` is still owed.
+    ///
+    /// Boost `16777216` is reachable: a `BOOST` factor goes through `f32`.
+    /// Field `a` then has bound `16777216` and field `b` has `1`; `a` matches
+    /// only deleted row 0, `b` matches live row 1. Once `a` is exhausted the
+    /// ledger must still hold `1` for `b`, otherwise the search stops before
+    /// scoring row 1 - which qualifies on its own.
+    #[test]
+    fn retiring_a_cursor_keeps_the_remaining_bound() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let a: &[(u64, u32)] = &[(0, 1)];
+        let b: &[(u64, u32)] = &[(1, 1)];
+        let make = || {
+            vec![
+                field(&[("a", a)], &doc_len, 2, vec![16_777_216.0]),
+                field(&[("b", b)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "pruning dropped a live document the naive scan keeps"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 must survive");
+        assert_eq!(pruned[0].0, 1);
     }
 
     /// Block maxima exist to stop the scan early: when the whole top-k lives in

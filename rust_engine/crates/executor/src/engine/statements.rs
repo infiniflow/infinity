@@ -8777,8 +8777,17 @@ impl Engine {
             }
             // `threshold=` raises the pruning bar, like the reference's
             // `UpdateScoreThreshold` (`blockmax_wand_iterator_impl.cpp:233`).
-            if let Some(t) = threshold {
-                iterator = iterator.with_threshold(t as f32);
+            // The iterator, its scores and the reference's `threshold_` are all
+            // `f32`, so the bar is rounded to `f32` **once** and that same value
+            // is what the final filter uses. Two bars for one query make
+            // `block_max` decide the answer: with `threshold=0.99999999` the
+            // bar rounds to `1.0`, so `block_max=false` scores a document and
+            // compares it against `0.99999999` (keeping it), while this path
+            // keeps it through the `1.0` pruning bar and then drops it against
+            // the original `f64` - the same query, two different row sets.
+            let threshold_f32 = threshold.map(|t| t as f32);
+            if let Some(t) = threshold_f32 {
+                iterator = iterator.with_threshold(t);
             }
             if naive_scan {
                 iterator = iterator.with_naive();
@@ -8787,7 +8796,7 @@ impl Engine {
             let scored: Vec<(usize, f64)> = hits
                 .into_iter()
                 .map(|(seq, score)| (seq as usize, score))
-                .filter(|(_, score)| threshold.map(|t| *score > t).unwrap_or(true))
+                .filter(|(_, score)| threshold_f32.map(|t| *score > f64::from(t)).unwrap_or(true))
                 .collect();
             // For plain OR terms this path is the whole answer: an empty result
             // is empty, and falling through would redo the same work on the

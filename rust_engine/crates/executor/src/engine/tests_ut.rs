@@ -11229,6 +11229,26 @@ mod tests {
         let zero = "SELECT id FROM tt SEARCH MATCH TEXT \
                     ('body','alpha beta','topn=10;similarity=boolean;threshold=0');";
         assert_eq!(rows(&e, zero).await.len(), 4);
+
+        // A threshold that rounds in `f32`. `0.99999999` becomes `1.0`, where a
+        // row matching one boolean term scores exactly `1.0`. The iterator
+        // prunes on the rounded bar, so the filter must use that same value;
+        // against the original `f64` the pruned path kept these rows and the
+        // unpruned path dropped them.
+        let rounded = "SELECT id FROM tt SEARCH MATCH TEXT \
+                       ('body','alpha beta','topn=10;similarity=boolean;threshold=0.99999999');";
+        let rounded_unpruned = "SELECT id FROM tt SEARCH MATCH TEXT \
+                                ('body','alpha beta','topn=10;similarity=boolean;\
+                                 threshold=0.99999999;block_max=false');";
+        let pruned_rows = rows(&e, rounded).await;
+        assert_eq!(
+            pruned_rows,
+            rows(&e, rounded_unpruned).await,
+            "a rounded threshold must not make block_max decide the answer"
+        );
+        // Which rows the bar admits is the scan's business; what must hold is
+        // that pruning does not change the set.
+        assert!(!pruned_rows.is_empty(), "the rounded bar admits rows");
     }
 
     /// `rank_features` adds the posting's doc-payload column, decoded with
