@@ -424,10 +424,14 @@ impl<'a> BlockMaxWandIterator<'a> {
                 total_len,
                 units,
             } = field;
-            let n = n_docs.max(1) as f32;
+            let n = n_docs.max(1);
             // `avg_column_len_ = doc_len * 1.0 / doc_cnt` into a `float`
-            // (term_doc_iterator_impl.cpp:66).
-            let avg = (total_len as f32 / n).max(1e-9);
+            // (term_doc_iterator_impl.cpp:66): the reference divides in
+            // `double` and rounds the quotient once. Dividing two `f32`s
+            // instead loses precision in the *numerator* first once
+            // `total_len` passes 2^24 - `16777217 / 5000` is
+            // `3355.443115` that way and `3355.443359` through `double`.
+            let avg = ((total_len as f64 / n as f64) as f32).max(1e-9);
             for (ui, unit) in units.into_iter().enumerate() {
                 let WandUnit {
                     mut stream,
@@ -1245,7 +1249,7 @@ mod tests {
         let ranker = Bm25Ranker::new(0.0);
         let n = 400.0f32;
         let total_len: u64 = doc_len.iter().map(|(_, l)| *l as u64).sum();
-        let avg = total_len as f32 / n;
+        let avg = (total_len as f64 / n as f64) as f32;
         let idf = ranker.idf(n, postings.len() as f32);
         let dl = |row: u64| *lens.get(&row).unwrap_or(&1);
         let mut it = BlockMaxWandIterator::new(
@@ -1641,7 +1645,7 @@ mod tests {
         }
         candidates.sort_unstable();
         candidates.dedup();
-        let avg = (total_len as f32 / n.max(1) as f32).max(1e-9);
+        let avg = ((total_len as f64 / n.max(1) as f64) as f32).max(1e-9);
         let mut scored = Vec::new();
         for doc in candidates {
             let mut score = 0.0f32;

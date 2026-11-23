@@ -234,7 +234,18 @@ fn parse_json(text: &str) -> Option<Json> {
             *i += 1;
         }
     }
-    fn value(s: &[u8], i: &mut usize) -> Option<Json> {
+    /// The deepest nesting `value` descends into before giving up.
+    ///
+    /// `value` recurses per object member and array element; without a limit a
+    /// body of tens of thousands of nested arrays in a field `sql_of` later
+    /// ignores overflows the serving thread's stack, and a Rust stack overflow
+    /// aborts the process instead of failing the request. 128 is far past
+    /// anything the REST front-end uses and far below what a stack holds.
+    const MAX_DEPTH: u32 = 128;
+    fn value(s: &[u8], i: &mut usize, depth: u32) -> Option<Json> {
+        if depth > MAX_DEPTH {
+            return None;
+        }
         skip(s, i);
         if *i >= s.len() {
             return None;
@@ -256,7 +267,7 @@ fn parse_json(text: &str) -> Option<Json> {
                         return None;
                     }
                     *i += 1;
-                    let v = value(s, i)?;
+                    let v = value(s, i, depth + 1)?;
                     out.push((key, v));
                     skip(s, i);
                     if *i < s.len() && s[*i] == b',' {
@@ -281,7 +292,7 @@ fn parse_json(text: &str) -> Option<Json> {
                     return Some(Json::Arr(out));
                 }
                 loop {
-                    let v = value(s, i)?;
+                    let v = value(s, i, depth + 1)?;
                     out.push(v);
                     skip(s, i);
                     if *i < s.len() && s[*i] == b',' {
@@ -318,7 +329,13 @@ fn parse_json(text: &str) -> Option<Json> {
                     *i += 1;
                 }
                 let text = std::str::from_utf8(&s[start..*i]).ok()?;
-                text.parse::<f64>().ok()?;
+                // `parse::<f64>` is not a grammar check: it accepts `007` and
+                // `1.`, neither of which JSON allows, so a malformed body would
+                // reach `engine.execute` through the `/query` validation. The
+                // grammar is small enough to check directly.
+                if !is_json_number(text) {
+                    return None;
+                }
                 Some(Json::Num(text.to_string()))
             }
         }
@@ -387,7 +404,15 @@ fn parse_json(text: &str) -> Option<Json> {
                             let mut buf = [0u8; 4];
                             out.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
                         }
-                        other => out.push(other),
+                        // The escaping characters, which is all RFC 8259
+                        // allows. Anything else is not a JSON escape: copying
+                        // the byte through (the old `other => out.push(other)`)
+                        // turned `\q` into `q` and handed the caller a body
+                        // that was never valid.
+                        b'"' => out.push(b'"'),
+                        b'\\' => out.push(b'\\'),
+                        b'/' => out.push(b'/'),
+                        _ => return None,
                     }
                 }
                 _ => out.push(c),
@@ -397,7 +422,7 @@ fn parse_json(text: &str) -> Option<Json> {
     }
     let bytes = text.as_bytes();
     let mut i = 0usize;
-    let v = value(bytes, &mut i)?;
+    let v = value(bytes, &mut i, 0)?;
     // The whole body has to be the document. Without this, `{"sql":"SELECT 1;"}junk`
     // parsed as the object and the rest was silently ignored, so a malformed
     // body reached the engine instead of being answered with `bad json`.
@@ -406,6 +431,54 @@ fn parse_json(text: &str) -> Option<Json> {
         return None;
     }
     Some(v)
+}
+
+/// RFC 8259 number grammar: `-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?`.
+///
+/// Written out rather than delegated to `str::parse::<f64>` so the caller can
+/// tell "not a number" from "a number JSON does not spell that way": the
+/// parser accepts `007`, `+1`, `1.` and `.5`, and a `/query` body carrying any
+/// of them in an unused field is malformed, not merely unusual.
+fn is_json_number(text: &str) -> bool {
+    let b = text.as_bytes();
+    let mut i = 0usize;
+    if i < b.len() && b[i] == b'-' {
+        i += 1;
+    }
+    match b.get(i) {
+        // A leading zero stands alone; any other digit may open the integer.
+        Some(b'0') => i += 1,
+        Some(b'1'..=b'9') => {
+            while i < b.len() && b[i].is_ascii_digit() {
+                i += 1;
+            }
+        }
+        _ => return false,
+    }
+    if i < b.len() && b[i] == b'.' {
+        i += 1;
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == start {
+            return false;
+        }
+    }
+    if i < b.len() && matches!(b[i], b'e' | b'E') {
+        i += 1;
+        if i < b.len() && matches!(b[i], b'+' | b'-') {
+            i += 1;
+        }
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == start {
+            return false;
+        }
+    }
+    i == b.len()
 }
 
 /// Restricts a list of identifiers to the ones we accept as names.
@@ -3522,6 +3595,39 @@ mod tests {
             parse_json("{\"body\":\"x\"}  \n\t").is_some(),
             "trailing whitespace is still a valid body"
         );
+        // Unknown escape letters are rejected: `\q` is not a JSON escape, and
+        // copying the byte through turned it into a plain `q`.
+        assert!(
+            parse_json("{\"body\":\"a\\q\"}").is_none(),
+            "an unknown escape must be rejected"
+        );
+        assert_eq!(
+            sql_of(parse_json("{\"body\":\"a\\\\b\\/c\\\"d\"}").expect("json")).as_deref(),
+            None,
+            "a valid body with the three escaping characters still parses"
+        );
+
+        // Numbers follow the JSON grammar: `007` and `1.` are not JSON.
+        assert!(parse_json("{\"n\":007}").is_none(), "leading zero");
+        assert!(parse_json("{\"n\":1.}").is_none(), "trailing dot");
+        assert!(parse_json("{\"n\":+1}").is_none(), "leading plus");
+        assert!(parse_json("{\"n\":-1.5e-3}").is_some(), "a normal number");
+        assert!(parse_json("{\"n\":0}").is_some(), "zero is fine");
+
+        // Nesting is bounded: a body deep enough to overflow the parser's
+        // stack is rejected instead of aborting the process.
+        let deep = format!("{{\"unused\":{}{}}}", "[".repeat(200), "]".repeat(200));
+        assert!(parse_json(&deep).is_none(), "deep nesting must be rejected");
+        let shallow = format!(
+            "{{\"unused\":{}{},\"sql\":\"SELECT 1;\"}}",
+            "[".repeat(8),
+            "]".repeat(8)
+        );
+        assert!(
+            sql_of(parse_json(&shallow).expect("json")).is_some(),
+            "ordinary nesting still parses"
+        );
+
         // Only RFC 8259 whitespace counts: vertical tab and form feed are not
         // JSON whitespace, so they are trailing content and must be rejected.
         assert!(
