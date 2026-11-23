@@ -553,11 +553,7 @@ impl RAGAnalyzer {
         tokens
             .iter()
             .map(|token| {
-                let is_word = token
-                    .chars()
-                    .last()
-                    .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '-');
-                if is_word {
+                if is_ascii_word(token) {
                     self.normalize_token(token)
                 } else {
                     token.clone()
@@ -569,12 +565,11 @@ impl RAGAnalyzer {
     /// The reference's per-token pipeline: lower-case, optionally lemmatize
     /// (English only), then stem with the selected Snowball algorithm.
     pub(crate) fn normalize_token(&self, token: &str) -> String {
-        let lower = token.to_ascii_lowercase();
-        let is_word = lower
+        let lower: String = token
             .chars()
-            .last()
-            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '-');
-        if !is_word {
+            .map(|c| lowercase_latin_letter(c.to_ascii_lowercase()))
+            .collect();
+        if !is_ascii_word(&lower) {
             return lower;
         }
         let lemma = match (&self.lemmatizer, self.use_lemmatizer) {
@@ -1448,6 +1443,33 @@ pub(crate) fn merge_with_position(
 /// U+4000..=U+9FFF.
 pub(crate) fn is_chinese(c: char) -> bool {
     ('\u{4000}'..='\u{9FFF}').contains(&c)
+}
+
+/// C++: `LowerLatinLetters` — rag_tokenizer.py lowercases the whole line, the
+/// reference's `ToLower` only A-Z. A Latin letter with a diacritic is
+/// lowercased too when its lowercase is one letter of the same UTF-8 length in
+/// the same ranges, so byte offsets do not move. That skips İ and ẞ (another
+/// length), Ⱥ and Ⱦ, and the capitals whose lowercase is in IPA Extensions
+/// (Ɓ, Ɔ, Ɛ, …).
+pub(crate) fn lowercase_latin_letter(c: char) -> char {
+    if !is_latin_with_diacritic(c) {
+        return c;
+    }
+    let mut lower = c.to_lowercase();
+    match (lower.next(), lower.next()) {
+        (Some(l), None) if l.len_utf8() == c.len_utf8() && is_latin_with_diacritic(l) => l,
+        _ => c,
+    }
+}
+
+/// C++: `re2::RE2::FullMatch(token, RAGAnalyzer::pattern1_)` — the whole
+/// token is `[a-zA-Z_-]+`. Only such tokens are lemmatized and stemmed, as in
+/// rag_tokenizer.py's `_normalize_token`.
+pub(crate) fn is_ascii_word(token: &str) -> bool {
+    !token.is_empty()
+        && token
+            .chars()
+            .all(|c| c.is_ascii_alphabetic() || c == '_' || c == '-')
 }
 
 /// C++: `RAGAnalyzer::SplitByLang` — split each chunk into maximal Chinese /

@@ -51,6 +51,7 @@
 //! `segment << 32 | row_off`. Storing the engine-wide id here would cost four
 //! bytes per row and go stale the moment a compaction renumbered the segment.
 
+use common::RowMask;
 use index::spann::{
     partition::{metric_score, Member, Partition},
     quantize::{self, Code, Rotation},
@@ -902,13 +903,18 @@ impl FileIndex {
 
     /// Scores one leaf's page into `set`, the single-chunk scan the chain reuses
     /// (`ChunkChain::search` walks the chain but scans through the owner layer).
+    /// Reads one leaf's slots into `set`, returning how many the mask admitted.
+    ///
+    /// The count is what a filtered walk charges against its beam: a leaf whose
+    /// rows are all rejected costs nothing, so a selective filter cannot spend
+    /// the budget on partitions that cannot contribute.
     pub(crate) fn scan_leaf_into(
         &self,
         key: PartitionKey,
         q: &[f32],
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
         set: &mut SearchSet,
-    ) {
+    ) -> usize {
         let chunk = self.chunk();
         self.scan_leaf(
             &chunk,
@@ -918,7 +924,7 @@ impl FileIndex {
             self.dims(),
             allowed,
             set,
-        );
+        )
     }
 
     pub fn dims(&self) -> usize {
@@ -974,7 +980,7 @@ impl FileIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: &std::collections::HashSet<u64>,
+        allowed: &RowMask,
     ) -> Vec<(u64, f32)> {
         self.search_masked(q, k, beam, Some(allowed))
     }
@@ -984,7 +990,7 @@ impl FileIndex {
         q: &[f32],
         k: usize,
         beam: Option<usize>,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
     ) -> Vec<(u64, f32)> {
         let dims = self.dims();
         if k == 0 || q.len() != dims {
@@ -1024,11 +1030,17 @@ impl FileIndex {
                 continue;
             };
             if meta.level <= 1 {
-                if scanned >= budget {
+                // The budget is checked **before** the scan, so `beam = 1`
+                // scans exactly one leaf. Only a leaf that admits at least one
+                // row is charged: a leaf the mask rejects cannot contribute, and
+                // charging it made a selective filter come back short.
+                if allowed.is_some() && scanned >= budget {
                     break;
                 }
-                scanned += 1;
-                self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
+                let admitted = self.scan_leaf(&chunk, key, q, metric, dims, allowed, &mut set);
+                if admitted > 0 || allowed.is_none() {
+                    scanned += 1;
+                }
                 continue;
             }
             for child in chunk.children(key) {
@@ -1047,6 +1059,16 @@ impl FileIndex {
         set.into_sorted()
     }
 
+    /// The admitted rows this chunk holds, scored exactly.
+    ///
+    /// `SpannHandle::search_filtered` calls this once its widened beam still
+    /// came back short: the beam is a work bound, not a correctness one, so a
+    /// selective filter must fall back to the whole tree rather than answer
+    /// fewer than `k` rows while admitted rows exist.
+    pub fn search_admitted_exact(&self, q: &[f32], k: usize, allowed: &RowMask) -> Vec<(u64, f32)> {
+        self.search_masked(q, k, Some(usize::MAX), Some(allowed))
+    }
+
     /// Scores every slot of one leaf into `set`.
     #[allow(clippy::too_many_arguments)]
     fn scan_leaf(
@@ -1056,14 +1078,15 @@ impl FileIndex {
         q: &[f32],
         metric: Metric,
         dims: usize,
-        allowed: Option<&std::collections::HashSet<u64>>,
+        allowed: Option<&RowMask>,
         set: &mut SearchSet,
-    ) {
+    ) -> usize {
         let (Some(slots), Some(centroid)) = (chunk.slots(key), chunk.centroid(key)) else {
-            return;
+            return 0;
         };
         let rot_centroid = self.rotation.apply(&centroid);
         let query = quantize::make_query(&self.rotation, &rot_centroid, q);
+        let mut admitted = 0usize;
         for i in 0..slots.len() {
             let (Some(row), Some((norm, raw_norm, sum, error, bits))) =
                 (slots.row_id(i), slots.parts(i))
@@ -1071,10 +1094,11 @@ impl FileIndex {
                 continue;
             };
             if let Some(allowed) = allowed {
-                if !allowed.contains(&row) {
+                if !allowed.contains(row) {
                     continue;
                 }
             }
+            admitted += 1;
             // Scored from the raw columns: no per-member allocation, which is
             // what made the first mapped version 3.4× slower than heap.
             let squared = quantize::distance_estimate_parts(&query, norm, sum, error, bits, dims);
@@ -1082,12 +1106,14 @@ impl FileIndex {
             let (score, bound) = metric_score(metric, squared, err, query.raw_norm, raw_norm);
             set.add(score, bound, row);
         }
+        admitted
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::RowBitmap;
     use index::spann::SpannIndex;
 
     /// A chunk of another format version is **not** corruption: the bytes are
@@ -1165,6 +1191,78 @@ mod tests {
             max_partition_size: 32,
             min_partition_size: 8,
             ..Options::default()
+        }
+    }
+
+    /// A filtered probe may not spend its beam on leaves the mask rejects.
+    ///
+    /// 400 rows in ~13 leaves, `beam = 2`: with a mask that admits only the
+    /// rows of the **last** few leaves, charging every probed leaf to the beam
+    /// spent the budget on the first two rejected partitions and answered
+    /// nothing. Only a leaf that admits a row may count.
+    #[test]
+    fn a_filtered_beam_skips_leaves_the_mask_rejects() {
+        let data = rows(400, 8);
+        let index = SpannIndex::build(data.clone(), opts()).unwrap();
+        let bytes = write(&index, 0).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chunk_0.idx");
+        std::fs::write(&path, &bytes).unwrap();
+        let file = FileIndex::open(&path, &opts()).unwrap();
+
+        // Admit only the rows of the **last** leaves in the tree's own order,
+        // so a best-first walk reaches them last: a `beam = 2` walk that charges
+        // rejected leaves stops far short of them.
+        let mut leaf_order: Vec<u64> = index
+            .partitions()
+            .iter()
+            .filter(|p| p.level <= 1)
+            .flat_map(|p| p.members.iter().map(|m| m.id))
+            .collect();
+        leaf_order.dedup();
+        let admitted: RowMask = RowMask::from_rows(
+            leaf_order
+                .iter()
+                .rev()
+                .take(6)
+                .copied()
+                .collect::<RowBitmap>(),
+        );
+        assert!(!admitted.is_empty(), "the mask admits the tail leaves");
+
+        for query in data.iter().take(8) {
+            let filtered: Vec<u64> = index
+                .search_filtered(&query.1, 4, Some(2), &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert!(
+                !filtered.is_empty(),
+                "a rejected leaf must not consume the beam (row {}): {filtered:?}",
+                query.0
+            );
+            assert!(
+                filtered.iter().all(|id| admitted.contains(*id)),
+                "row {}: the probe returned a filtered-out row",
+                query.0
+            );
+            // `beam = 2` is approximate, so the ids need not equal the
+            // exhaustive answer - but the exhaustive fallback the handle uses
+            // must be full.
+            let exact: Vec<u64> = index
+                .search_admitted_exact(&query.1, 4, &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(exact.len(), 4, "row {}: the fallback is short", query.0);
+
+            // The mapped form walks the same code.
+            let mapped: Vec<u64> = file
+                .search_filtered(&query.1, 4, Some(2), &admitted)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            assert_eq!(mapped, filtered, "row {}: chunk file disagrees", query.0);
         }
     }
 
@@ -1449,8 +1547,8 @@ mod tests {
 
                 // The filtered probe is the path the statement takes whenever a
                 // predicate was pushed down, so it has to agree too.
-                let allowed: std::collections::HashSet<u64> =
-                    (0..data.len() as u64).filter(|i| i % 3 == 0).collect();
+                let allowed: RowMask =
+                    RowMask::from_rows((0..data.len() as u64).filter(|i| i % 3 == 0).collect());
                 for query in &queries {
                     let memory: Vec<u64> = index
                         .search_filtered(query, 10, Some(8), &allowed)
@@ -1464,7 +1562,7 @@ mod tests {
                         .collect();
                     assert_eq!(memory, mapped, "{metric:?}/{encode:?} filtered");
                     assert!(
-                        mapped.iter().all(|id| allowed.contains(id)),
+                        mapped.iter().all(|id| allowed.contains(*id)),
                         "{metric:?}/{encode:?}: the probe returned a filtered-out row"
                     );
                 }

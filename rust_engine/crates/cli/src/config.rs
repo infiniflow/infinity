@@ -101,6 +101,10 @@ pub struct Config {
     /// budget. Only parsed real C++ configs set it.
     buffer_manager_size: Option<i64>,
     mem_index_memory_quota: i64,
+    /// `[buffer] unsealed_reclaim_interval` in seconds: the sweep's period.
+    unsealed_reclaim_interval: u64,
+    /// `[buffer] unsealed_max_tables_per_round`: `0` means no limit.
+    unsealed_max_tables_per_round: u64,
 
     checkpoint_interval: u64,
     wal_compact_threshold: i64,
@@ -155,6 +159,8 @@ impl Default for Config {
             temp_dir: "/var/infinity/tmp".into(),
             buffer_manager_size: None,
             mem_index_memory_quota: 4 * 1024 * 1024 * 1024,
+            unsealed_reclaim_interval: 30,
+            unsealed_max_tables_per_round: 100,
             checkpoint_interval: 86400,
             wal_compact_threshold: 1024 * 1024 * 1024,
             wal_flush: "only_write".into(),
@@ -270,8 +276,26 @@ impl Config {
             }
             ("buffer", "lru_num") => self.lru_num = integer()? as usize,
             ("buffer", "temp_dir") => self.temp_dir = string(),
+            ("buffer", "unsealed_memory_quota") => {
+                self.mem_index_memory_quota = parse_byte_size(&string())?
+            }
+            // The old spelling. Kept so an existing config keeps working; the
+            // name is misleading now - the quota bounds everything not yet on
+            // disk (the append buffer plus every index tail), not one index.
             ("buffer", "memindex_memory_quota") => {
                 self.mem_index_memory_quota = parse_byte_size(&string())?
+            }
+            // The reclaim loop's two settings (`docs/MEMORY_RECLAIM.md` §5).
+            // This parser has no consumer of its own - the serving binary reads
+            // the same file through `toml_value` - but the shipped
+            // `conf/infinity_conf.toml` carries both keys and `Config::init`
+            // rejects a key it does not know, so leaving them out made the
+            // shipped config unloadable.
+            ("buffer", "unsealed_reclaim_interval") => {
+                self.unsealed_reclaim_interval = parse_time_info(&string())?
+            }
+            ("buffer", "unsealed_max_tables_per_round") => {
+                self.unsealed_max_tables_per_round = integer()? as u64
             }
             ("buffer", "result_cache") => self.result_cache = string(),
             ("buffer", "cache_result_capacity") => self.cache_result_capacity = integer()? as u64,
@@ -430,6 +454,14 @@ impl Config {
     pub fn mem_index_memory_quota(&self) -> i64 {
         self.mem_index_memory_quota
     }
+    /// `[buffer] unsealed_reclaim_interval` in seconds; `0` stops the sweep.
+    pub fn unsealed_reclaim_interval(&self) -> u64 {
+        self.unsealed_reclaim_interval
+    }
+    /// `[buffer] unsealed_max_tables_per_round`; `0` means no limit.
+    pub fn unsealed_max_tables_per_round(&self) -> u64 {
+        self.unsealed_max_tables_per_round
+    }
     /// `[buffer] buffer_manager_size` in bytes, `None` when the config leaves
     /// it out (the engine then keeps its built-in budget).
     pub fn buffer_manager_size(&self) -> Option<i64> {
@@ -473,6 +505,9 @@ fn parse_time_zone(text: &str) -> Result<(String, i32), ConfigError> {
 }
 
 /// C++: `Config::ParseByteSize`: `KB`/`MB`/`GB` suffixes; `TB` is rejected.
+///
+/// `B` is accepted as a factor of one (`"2B"` is two bytes), which is the
+/// spelling the reclaim tests use to force a drain on the first batch.
 fn parse_byte_size(text: &str) -> Result<i64, ConfigError> {
     let lower = text.trim().to_ascii_lowercase();
     let (number, factor) = if let Some(v) = lower.strip_suffix("kb") {
@@ -483,6 +518,8 @@ fn parse_byte_size(text: &str) -> Result<i64, ConfigError> {
         (v, 1024 * 1024 * 1024)
     } else if lower.ends_with("tb") {
         return Err(ConfigError::InvalidByteSize);
+    } else if let Some(v) = lower.strip_suffix('b') {
+        (v, 1)
     } else {
         (lower.as_str(), 1)
     };
@@ -718,5 +755,28 @@ mod tests {
         assert_eq!(config.wal_compact_threshold(), 1024 * 1024 * 1024);
         assert_eq!(config.resource_path(), "/usr/share/infinity/resource");
         assert_eq!(config.persistence_dir(), "/var/infinity/persistence");
+    }
+
+    /// The checked-in config carries the reclaim settings, so `Config::init`
+    /// has to accept them: a key it does not know is `InvalidConfig`.
+    #[test]
+    fn the_shipped_config_loads_its_reclaim_settings() {
+        let mut config = Config::default();
+        config.init(Some(&fixture("infinity_conf.toml"))).unwrap();
+        assert_eq!(config.unsealed_reclaim_interval(), 30);
+        assert_eq!(config.unsealed_max_tables_per_round(), 100);
+    }
+
+    /// `"2B"` is two bytes, not an unparseable value: the end-to-end reclaim
+    /// test sets it to force a drain on the first batch.
+    #[test]
+    fn a_bare_byte_suffix_is_a_factor_of_one() {
+        assert_eq!(parse_byte_size("2B").unwrap(), 2);
+        assert_eq!(parse_byte_size("2b").unwrap(), 2);
+        assert_eq!(parse_byte_size("4096").unwrap(), 4096);
+        assert_eq!(parse_byte_size("1KB").unwrap(), 1024);
+        assert_eq!(parse_byte_size("2MB").unwrap(), 2 * 1024 * 1024);
+        assert!(parse_byte_size("1TB").is_err());
+        assert!(parse_byte_size("lots").is_err());
     }
 }

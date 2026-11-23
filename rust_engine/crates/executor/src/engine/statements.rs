@@ -516,9 +516,10 @@ impl Engine {
                 memindex_total: std::sync::atomic::AtomicUsize::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
-                memindex_pending: Arc::new(std::sync::Mutex::new(MemIndexPending::default())),
-                watermarks: std::sync::Mutex::new(Watermarks::new(0)),
-                seal_scheduler: std::sync::Mutex::new(SealScheduler::new(1)),
+                unsealed_backoff_until: std::sync::atomic::AtomicU64::new(0),
+                unsealed_reclaim_requested: std::sync::atomic::AtomicBool::new(false),
+                unsealed_reclaim_interval: std::sync::atomic::AtomicU64::new(30_000),
+                unsealed_max_tables_per_round: std::sync::atomic::AtomicUsize::new(100),
                 recall: std::sync::Mutex::new(std::collections::HashMap::new()),
                 object_store: Mutex::new(None),
                 hnsw_budget: std::sync::atomic::AtomicUsize::new(8 * 1024 * 1024 * 1024),
@@ -784,24 +785,20 @@ impl Engine {
             .unwrap_or(1)
     }
 
-    /// Dumps every memory index when the unified budget is exceeded, mirroring
-    /// the reference's memindex dump. The budget is one number for the whole
-    /// engine (`memindex_bytes`: every dumpable family, including the HNSW
-    /// charge and the IVF rows), not one per index.
-    /// `memindex_memory_quota = 0` disables it.
+    /// The write path's quota check: note that a batch pushed the ledger over
+    /// `[buffer] unsealed_memory_quota`, and let the trigger loop drain.
     ///
-    /// With a `BGTaskProcessor` attached this proposes one background
-    /// `DumpMemIndexTask` (C++ `BGMemIndexTracer::IncreaseMemoryUsage`): the
-    /// pending flag coalesces the per-row checks, and the task dumps whatever
-    /// was buffered when the worker runs. Without a processor the dump stays
-    /// synchronous, which is the engine's historical in-process behaviour.
-    /// `table` is the one whose tails just changed (the per-row call); `None`
+    /// **This does not drain.** Draining here would take other tables' bottom
+    /// gates from inside its own table's bottom half (the cross-table cycle the
+    /// block drain documents) and would put a block write plus an index dump on
+    /// the statement's latency. It raises
+    /// [`Context::unsealed_reclaim_requested`] instead; the trigger loop's next
+    /// tick runs the same [`Engine::reclaim_unsealed`] the periodic sweep runs.
+    /// One drain, one place that performs it.
+    ///
+    /// `table` names the table whose charge changed (the per-row call); `None`
     /// asks for a full recompute first (an explicit check).
-    /// The quota check, in its **async** form: every caller
-    /// (`run_bottom`, `insert_literals_inner`, `copy_from_inner`,
-    /// `execute_stmt_inner`) is already a task, so the fallback dump is an
-    /// `.await` instead of a nested `block_on` on a runtime worker.
-    pub(crate) async fn enforce_memindex_quota(&self, table: Option<&str>) {
+    pub(crate) fn enforce_memindex_quota(&self, table: Option<&str>) {
         let quota = self
             .context
             .memindex_quota
@@ -817,90 +814,31 @@ impl Engine {
         if table.is_some_and(|table| self.import_in_flight(table)) {
             return;
         }
-        // No time gate. The reference's `MemIndexTracer::IncreaseMemoryUsage`
-        // compares on **every** increase (`cur_index_memory_ >
-        // index_memory_limit_ + proposed_dump_size_`, `memindex_tracer.cppm:103`)
-        // and relies on `proposed_dump_` to avoid queueing a second task for an
-        // index that already has one in flight - never on a clock.
-        //
-        // This used to skip a check whose predecessor was younger than 10 ms,
-        // which made the outcome of a write depend on how fast the previous
-        // statement had been: two `INSERT`s issued back to back landed as one
-        // breach, so only one dump happened where the reference makes two.
-        // The callers are **per statement** (`update_text_indexes_batch`), not
-        // per row, so the clock bought nothing anyway.
-        //
-        // Fold in what changed before comparing: one table when the caller
-        // names it (O(that table's indexes)), everything for an explicit check.
+        // Fold in what changed: one table when the caller names it (O(that
+        // table's indexes)), everything for an explicit check. The ledger has to
+        // be current before the next tick decides, and only this call site knows
+        // which table moved.
         match table {
             Some(table) => self.refresh_memindex_charge(table),
             None => {
                 self.recompute_memindex_total();
             }
         }
-        // §9.5: one ledger, three waterlines. `soft` asks for a background
-        // seal, `hard` escalates it to every tail of the table; there is no
-        // second (row-based) trigger deciding *when* to dump - rows bound what
-        // one index keeps, bytes decide the pressure.
-        let pressure = self.seal_pressure();
-        if pressure == Pressure::Normal {
-            return;
-        }
-        if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(table.is_none(), table.map(str::to_string));
-            return;
-        }
-        // No background processor (a test, or shutdown): do the same work
-        // inline. An explicit check (`table == None`) is a caller asking for
-        // everything to be released, so it drains every tail; the per-write
-        // path takes the largest one.
-        if table.is_none() {
-            self.dump_all_memory_indexes().await;
-            // An explicit check may run outside any bottom half (a test, a
-            // shutdown), so the block drain can walk every table.
-            self.dump_all_sealed_blocks(None).await;
-            // The block drain released rows after the index dump had already
-            // folded its own result in, so the total is restated once more.
-            self.recompute_memindex_total();
-        } else {
-            // Inside this table's bottom half: its own gate is held, so the
-            // block drain must not reach for another table's.
-            self.dump_under_pressure(table).await;
+        if (self.budget_bytes() as u64) > self.reclaim_target() {
+            self.context
+                .unsealed_reclaim_requested
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
-    /// The quota check for a table whose rows just grew, without the per-row
-    /// gate.
+    /// The quota check for a table whose rows just grew.
     ///
     /// [`Self::enforce_memindex_quota`] is driven by the **index** write path,
-    /// so a table with no index never reached it - and that is exactly the
-    /// table whose append buffer grows unbounded. This runs at the end of a
-    /// commit instead: it folds in this table's new charge and, if the engine
-    /// is over budget, proposes the same background drain. Cheap enough for the
-    /// commit path because it reads one table's running totals and one atomic.
-    pub(crate) async fn enforce_quota_after_append(&self, table: &str) {
-        let quota = self
-            .context
-            .memindex_quota
-            .load(std::sync::atomic::Ordering::Relaxed) as usize;
-        if quota == 0 {
-            return;
-        }
-        if self.import_in_flight(table) {
-            return;
-        }
-        self.refresh_memindex_charge(table);
-        if self.seal_pressure() == Pressure::Normal {
-            return;
-        }
-        if self.bg_processor.lock().unwrap().is_some() {
-            self.propose_dump(false, Some(table.to_string()));
-            return;
-        }
-        // This runs after the commit returned, so no bottom gate is held. It
-        // still names the table: the breach is that table's charge, and picking
-        // the victim across the engine would leave it undrained.
-        self.dump_under_pressure(Some(table)).await;
+    /// so a table with no index never reached it - and that is exactly the table
+    /// whose append buffer grows unbounded. This runs at the end of a commit
+    /// instead and raises the same flag.
+    pub(crate) fn enforce_quota_after_append(&self, table: &str) {
+        self.enforce_memindex_quota(Some(table));
     }
 
     /// Whether an `IMPORT` is currently staging rows into `table`.
@@ -916,73 +854,6 @@ impl Engine {
             .unwrap()
             .get(&self.table_key(table))
             .is_some_and(|entry| entry.import_in_flight())
-    }
-
-    /// Queues the background drain. The caller has already established that a
-    /// processor is attached; one proposal is in flight at a time
-    /// (`proposed_dump_`).
-    pub(crate) fn propose_dump(&self, drain_all: bool, table: Option<String>) {
-        // Both callers check the processor first, so reaching here without one
-        // is a shutdown in progress: there is no worker to run the task.
-        let Some(processor) = self.bg_processor.lock().unwrap().clone() else {
-            return;
-        };
-        // One task per table at a time, but a breach that arrives while that
-        // task is still queued is **counted**, not dropped: the task's
-        // completion re-proposes when the count is still above zero. Dropping
-        // it lost a chunk the write was supposed to produce
-        // (`test_mem_bmp`, `test_optimize_from_different_database`).
-        let key = table.clone().unwrap_or_else(|| ALL_TABLES.to_string());
-        {
-            let mut pending = self.context.memindex_pending.lock().unwrap();
-            let count = {
-                let count = pending.pending.entry(key.clone()).or_insert(0);
-                *count += 1;
-                *count
-            };
-            if drain_all {
-                pending.drain_all.insert(key.clone());
-            }
-            // A task is already queued for this key; it serves this breach too.
-            if count > 1 {
-                return;
-            }
-        }
-        self.submit_dump_task(processor, drain_all, table);
-    }
-
-    /// Enqueues one dump task, without recording a breach.
-    ///
-    /// Separate from [`Self::propose_dump`] because the task's completion uses
-    /// it: going back through `propose_dump` incremented the count it had just
-    /// decremented, so the guard saw "already queued" and returned without
-    /// submitting anything - and every later breach returned the same way, so
-    /// that table never dumped again.
-    pub(crate) fn submit_dump_task(
-        &self,
-        processor: Arc<crate::bg_task::BGTaskProcessor>,
-        drain_all: bool,
-        table: Option<String>,
-    ) {
-        let engine = self.self_weak.lock().unwrap().clone();
-        let queued = processor.submit(Box::new(DumpMemIndexTask {
-            engine,
-            pending: Arc::clone(&self.context.memindex_pending),
-            drain_all,
-            table: table.clone(),
-        }));
-        if !queued {
-            // The processor is shutting down and dropped the task, so no worker
-            // will clear its proposal: drop it here or that table is never
-            // proposed again.
-            let key = table.unwrap_or_else(|| ALL_TABLES.to_string());
-            self.context
-                .memindex_pending
-                .lock()
-                .unwrap()
-                .pending
-                .remove(&key);
-        }
     }
 
     /// Records one sampled query's recall (`SPANN_DESIGN.md` §11.3 item 4).
@@ -1607,8 +1478,7 @@ impl Engine {
             entry.block_rows = None;
             entry.block_index = None;
             entry.live_rows = None;
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         // The files this engine mapped no longer describe the table: drop the
         // mappings so the next read maps what is on disk now.
@@ -2019,14 +1889,20 @@ impl Engine {
         self.load_deletes(table).0
     }
 
-    /// [`Self::deleted_ids`] as a set, built once per journal load.
+    /// [`Self::deleted_ids`] as a bitmap, built once per journal load.
     ///
     /// A bulk `DELETE`/`UPDATE` asks whether each of its rows is already gone
     /// (`row_is_present` -> `is_deleted`), and scanning the journal for every
     /// one of them made the statement quadratic in the journal's length. The
-    /// set is built on the first lookup, shared (`Arc`) by every later reader,
-    /// and dropped when `ensure_journals` rebuilds the journal from the blocks.
-    pub(crate) fn deleted_set(&self, table: &str) -> Arc<std::collections::HashSet<u64>> {
+    /// bitmap is built on the first lookup, shared (`Arc`) by every later
+    /// reader, and dropped when `ensure_journals` rebuilds the journal from the
+    /// blocks.
+    ///
+    /// Shared rather than copied: a statement reads the tombstones several
+    /// times (the index probe, the mask, the exact scan), and each read used to
+    /// deep-copy the whole set. Handing out the `Arc` makes those reads one
+    /// refcount bump.
+    pub(crate) fn deleted_set(&self, table: &str) -> Arc<common::RowBitmap> {
         let key = self.table_key(table);
         {
             let tables = self.tables.lock().unwrap();
@@ -2039,11 +1915,7 @@ impl Engine {
         }
         // Loading the journal takes the table lock itself, so it runs outside
         // it (`ensure_journals` re-reads the block `version` files).
-        let set = Arc::new(
-            self.deleted_ids(table)
-                .into_iter()
-                .collect::<std::collections::HashSet<u64>>(),
-        );
+        let set = Arc::new(common::RowBitmap::of(self.deleted_ids(table)));
         let mut tables = self.tables.lock().unwrap();
         let entry = tables.entry(key).or_default();
         match entry.deleted_set {
@@ -2331,8 +2203,7 @@ impl Engine {
         let _ = room;
         entry.row_counter = Some((at_seg, at_off as u32, copy));
         if n > 0 {
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         drop(tables);
         // One `create` per append in the mirror's `version` file.
@@ -2408,8 +2279,7 @@ impl Engine {
                     id: cursor.segment,
                     rows: offset,
                 });
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         let mut batches = cursor.batches.clone();
         batches.push(n);
@@ -2486,6 +2356,26 @@ impl Engine {
             .unwrap()
             .get(&key)
             .and_then(|e| e.analyzers.get(&column).cloned())
+    }
+
+    /// The analyzer **recorded for the index itself**, never the column's.
+    ///
+    /// [`Self::analyzer_of_index`] falls back to the column's analyzer when the
+    /// record names none, which is right for a query written without `@index`
+    /// but wrong for a cold handle being built *for* a record: a record with
+    /// no analyzer means the default tokeniser, not a loan of the other
+    /// index's delimiters.
+    pub(crate) fn analyzer_recorded_for_index(
+        &self,
+        table: &str,
+        index_name: &str,
+    ) -> Option<String> {
+        let key = self.table_key(table);
+        self.tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .and_then(|e| e.analyzers_by_index.get(index_name).cloned())
     }
 
     /// `(column, min_n, max_n, fold)` for every full-text index whose analyzer
@@ -3790,7 +3680,7 @@ impl Engine {
                             .tombstone_set_at(table, crate::read_ts())
                             .unwrap_or_default();
                         rows.into_iter()
-                            .filter(|(seq, _)| !dead.contains(&(*seq as u64)))
+                            .filter(|(seq, _)| !dead.contains(*seq as u64))
                             .map(|(_, cells)| cells)
                             .collect()
                     }
@@ -3969,7 +3859,7 @@ impl Engine {
         Ok(self
             .pending_rows_of(table)
             .into_iter()
-            .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+            .filter(|(seq, _)| !deleted.contains(*seq as u64))
             .collect())
     }
 
@@ -4173,7 +4063,7 @@ impl Engine {
         let hidden = self.tombstone_set_at(table, crate::read_ts())?;
         let mut out: Vec<(usize, Vec<Value>)> = rows
             .into_iter()
-            .filter(|(seq, _): &(usize, Vec<Value>)| !hidden.contains(&(*seq as u64)))
+            .filter(|(seq, _): &(usize, Vec<Value>)| !hidden.contains(*seq as u64))
             .collect();
         // A mirror that is untouched since it was written is the whole table.
         // `mirror_dirty` also covers what a replay sets when it applies a frame
@@ -4188,7 +4078,7 @@ impl Engine {
         out.extend(
             self.pending_rows_of(table)
                 .into_iter()
-                .filter(|(seq, _)| !hidden.contains(&(*seq as u64)) && !have.contains(seq)),
+                .filter(|(seq, _)| !hidden.contains(*seq as u64) && !have.contains(seq)),
         );
         out.sort_by_key(|(seq, _)| *seq);
         Ok(Some(out))
@@ -4261,7 +4151,7 @@ impl Engine {
                 let deleted = self.tombstone_set(table)?;
                 let kept: Vec<Vec<Value>> = rows
                     .into_iter()
-                    .filter(|(seq, _)| !deleted.contains(&(*seq as u64)))
+                    .filter(|(seq, _)| !deleted.contains(*seq as u64))
                     .map(|(_, cells)| cells)
                     .collect();
                 return Ok(Some(self.block_of(table, &wanted, kept)?));
@@ -4772,13 +4662,38 @@ impl Engine {
         column: &str,
         tokenizer: TextTokenizer,
     ) -> Result<(SharedTextIndex, TextTokenizer)> {
-        let (index_id, index_name) = self.fulltext_record(table, column).ok_or_else(|| {
+        let (index_id, _) = self.fulltext_record(table, column).ok_or_else(|| {
             Error::Invalid(format!(
                 "fulltext index does not exist for column '{column}'"
             ))
         })?;
-        let tokenizer = self
-            .index_tokenizer_of(table, &index_name)
+        self.text_index_with_tokenizer_of_id(table, index_id, column, tokenizer)
+            .await
+    }
+
+    /// [`Self::text_index_with_tokenizer`] for **one** catalog record.
+    ///
+    /// The write path needs this form: a column may carry two `FULLTEXT`
+    /// indexes (with different analyzers), and each owns its own cached index.
+    /// Resolving by column returned the first record's handle for both, so the
+    /// same documents were published into one index twice.
+    pub(crate) async fn text_index_with_tokenizer_of_id(
+        &self,
+        table: &str,
+        index_id: u64,
+        column: &str,
+        tokenizer: TextTokenizer,
+    ) -> Result<(SharedTextIndex, TextTokenizer)> {
+        let index_name = self
+            .storage
+            .catalog
+            .indexes_of_table(&self.qualified_table(table))
+            .ok()
+            .and_then(|list| list.into_iter().find(|im| im.id == index_id))
+            .map(|im| im.name);
+        let tokenizer = index_name
+            .as_deref()
+            .and_then(|name| self.index_tokenizer_of(table, name))
             .unwrap_or(tokenizer);
         let index = self
             .text_index_for_id(table, index_id, column, tokenizer.clone())
@@ -4819,27 +4734,27 @@ impl Engine {
     }
 
     /// The tokeniser one full-text record was created with.
+    ///
+    /// All three settings come from the **record**, not from the column: a
+    /// column may carry two `FULLTEXT` indexes with different analyzers, and
+    /// taking the delimiters or the stemmer from the column gave the second
+    /// record the first one's tokenisation.
     fn index_tokenizer_of(&self, table: &str, index_name: &str) -> Option<TextTokenizer> {
-        let analyzer = self.analyzer_of_index(table, index_name);
-        let column = self
-            .storage
+        // A record with no analyzer entry at all keeps the column's tokeniser,
+        // which is what the write path has always used.
+        let fallback = self.index_tokenizer(table, &self.index_column_named(table, index_name)?);
+        Some(self.index_tokenizer_of_name(table, index_name, fallback))
+    }
+
+    /// The column a full-text record named `index_name` covers.
+    fn index_column_named(&self, table: &str, index_name: &str) -> Option<String> {
+        self.storage
             .catalog
             .indexes_of_table(&self.qualified_table(table))
             .ok()?
             .into_iter()
-            .find(|im| im.name == index_name)?
-            .column;
-        let mut tokenizer = TextTokenizer::new(
-            self.index_delims(table, &column),
-            analyzer.and_then(|name| match analyzer::parse_analyzer_name(&name) {
-                Ok(analyzer::AnalyzerName::Standard { .. })
-                | Ok(analyzer::AnalyzerName::Whitespace { .. })
-                | Err(_) => None,
-                Ok(_) => Some(name),
-            }),
-        );
-        tokenizer.stemmer = self.index_stemmer(table, &column);
-        Some(tokenizer)
+            .find(|im| im.name == index_name)
+            .map(|im| im.column)
     }
 
     /// The catalog id of the full-text index on `column` - the first one when
@@ -6145,7 +6060,7 @@ impl Engine {
             return Ok(std::collections::HashSet::new());
         }
         match self.columnar_mask_rows(table, filters).await {
-            Some(mask) => Ok(mask.into_iter().map(|seq| seq as u64).collect()),
+            Some(mask) => Ok(mask.iter().collect()),
             None => self.match_filter_rows(table, filters).await,
         }
     }
@@ -6182,11 +6097,14 @@ impl Engine {
     ///
     /// `None` is not "no rows" - it is "use the exact scan", which is the only
     /// safe answer for a shape this module does not evaluate.
-    async fn columnar_mask_rows(
-        &self,
-        table: &str,
-        filters: &[&Expr],
-    ) -> Option<std::collections::HashSet<usize>> {
+    ///
+    /// The tombstones are folded in here rather than by the caller, which is
+    /// what the reference does: `CommonQueryFilter::NewBuildFilter` ends with
+    /// `CheckSegmentRowsVisible` writing the deleted rows into the same bitmap
+    /// the predicate produced (`common_query_filter_impl.cpp:234-241`). One
+    /// filter reaches the index, so a delete that leaves a row at the top of an
+    /// index's ranking hides it instead of making the answer one row short.
+    async fn columnar_mask_rows(&self, table: &str, filters: &[&Expr]) -> Option<common::RowMask> {
         if filters.is_empty() {
             return None;
         }
@@ -6197,7 +6115,7 @@ impl Engine {
         // to be the filter's own, not a subset, or a search would lose rows -
         // see `indexed_filter_rows`.
         if let Some(rows) = self.indexed_filter_rows(table, filters) {
-            return Some(rows.into_iter().map(|seq| seq as usize).collect());
+            return Some(common::RowMask::from_rows(rows.into_iter().collect()));
         }
         let mut wanted: Vec<usize> = Vec::new();
         for filter in filters {
@@ -6239,12 +6157,16 @@ impl Engine {
             });
         }
         let keep = keep?;
-        Some(
+        // `fetch_rows_with_ids_projected_some` is the live population, so the
+        // tombstones are already gone from `seqs`. Folding the journal in again
+        // would be redundant work on every filtered query; `with_excluded` is
+        // left for the caller that has no predicate to read the rows through.
+        Some(common::RowMask::from_rows(
             seqs.into_iter()
                 .zip(keep)
-                .filter_map(|(seq, kept)| kept.then_some(seq))
-                .collect(),
-        )
+                .filter_map(|(seq, kept)| kept.then_some(seq as u64))
+                .collect::<common::RowBitmap>(),
+        ))
     }
 
     /// The row ids whose tensor parses, ascending: the document order a PLAID
@@ -6773,12 +6695,16 @@ impl Engine {
     }
 
     /// Tombstoned sequence ids of a table; index hits are validated against it.
-    pub(crate) fn tombstone_set(&self, table: &str) -> Result<std::collections::HashSet<u64>> {
+    ///
+    /// Shared, not copied: the caller hands it to the index probe, the filter
+    /// mask and the exact scan in turn, and a copy per read was the largest
+    /// avoidable allocation on the read path of a table with many deletes.
+    pub(crate) fn tombstone_set(&self, table: &str) -> Result<Arc<common::RowBitmap>> {
         // A delete the checkpoint has not written yet is in the table's delete
         // log (`note_deleted_ids`, `DeleteInBlock`); the block's `version`
-        // carries it after the flush. The set is the one the journal keeps for
-        // single-row lookups, so building it is not repeated per query.
-        Ok((*self.deleted_set(table)).clone())
+        // carries it after the flush. The bitmap is the one the journal keeps
+        // for single-row lookups, so building it is not repeated per query.
+        Ok(self.deleted_set(table))
     }
 
     /// [`Self::tombstone_set`] as of `read_ts`: a delete that committed after
@@ -6787,14 +6713,14 @@ impl Engine {
         &self,
         table: &str,
         read_ts: u64,
-    ) -> Result<std::collections::HashSet<u64>> {
+    ) -> Result<Arc<common::RowBitmap>> {
         if read_ts == u64::MAX {
             return self.tombstone_set(table);
         }
         // Both journal halves in one load: each `deleted_ids`/`delete_ts` call
         // clones the whole journal, and this is the read path of every query.
         let (ids, ts) = self.load_deletes(table);
-        let mut dead: std::collections::HashSet<u64> = Default::default();
+        let mut dead = common::RowBitmap::new();
         for (at, id) in ids.iter().enumerate() {
             let deleted = ts.get(at).copied().unwrap_or(0);
             // An unsettled entry is a delete the commit already accepted but
@@ -6803,7 +6729,8 @@ impl Engine {
                 dead.insert(*id);
             }
         }
-        Ok(dead)
+        dead.run_optimize();
+        Ok(Arc::new(dead))
     }
 
     /// Several columns with only `idxs` parsed: the shape a predicate needs, and
@@ -8308,7 +8235,7 @@ impl Engine {
         pred: Option<&Expr>,
         in_filter: Option<&Expr>,
         opt_filter: Option<&Expr>,
-        dead: &std::collections::HashSet<u64>,
+        dead: &common::RowBitmap,
     ) -> Result<Option<wand::DocFilter>> {
         if pred.is_none() && in_filter.is_none() && opt_filter.is_none() {
             return Ok(None);
@@ -8328,7 +8255,7 @@ impl Engine {
             .filter_row_ids(table, &filters)
             .await?
             .into_iter()
-            .filter(|row_id| !dead.contains(row_id))
+            .filter(|row_id| !dead.contains(*row_id))
             .collect();
         // The row cache the fetch may answer from is not ordered by row id, and
         // the pushdown needs `partition_point` to work.
@@ -9103,7 +9030,7 @@ impl Engine {
                     continue;
                 }
             }
-            if !dead.contains(&doc) {
+            if !dead.contains(doc) {
                 // `rank_features=<col>^<tag>^<weight>` adds `weight_of_tag * weight`,
                 // where `weight_of_tag` is the posting's doc payload decoded with
                 // `SmallFloat::UInt16ToFloat122`.
@@ -9756,7 +9683,7 @@ impl Engine {
                     None => Value::Null,
                 });
             }
-            let live = !dead.contains(&(seq as u64));
+            let live = !dead.contains(seq as u64);
             let passes = pred.map(|p| p.eval_predicate(&row)).unwrap_or(true);
             #[cfg(test)]
             MATCH_ROWS_TOKENIZED.with(|n| n.set(n.get() + 1));
@@ -11191,15 +11118,37 @@ impl Engine {
         // compared to a column), and then a filtered query keeps the exact scan
         // - an index whose candidates the mask cannot prune would answer a short
         // top-k (`docs/SPANN_DESIGN.md` §12.5).
-        let allowed: Option<std::collections::HashSet<usize>> = if has_filter {
-            let filters: Vec<&Expr> = pred
-                .into_iter()
-                .chain(in_filter.as_ref())
-                .chain(search_filter.as_ref())
-                .collect();
-            self.columnar_mask_rows(table, &filters).await
-        } else {
+        //
+        // The tombstones are part of this mask even when there is no predicate:
+        // the reference folds them into `filter_result_` unconditionally
+        // (`common_query_filter_impl.cpp:234-241`), which is why an index with
+        // no filter still hides a deleted row instead of returning it. Skipping
+        // that here is what made a mostly-deleted table answer a short - or
+        // empty - top-k: the beam and the candidate pool were sized for
+        // `topn`, and every row they reached had been deleted.
+        let tombstones = if has_filter {
             None
+        } else {
+            // Only needed when nothing else reads the journal for this
+            // statement: a predicate's mask is built from the live row set,
+            // which already excludes the tombstones. A journal that cannot be
+            // read leaves the mask out, which falls back to the exact scan -
+            // never to answering a row the statement may not see.
+            self.tombstone_set_at(table, crate::read_ts()).ok()
+        };
+        let allowed: Option<common::RowMask> = match (has_filter, tombstones) {
+            (true, _) => {
+                let filters: Vec<&Expr> = pred
+                    .into_iter()
+                    .chain(in_filter.as_ref())
+                    .chain(search_filter.as_ref())
+                    .collect();
+                self.columnar_mask_rows(table, &filters).await
+            }
+            (false, Some(dead)) if !dead.is_empty() => {
+                Some(common::RowMask::all_true().with_excluded(Some((*dead).clone())))
+            }
+            (false, _) => None,
         };
         // Walk a persisted HNSW graph instead of every row when one is loaded
         // for this column (plan #70). The candidates are still scored exactly
@@ -12276,6 +12225,10 @@ impl Engine {
         cleanup_interval: std::time::Duration,
         compact_interval: std::time::Duration,
         optimize_interval: std::time::Duration,
+        // The staleness sweep's period (`[buffer] unsealed_reclaim_interval`).
+        // Zero disables that path; it is the fifth interval rather than a field
+        // read inside the loop so a test that passes four zeros stays inert.
+        reclaim_interval: std::time::Duration,
     ) {
         let processor = Arc::new(BGTaskProcessor::new(1));
         processor.start().await;
@@ -12299,6 +12252,7 @@ impl Engine {
                 cleanup_interval,
                 compact_interval,
                 optimize_interval,
+                reclaim_interval,
             )
             .await
         });

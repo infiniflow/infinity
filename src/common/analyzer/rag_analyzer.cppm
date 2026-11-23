@@ -164,7 +164,9 @@ public:
 
     bool enable_position_{false};
 
-    static inline re2::RE2 pattern1_{"[a-zA-Z_-]+$"};
+    // Used with FullMatch: only tokens made entirely of these characters are
+    // lemmatized and stemmed, as in rag_tokenizer.py's _normalize_token.
+    static inline re2::RE2 pattern1_{"[a-zA-Z_-]+"};
 
     static inline re2::RE2 pattern2_{"[a-zA-Z\\.-]+$"};
 
@@ -174,8 +176,32 @@ public:
 
     static inline re2::RE2 pattern5_{"[a-zA-Z\\.-]+"};
 
+    // The word run's letters. rag_tokenizer.py lowercases the line and then
+    // splits it on [a-zA-Z0-9À-ÖØ-öø-ɏḀ-ỿ]. This pattern splits the original
+    // text and each token is lowercased after, so the class holds every code
+    // point whose lowercase is one code point in Python's class: each boundary
+    // falls where Python puts it. Against Python's class it drops Ⱥ U+023A,
+    // Ⱦ U+023E and the 21 capitals whose lowercase is in IPA Extensions
+    // (U+0181 ... U+0245), and adds the Kelvin and Angstrom signs U+212A and
+    // U+212B, U+2C7E, U+2C7F and U+A7DC. It also drops İ U+0130, the one letter
+    // whose lowercase is two code points: Python splits it between i and
+    // U+0307, which no class on the original text can do. Generated with
+    // Python 3.14 (3.13 gives the same without U+A7DC, unassigned in its
+    // Unicode 15.1); is_split_word_char in the Rust port has the same ranges:
+    //   P = re.compile(r"[a-zA-Z0-9À-ÖØ-öø-ɏḀ-ỿ]")
+    //   cps = [i for i in range(0x110000) if not 0xD800 <= i <= 0xDFFF
+    //          and len(chr(i).lower()) == 1 and P.fullmatch(chr(i).lower())]
+    //   runs = [[cps[0], cps[0]]]
+    //   for cp in cps[1:]:
+    //       if cp == runs[-1][1] + 1: runs[-1][1] = cp
+    //       else: runs.append([cp, cp])
+    //   cls = "".join(f"\\x{{{a:04X}}}" + (f"-\\x{{{b:04X}}}" if b > a else "") for a, b in runs[3:])
     static inline re2::RE2 regex_split_pattern_{
-        R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+))#"};
+        R"#(([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9)#"
+        R"#(\x{00C0}-\x{00D6}\x{00D8}-\x{00F6}\x{00F8}-\x{012F}\x{0131}-\x{0180}\x{0182}-\x{0185}\x{0187}-\x{0188}\x{018B}-\x{018E})#"
+        R"#(\x{0191}-\x{0192}\x{0195}\x{0198}-\x{019B}\x{019E}\x{01A0}-\x{01A5}\x{01A7}-\x{01A8}\x{01AA}-\x{01AD}\x{01AF}-\x{01B0}\x{01B3}-\x{01B6})#"
+        R"#(\x{01B8}-\x{0239}\x{023B}-\x{023D}\x{023F}-\x{0243}\x{0246}-\x{024F}\x{1E00}-\x{1EFF}\x{212A}-\x{212B}\x{2C7E}-\x{2C7F}\x{A7DC})#"
+        R"#(,\.-]+))#"};
 
     static inline re2::RE2 blank_pattern_{"( )"};
 

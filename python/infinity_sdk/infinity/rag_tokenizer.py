@@ -160,7 +160,10 @@ class RagTokenizer:
         self._use_lemmatizer = True  # WordNet only supports English
         self._fold_diacritics = False
 
-        self.SPLIT_CHAR = r"([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9,\.-]+)"
+        # Latin letters with diacritics (U+00C0-U+024F minus × and ÷, and
+        # U+1E00-U+1EFF) are word characters too, so 'nhà' or 'café' is not
+        # split into pieces.
+        self.SPLIT_CHAR = r"([ ,\.<>/?;:'\[\]\\`!@#$%^&*\(\)\{\}\|_+=《》，。？、；‘’：“”【】~！￥%……（）——-]+|[a-zA-Z0-9À-ÖØ-öø-ɏḀ-ỿ,\.-]+)"
 
         trie_file_name = self.DIR_ + ".trie"
         # check if trie file existence

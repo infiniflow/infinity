@@ -150,6 +150,7 @@ async fn start_background_tasks_sets_processor() {
             std::time::Duration::ZERO,
             std::time::Duration::ZERO,
             std::time::Duration::ZERO,
+            std::time::Duration::ZERO,
         )
         .await;
     // `submit_cleanup` is the marker here, not `submit_optimize_indexes`: an

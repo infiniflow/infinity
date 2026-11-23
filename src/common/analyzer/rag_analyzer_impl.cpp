@@ -76,6 +76,93 @@ static const std::string NLTK_TOKENIZE_PATTERN =
 
 static constexpr std::size_t MAX_SENTENCE_LEN = 100;
 
+// rag_tokenizer.py lowercases the whole line with str.lower(); ToLower() only
+// folds A-Z. LATIN_UPPER[i] lowercases to LATIN_LOWER[i]: every letter of
+// rag_tokenizer.py's Latin ranges (U+00C0-U+00D6, U+00D8-U+00F6, U+00F8-U+024F,
+// U+1E00-U+1EFF) whose lowercase is one letter of the same UTF-8 length in
+// those ranges, so lowercasing in place keeps byte offsets. Skipped: İ U+0130
+// and ẞ U+1E9E (their lowercase has another length), Ⱥ U+023A and Ⱦ U+023E
+// (lowercase at U+2C65/U+2C66), and the 21 capitals whose lowercase is in IPA
+// Extensions (Ɓ U+0181 ... Ʌ U+0245). The letters regex_split_pattern_ adds
+// outside those ranges (U+212A, U+212B, U+2C7E, U+2C7F, U+A7DC) lowercase to
+// another length, so they are not lowercased either. Generated with Python 3.13:
+//   R = [(0xC0, 0xD6), (0xD8, 0xF6), (0xF8, 0x24F), (0x1E00, 0x1EFF)]
+//   ok = lambda c: any(lo <= ord(c) <= hi for lo, hi in R)
+//   pairs = [(c, c.lower()) for lo, hi in R for c in map(chr, range(lo, hi + 1))
+//            if c.lower() != c and len(c.lower()) == 1 and ok(c.lower())
+//            and len(c.lower().encode()) == len(c.encode())]
+//   upper, lower = ("".join(p[i] for p in pairs) for i in (0, 1))
+// The Rust port checks the same table in test_latin_lowercase_table.
+static constexpr std::u16string_view LATIN_UPPER = u"ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞĀĂĄĆĈĊČĎĐĒ"
+                                                   u"ĔĖĘĚĜĞĠĢĤĦĨĪĬĮĲĴĶĹĻĽĿŁŃŅŇŊŌŎŐŒŔŖŘŚŜŞŠŢŤŦ"
+                                                   u"ŨŪŬŮŰŲŴŶŸŹŻŽƂƄƇƋƎƑƘƠƢƤƧƬƯƳƵƸƼǄǅǇǈǊǋǍǏǑǓǕ"
+                                                   u"ǗǙǛǞǠǢǤǦǨǪǬǮǱǲǴǶǷǸǺǼǾȀȂȄȆȈȊȌȎȐȒȔȖȘȚȜȞȠȢȤ"
+                                                   u"ȦȨȪȬȮȰȲȻȽɁɃɆɈɊɌɎḀḂḄḆḈḊḌḎḐḒḔḖḘḚḜḞḠḢḤḦḨḪḬḮ"
+                                                   u"ḰḲḴḶḸḺḼḾṀṂṄṆṈṊṌṎṐṒṔṖṘṚṜṞṠṢṤṦṨṪṬṮṰṲṴṶṸṺṼṾ"
+                                                   u"ẀẂẄẆẈẊẌẎẐẒẔẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼẾỀỂỄỆỈỊỌỎỐỒỔỖỘ"
+                                                   u"ỚỜỞỠỢỤỦỨỪỬỮỰỲỴỶỸỺỼỾ";
+static constexpr std::u16string_view LATIN_LOWER = u"àáâãäåæçèéêëìíîïðñòóôõöøùúûüýþāăąćĉċčďđē"
+                                                   u"ĕėęěĝğġģĥħĩīĭįĳĵķĺļľŀłńņňŋōŏőœŕŗřśŝşšţťŧ"
+                                                   u"ũūŭůűųŵŷÿźżžƃƅƈƌǝƒƙơƣƥƨƭưƴƶƹƽǆǆǉǉǌǌǎǐǒǔǖ"
+                                                   u"ǘǚǜǟǡǣǥǧǩǫǭǯǳǳǵƕƿǹǻǽǿȁȃȅȇȉȋȍȏȑȓȕȗșțȝȟƞȣȥ"
+                                                   u"ȧȩȫȭȯȱȳȼƚɂƀɇɉɋɍɏḁḃḅḇḉḋḍḏḑḓḕḗḙḛḝḟḡḣḥḧḩḫḭḯ"
+                                                   u"ḱḳḵḷḹḻḽḿṁṃṅṇṉṋṍṏṑṓṕṗṙṛṝṟṡṣṥṧṩṫṭṯṱṳṵṷṹṻṽṿ"
+                                                   u"ẁẃẅẇẉẋẍẏẑẓẕạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộ"
+                                                   u"ớờởỡợụủứừửữựỳỵỷỹỻỽỿ";
+static_assert(LATIN_UPPER.size() == LATIN_LOWER.size());
+static_assert(std::is_sorted(LATIN_UPPER.begin(), LATIN_UPPER.end()));
+
+static inline bool IsUTF8Continuation(char c) { return (static_cast<unsigned char>(c) & 0xC0) == 0x80; }
+
+// Lowercase the LATIN_UPPER letters of a UTF-8 buffer in place.
+static void LowerLatinLetters(char *data, std::size_t len) {
+    for (std::size_t i = 0; i < len;) {
+        const auto lead = static_cast<unsigned char>(data[i]);
+        std::size_t n = 0;
+        char16_t cp = 0;
+        if (lead >= 0xC3 && lead <= 0xC9 && i + 1 < len && IsUTF8Continuation(data[i + 1])) {
+            n = 2;
+            cp = static_cast<char16_t>(((lead & 0x1F) << 6) | (data[i + 1] & 0x3F));
+        } else if (lead == 0xE1 && i + 2 < len && IsUTF8Continuation(data[i + 1]) && IsUTF8Continuation(data[i + 2])) {
+            n = 3;
+            cp = static_cast<char16_t>(((lead & 0x0F) << 12) | ((data[i + 1] & 0x3F) << 6) | (data[i + 2] & 0x3F));
+        } else {
+            ++i;
+            continue;
+        }
+        const auto it = std::lower_bound(LATIN_UPPER.begin(), LATIN_UPPER.end(), cp);
+        if (it != LATIN_UPPER.end() && *it == cp) {
+            const char16_t lower = LATIN_LOWER[it - LATIN_UPPER.begin()];
+            if (n == 2) {
+                data[i] = static_cast<char>(0xC0 | (lower >> 6));
+                data[i + 1] = static_cast<char>(0x80 | (lower & 0x3F));
+            } else {
+                data[i] = static_cast<char>(0xE0 | (lower >> 12));
+                data[i + 1] = static_cast<char>(0x80 | ((lower >> 6) & 0x3F));
+                data[i + 2] = static_cast<char>(0x80 | (lower & 0x3F));
+            }
+        }
+        i += n;
+    }
+}
+
+// Lowercases term like rag_tokenizer.py (A-Z and the LATIN_UPPER letters) into
+// buffer, or into large when it does not fit there, and returns the
+// NUL-terminated result. A term is never cut: a run of 12k+ letters with no
+// separator tokenizes as in Python and Rust.
+static char *LowercaseTerm(const std::string &term, std::vector<char> &buffer, std::string &large) {
+    char *out = buffer.data();
+    std::size_t limit = buffer.size();
+    if (term.size() + 1 > limit) {
+        large.resize(term.size() + 1);
+        out = large.data();
+        limit = large.size();
+    }
+    ToLower(term.data(), term.size(), out, limit);
+    LowerLatinLetters(out, term.size());
+    return out;
+}
+
 static inline i32 Encode(i32 freq, i32 idx) {
     u32 encoded_value = 0;
     if (freq < 0) {
@@ -1461,10 +1548,10 @@ void RAGAnalyzer::MergeWithPosition(const std::vector<std::string> &tokens,
 
 void RAGAnalyzer::EnglishNormalize(const std::vector<std::string> &tokens, std::vector<std::string> &res) {
     for (auto &t : tokens) {
-        if (re2::RE2::PartialMatch(t, pattern1_)) { //"[a-zA-Z_-]+$"
+        if (re2::RE2::FullMatch(t, pattern1_)) {
             // Apply lowercase before lemmatization to match Python NLTK behavior
-            char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(t.c_str(), t.size(), lowercase_term, term_string_buffer_limit_);
+            std::string large_term;
+            char *lowercase_term = LowercaseTerm(t, lowercase_string_buffer_, large_term);
             std::string term_to_stem;
             if (use_lemmatizer_) {
                 term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
@@ -1850,8 +1937,13 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
             }
             for (unsigned i = 0; i < term_list.size(); ++i) {
                 // Apply lowercase before lemmatization to match Python NLTK behavior
-                char *lowercase_term = lowercase_string_buffer_.data();
-                ToLower(term_list[i].c_str(), term_list[i].size(), lowercase_term, term_string_buffer_limit_);
+                std::string large_term;
+                char *lowercase_term = LowercaseTerm(term_list[i], lowercase_string_buffer_, large_term);
+                // Like rag_tokenizer.py, only all-ASCII words are lemmatized and stemmed.
+                if (!re2::RE2::FullMatch(lowercase_term, pattern1_)) {
+                    res.push_back(lowercase_term);
+                    continue;
+                }
                 std::string term_to_stem;
                 if (use_lemmatizer_) {
                     term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
@@ -1997,19 +2089,24 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                         unsigned start_pos = sentence_start_pos + static_cast<unsigned>(pos_in_sentence);
                         unsigned end_pos = start_pos + static_cast<unsigned>(term.size());
                         // Apply lowercase before lemmatization to match Python NLTK behavior
-                        char *lowercase_term = lowercase_string_buffer_.data();
-                        ToLower(term.c_str(), term.size(), lowercase_term, term_string_buffer_limit_);
-                        std::string term_to_stem;
-                        if (use_lemmatizer_) {
-                            term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
-                        } else {
-                            term_to_stem = lowercase_term;
-                        }
+                        std::string large_term;
+                        char *lowercase_term = LowercaseTerm(term, lowercase_string_buffer_, large_term);
                         std::string stem_term;
-                        if (use_stemmer_) {
-                            stemmer_->Stem(term_to_stem, stem_term);
+                        if (!re2::RE2::FullMatch(lowercase_term, pattern1_)) {
+                            // Like rag_tokenizer.py, only all-ASCII words are lemmatized and stemmed.
+                            stem_term = lowercase_term;
                         } else {
-                            stem_term = term_to_stem;
+                            std::string term_to_stem;
+                            if (use_lemmatizer_) {
+                                term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);
+                            } else {
+                                term_to_stem = lowercase_term;
+                            }
+                            if (use_stemmer_) {
+                                stemmer_->Stem(term_to_stem, stem_term);
+                            } else {
+                                stem_term = term_to_stem;
+                            }
                         }
 
                         tokens.push_back(stem_term);
@@ -2329,10 +2426,10 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
         const auto &token = tokens[i];
         const auto &[start_pos, end_pos] = positions[i];
 
-        if (re2::RE2::PartialMatch(token, pattern1_)) { //"[a-zA-Z_-]+$"
+        if (re2::RE2::FullMatch(token, pattern1_)) {
             // Apply lowercase before lemmatization to match Python NLTK behavior
-            char *lowercase_term = lowercase_string_buffer_.data();
-            ToLower(token.c_str(), token.size(), lowercase_term, term_string_buffer_limit_);
+            std::string large_term;
+            char *lowercase_term = LowercaseTerm(token, lowercase_string_buffer_, large_term);
             std::string term_to_stem;
             if (use_lemmatizer_) {
                 term_to_stem = wordnet_lemma_->Lemmatize(lowercase_term);

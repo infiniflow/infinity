@@ -1820,15 +1820,17 @@ impl Engine {
                     crate::spann_mem::SpannTail::new(*dims, opts.clone())
                         .expect("a tail over a validated dimension")
                 });
+                let mut held = 0u64;
                 for (seq, row) in &rows {
                     let Some(value) = row.get(*column) else {
                         continue;
                     };
                     let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
-                    if !vector.is_empty() {
-                        let _ = tail.insert(*seq as u64, &vector);
+                    if !vector.is_empty() && tail.insert(*seq as u64, &vector).is_ok() {
+                        held += 1;
                     }
                 }
+                entry.bump_unsealed(*index_id, held);
             }
             // Only the rows the caller is not writing elsewhere: a staged block
             // must not also sit in the buffer, or the same 8192 rows stay
@@ -1840,8 +1842,7 @@ impl Engine {
                 resolve,
                 || (live.ids.clone(), live.defaults.clone()),
             );
-            entry.mirror_dirty = true;
-            entry.mirror_epoch += 1;
+            entry.note_write();
         }
         Ok(buffered)
     }
@@ -2842,7 +2843,7 @@ impl Engine {
                             .row_ids()
                             .into_iter()
                             .filter(|id| *id >> 32 == u64::from(*segment))
-                            .filter(|id| !tail_dead.contains(id))
+                            .filter(|id| !tail_dead.contains(*id))
                             .collect();
                         // The tree is **not** materialised: the pages are read
                         // through the chain as the descent visits them and
@@ -3570,19 +3571,20 @@ impl Engine {
                         crate::spann_mem::SpannTail::new(*dims, opts.clone())
                             .expect("a tail over a validated dimension")
                     });
+                    let mut held = 0u64;
                     for (seq, cells) in &attributed {
                         let Some(value) = cells.get(column_id) else {
                             continue;
                         };
                         let vector = crate::engine::state::parse_vec_f32(&mirror_cell_text(value));
-                        if !vector.is_empty() {
-                            let _ = tail.insert(*seq as u64, &vector);
+                        if !vector.is_empty() && tail.insert(*seq as u64, &vector).is_ok() {
+                            held += 1;
                         }
                     }
+                    entry.bump_unsealed(*index_id, held);
                 }
                 entry.buffer_attributed_rows(attributed, &live_ids, &live_defaults);
-                entry.mirror_dirty = true;
-                entry.mirror_epoch += 1;
+                entry.note_write();
             }
             if !rows.contains_key(&table) {
                 order.push(table.clone());
@@ -4073,7 +4075,7 @@ impl Engine {
     /// per row (`row_is_present`) and made the statement quadratic in the
     /// journal's length.
     pub(crate) fn is_deleted(&self, table: &str, seq: usize) -> bool {
-        self.deleted_set(table).contains(&(seq as u64))
+        self.deleted_set(table).contains(seq as u64)
     }
 
     /// The blocks a reader may see: the table's block index minus every segment
@@ -4282,7 +4284,7 @@ impl Engine {
                 // delete log and not in the block's `version`; a delete it has
                 // written is in both, and counting it twice would under-report.
                 let seq = base | slot as u64;
-                if !deleted.contains(&seq) {
+                if !deleted.contains(seq) {
                     sink(seq as usize);
                 }
             }
@@ -4304,7 +4306,7 @@ impl Engine {
         let view = self.append_view(table, read_ts);
         for (seq, _) in &pending {
             if have.contains(seq)
-                || deleted.contains(&(*seq as u64))
+                || deleted.contains(*seq as u64)
                 || view
                     .as_ref()
                     .is_some_and(|view| !view.covers(*seq, read_ts))
@@ -5376,7 +5378,7 @@ impl Engine {
         let mut out: Vec<(usize, Vec<Value>)> = Vec::with_capacity(entry.pending_rows.len());
         for k in 0..entry.pending_rows.len() {
             let seq = entry.pending_rows.row_id(k);
-            if dead.contains(&(seq as u64)) {
+            if dead.contains(seq as u64) {
                 continue;
             }
             if let Some(view) = &view {
@@ -5450,7 +5452,7 @@ impl Engine {
         let lo = bounds.lo.as_ref();
         let hi = bounds.hi.as_ref();
         for (seq, values) in self.pending_rows_of(&table) {
-            if dead.contains(&(seq as u64)) {
+            if dead.contains(seq as u64) {
                 continue;
             }
             let Some(value) = values.get(bounds.pos) else {
@@ -5625,7 +5627,7 @@ impl Engine {
                 .unwrap_or_default();
             for (seq, values) in &rows {
                 let seq = *seq;
-                if dead.contains(&(seq as u64)) {
+                if dead.contains(seq as u64) {
                     continue;
                 }
                 if let Some(view) = &view {
@@ -5652,7 +5654,7 @@ impl Engine {
         // A delete that has not reached the block's `version` yet lives in the
         // tombstone set; the row path filters those, and so must this one.
         if !dead.is_empty() && !seqs.is_empty() {
-            let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(&(*s as u64))).collect();
+            let keep: Vec<bool> = seqs.iter().map(|s| !dead.contains(*s as u64)).collect();
             if keep.iter().any(|k| !k) {
                 for column in data.iter_mut() {
                     column.retain(&keep);
@@ -5836,7 +5838,7 @@ impl Engine {
             };
             for k in at..end {
                 let s = rows[order[k]] as usize;
-                let is_dead = dead.contains(&(s as u64));
+                let is_dead = dead.contains(s as u64);
                 let run_index = visible_run[k - at];
                 count += 1;
                 for (o, pos) in wanted.iter().enumerate() {
@@ -6248,7 +6250,7 @@ impl Engine {
             let dead = self.tombstone_set_at(&table, read_ts).unwrap_or_default();
             let view = self.append_view(&table, read_ts);
             for (seq, values) in pending {
-                if have.contains(&seq) || dead.contains(&(seq as u64)) {
+                if have.contains(&seq) || dead.contains(seq as u64) {
                     continue;
                 }
                 if let Some(view) = &view {
@@ -8706,7 +8708,7 @@ impl Engine {
                 }
                 let seq = ((id.segment_id as usize) << 32)
                     | (id.block_id as usize * DEFAULT_BLOCK_CAPACITY + slot);
-                if !dead.contains(&(seq as u64)) {
+                if !dead.contains(seq as u64) {
                     out.push(seq as u64);
                 }
             }
@@ -8715,7 +8717,7 @@ impl Engine {
         // they are for a scan. They are already `Value`s, so the shape test they
         // get is the text one.
         for (seq, values) in self.pending_rows_of(&table) {
-            if dead.contains(&(seq as u64)) {
+            if dead.contains(seq as u64) {
                 continue;
             }
             let Some(Value::Str(text)) = values.get(col) else {
@@ -8814,7 +8816,7 @@ impl Engine {
                 continue;
             };
             for (seq, cell) in cells {
-                if dead.contains(&(seq as u64)) {
+                if dead.contains(seq as u64) {
                     continue;
                 }
                 let text = cell.get(col).map(String::as_str).unwrap_or("");
@@ -8835,7 +8837,7 @@ impl Engine {
             }
         }
         for (seq, values) in self.pending_rows_of(&table) {
-            if dead.contains(&(seq as u64)) {
+            if dead.contains(seq as u64) {
                 continue;
             }
             let text = match values.get(col) {

@@ -511,7 +511,7 @@ impl<'a> PostingMerger<'a> {
         &mut self,
         postings: &mut [MergingPosting],
         merge_base_rowid: u64,
-        deleted: Option<&std::collections::HashSet<u64>>,
+        deleted: Option<&common::RowBitmap>,
     ) -> Result<(), FormatError> {
         for posting in postings.iter_mut() {
             let base_doc_id =
@@ -533,7 +533,7 @@ impl<'a> PostingMerger<'a> {
                     // posting's id is `row - base_row_id`). The position stream
                     // above is still consumed, so the decoder stays in sync.
                     if deleted.is_some_and(|deleted| {
-                        deleted.contains(&(merge_base_rowid + u64::from(merged_doc)))
+                        deleted.contains(merge_base_rowid + u64::from(merged_doc))
                     }) {
                         continue;
                     }
@@ -628,7 +628,7 @@ impl ColumnIndexMerger {
         &self,
         sources: &[ColumnSource],
         dst_base_name: &str,
-        deleted: Option<&std::collections::HashSet<u64>>,
+        deleted: Option<&common::RowBitmap>,
     ) -> Result<MergedChunk, FormatError> {
         if sources.is_empty() {
             return Ok(MergedChunk::default());

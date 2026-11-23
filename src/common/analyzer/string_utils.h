@@ -45,7 +45,19 @@ inline void ToLower(char *data, size_t len) {
     }
 }
 
-inline void ToLower(const char *data, size_t len, char *out, size_t out_limit) {
+// Lowercases A-Z of data[0, len) into out and NUL-terminates it. At most
+// out_limit bytes are written: a longer input is cut at the last UTF-8
+// character boundary that fits. Returns the number of bytes before the NUL.
+inline size_t ToLower(const char *data, size_t len, char *out, size_t out_limit) {
+    if (out_limit == 0) {
+        return 0;
+    }
+    if (len > out_limit - 1) {
+        len = out_limit - 1;
+        while (len > 0 && (static_cast<unsigned char>(data[len]) & 0xC0) == 0x80) {
+            --len;
+        }
+    }
     memcpy(out, data, len);
     char *begin = out;
     char *end = out + len;
@@ -66,6 +78,7 @@ inline void ToLower(const char *data, size_t len, char *out, size_t out_limit) {
             (*p) += 32;
     }
     (*end) = '\0';
+    return len;
 }
 
 inline std::string ToLowerString(std::string_view s) {

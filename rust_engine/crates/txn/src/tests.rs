@@ -561,6 +561,101 @@ async fn restart_rebuilds_the_conflict_state_from_the_wal() {
     assert_eq!(seen.get(&del_key("default_db.t", 7)), Some(&4));
 }
 
+/// The replay's segment skip needs **both** floors.
+///
+/// The KV batch of a commit is covered by the checkpoint frame
+/// (`checkpoint_ts`); its rows reach a block in the commit's bottom half, so
+/// they are covered by the block files' own watermark (`block_floor`). The two
+/// advance independently - a checkpoint reads its blocks at `bound_ts` and
+/// writes the frame afterwards - so one commit can sit **above** the blocks and
+/// **at or below** the frame. Skipping a sealed WAL segment by the frame alone
+/// dropped that commit's rows: the segment was sealed with a ts the frame
+/// covered, and its rows had no block to be read back from. This is
+/// `test_insert_checkpoint`: one 8192-row batch disappeared on the restart
+/// after each checkpoint.
+#[tokio::test]
+async fn a_segment_is_skipped_only_when_both_floors_cover_it() {
+    use storage::wal::block::{BlockColumn, ColumnValues};
+    use storage::wal::ddl_def::{DataType, LogicalType};
+    const SEGMENT_BYTES: usize = 64 * 1024 * 1024;
+    let dir = tempdir().unwrap();
+    {
+        let store: Arc<dyn MetaStore> =
+            Arc::new(RocksMetaStore::open(dir.path().join("kv")).unwrap());
+        let m = TxnManager::open(dir.path().join("wal.log"), store)
+            .await
+            .unwrap();
+        // Past the log's rotation point, so the frame below seals a segment
+        // that also holds this commit - the shape a busy server reaches.
+        let mut t = m.begin();
+        t.set_typed_commands(vec![WalCmd::Append {
+            db_name: "default_db".to_string(),
+            db_id: "1".to_string(),
+            table_name: "t".to_string(),
+            table_id: "1".to_string(),
+            row_ranges: vec![(WalRowId::new(0, 0), 2)],
+            block: vec![BlockColumn::new(
+                DataType::new(LogicalType::Varchar),
+                ColumnValues::varchars(&[Some("0\trow-0"), Some("1\trow-1")]),
+            )],
+        }]);
+        (m.commit(t)).await.unwrap();
+        let mut filler = m.begin();
+        filler.set_typed_commands(vec![WalCmd::Append {
+            db_name: "default_db".to_string(),
+            db_id: "1".to_string(),
+            table_name: "t2".to_string(),
+            table_id: "2".to_string(),
+            row_ranges: vec![(WalRowId::new(0, 0), 1)],
+            block: vec![BlockColumn::new(
+                DataType::new(LogicalType::Varchar),
+                ColumnValues::varchars(&[Some(&"x".repeat(SEGMENT_BYTES))]),
+            )],
+        }]);
+        (m.commit(filler)).await.unwrap();
+        m.flush().unwrap();
+        m.append_checkpoint_flushed().await.unwrap();
+        m.rotate_wal_if_large().await.unwrap();
+    }
+    assert!(
+        !sealed_segments(&dir.path().join("wal.log"))
+            .unwrap()
+            .is_empty(),
+        "the test needs a sealed segment"
+    );
+    let m = TxnManager::open(
+        dir.path().join("wal.log"),
+        Arc::new(RocksMetaStore::open(dir.path().join("kv2")).unwrap()) as Arc<dyn MetaStore>,
+    )
+    .await
+    .unwrap();
+    let frame = m.applied_ts().await.unwrap();
+    assert!(frame > 0, "the frame covers the append");
+    // The frame covers the append but the blocks do not: its rows still have to
+    // come back from the log the skip would have thrown away.
+    let mut appends = Vec::new();
+    let mut deletes = Vec::new();
+    m.recover_into(frame, 0, &mut appends, &mut deletes)
+        .await
+        .unwrap();
+    assert_eq!(
+        appends.iter().map(|a| a.rows.len()).sum::<usize>(),
+        3,
+        "every row above the block floor must be replayed, the sealed segment included"
+    );
+    // With the blocks at the frame, nothing is left for the log.
+    let mut appends = Vec::new();
+    let mut deletes = Vec::new();
+    m.recover_into(frame, frame, &mut appends, &mut deletes)
+        .await
+        .unwrap();
+    assert!(
+        appends.is_empty(),
+        "both floors cover every record, so the skip is right: {} row(s) replayed",
+        appends.iter().map(|a| a.rows.len()).sum::<usize>()
+    );
+}
+
 #[tokio::test]
 async fn checkpoint_ts_skips_already_applied_records() {
     let dir = tempdir().unwrap();

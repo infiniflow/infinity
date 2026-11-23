@@ -105,12 +105,43 @@ fn usage() -> ! {
 }
 
 /// Reads `key = "value"` out of a TOML text without pulling in a parser.
+///
+/// A trailing `# comment` is dropped, and only outside a quoted string: an
+/// operator who writes `unsealed_memory_quota = "512MB" # container budget`
+/// means the size, and the stricter validation below would otherwise reject the
+/// whole line and refuse to start. A `#` inside the quotes stays part of the
+/// value.
 fn toml_value(text: &str, key: &str) -> Option<String> {
-    text.lines()
+    let line = text
+        .lines()
         .map(str::trim)
-        .find(|l| l.starts_with(key) && l[key.len()..].trim_start().starts_with('='))
-        .and_then(|l| l.split_once('='))
-        .map(|(_, v)| v.trim().trim_matches('"').to_string())
+        .find(|l| l.starts_with(key) && l[key.len()..].trim_start().starts_with('='))?;
+    let (_, value) = line.split_once('=')?;
+    Some(
+        strip_toml_comment(value)
+            .trim()
+            .trim_matches('"')
+            .to_string(),
+    )
+}
+
+/// Everything before an unquoted `#`, with a quoted run kept verbatim.
+fn strip_toml_comment(value: &str) -> &str {
+    let mut quoted = false;
+    let mut escaped = false;
+    for (at, ch) in value.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            '#' if !quoted => return &value[..at],
+            _ => {}
+        }
+    }
+    value
 }
 
 /// The reference's default invocation: `infinity [-f <config>] [-m]` starts the
@@ -222,15 +253,21 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     // entry and lets the OS flush; the checkpoint is the durability boundary.
     let wal_flush = toml_value(&text, "wal_flush").unwrap_or_default();
     engine.set_wal_flush(txn::WalFlush::parse(&wal_flush));
-    // `[buffer] memindex_memory_quota` — a memory index is dumped into a C++
-    // chunk once it reaches this size. The reference defaults to 4 GiB.
-    let quota = toml_value(&text, "memindex_memory_quota").unwrap_or_default();
-    let quota = if quota.trim().is_empty() {
-        4 * 1024 * 1024 * 1024
-    } else {
-        parse_size_bytes(&quota)
+    // `[buffer] unsealed_memory_quota` — everything not yet on disk (the append
+    // buffer plus every index tail) is drained once it passes this. The byte
+    // figure the loop compares against is `budget_bytes()`; the reference's
+    // nearest knob is `index_memory_limit` (default 4 GiB). The older spelling
+    // `memindex_memory_quota` is still accepted.
+    //
+    // Parsed before it reaches the engine and rejected with a message naming
+    // the field: a typo used to become zero, which is the explicit off switch,
+    // so the operator got a running server with reclaim disabled and no hint
+    // why. An explicit numeric `0` still disables the mechanism.
+    let quota = match configured_size(&text, "unsealed_memory_quota")? {
+        Some(bytes) => bytes,
+        None => configured_size(&text, "memindex_memory_quota")?.unwrap_or(4 * 1024 * 1024 * 1024),
     };
-    engine.set_memindex_quota(quota);
+    engine.set_unsealed_memory_quota(quota);
     // `[storage] mem_index_capacity` — rows an in-memory index holds before it
     // is dumped into a sealed chunk (the reference defaults to 65536 rows).
     let capacity = toml_value(&text, "mem_index_capacity")
@@ -255,11 +292,8 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     // the decoded HNSW chunks and the block map, so the configured value is
     // applied instead of being dropped - a memory-limited container that asks
     // for 512MB must not get the built-in 8 GiB.
-    if let Some(size) = toml_value(&text, "buffer_manager_size")
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-    {
-        let bytes = parse_size_bytes(&size) as usize;
+    if let Some(bytes) = configured_size(&text, "buffer_manager_size")? {
+        let bytes = bytes as usize;
         if bytes > 0 {
             engine.set_buffer_budget(bytes);
             // The same number is the process's RSS ceiling: the budget above
@@ -272,7 +306,7 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     }
     // The reference checkpoints periodically (`[wal] checkpoint_interval`), which
     // is what dumps the memory blocks into the on-disk C++ layout.
-    let secs = parse_interval_secs(&toml_value(&text, "checkpoint_interval").unwrap_or_default());
+    let secs = interval_or_zero(&text, "checkpoint_interval")?;
     // `-m/--maintenance` (the reference's admin mode) leaves the periodic
     // triggers off: maintenance is about inspecting and repairing a stopped
     // node, not about letting cleanup/compact/checkpoint mutate it.
@@ -303,9 +337,32 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     // `trim_allocator` is CLI-only (`infinity-executor` forbids unsafe code):
     // folding the checkpoint into the scheduler would drop the page release
     // after each dump (Gate C).
-    let cleanup = parse_interval_secs(&toml_value(&text, "cleanup_interval").unwrap_or_default());
-    let compact = parse_interval_secs(&toml_value(&text, "compact_interval").unwrap_or_default());
-    let optimize = parse_interval_secs(&toml_value(&text, "optimize_interval").unwrap_or_default());
+    let cleanup = interval_or_zero(&text, "cleanup_interval")?;
+    let compact = interval_or_zero(&text, "compact_interval")?;
+    let optimize = interval_or_zero(&text, "optimize_interval")?;
+    // `[buffer] unsealed_*`: the loop that reclaims memory from tables nobody
+    // writes any more (`docs/MEMORY_RECLAIM.md` §5). An absent key keeps the
+    // engine's default, so "not configured" must not become `0` - that value
+    // means "scheduler off" for the interval. `"250ms"` is a request, not a
+    // zero: `configured_interval` rejects anything a positive value cannot
+    // express in whole seconds instead of silently disabling the sweep.
+    if let Some(secs) = configured_interval(&text, "unsealed_reclaim_interval")? {
+        engine.set_unsealed_reclaim_interval(secs);
+    }
+    if let Some(raw) = toml_value(&text, "unsealed_max_tables_per_round") {
+        let raw = raw.trim();
+        if !raw.is_empty() {
+            // `0` is the documented "no limit"; anything unparseable is an
+            // operator error, not a reason to fall back to 100 tables.
+            let tables = raw.parse::<usize>().map_err(|_| {
+                common::Error::Invalid(format!(
+                    "[buffer] unsealed_max_tables_per_round: '{raw}' is not a count \
+                     (expected a non-negative integer; 0 means no limit)"
+                ))
+            })?;
+            engine.set_unsealed_max_tables_per_round(tables);
+        }
+    }
     if !maintenance {
         engine
             .start_background_tasks(
@@ -313,6 +370,7 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
                 std::time::Duration::from_secs(cleanup),
                 std::time::Duration::from_secs(compact),
                 std::time::Duration::from_secs(optimize),
+                std::time::Duration::from_millis(engine.unsealed_reclaim_interval_ms()),
             )
             .await;
     }
@@ -424,8 +482,16 @@ fn read_ivecs(path: &str) -> common::Result<Vec<Vec<i32>>> {
 }
 
 /// Parses a duration like `1s`, `500ms`, `1.5s` or `0s` into whole seconds.
-fn parse_interval_secs(text: &str) -> u64 {
+///
+/// `None` is an unparseable value or a positive one that rounds to zero: `"250ms"`
+/// is a legitimate request for a sub-second sweep, and turning it into `0` would
+/// silently disable the sweep instead. Zero itself stays `Some(0)` - it is the
+/// explicit off switch.
+fn parse_interval_secs(text: &str) -> Option<u64> {
     let t = text.trim();
+    if t.is_empty() {
+        return Some(0);
+    }
     let (num, scale) = if let Some(v) = t.strip_suffix("ms") {
         (v, 0.001)
     } else if let Some(v) = t.strip_suffix('s') {
@@ -435,26 +501,85 @@ fn parse_interval_secs(text: &str) -> u64 {
     } else {
         (t, 1.0)
     };
-    let value: f64 = num.trim().parse().unwrap_or(0.0);
-    (value * scale).round() as u64
+    let value: f64 = num.trim().parse().ok()?;
+    if !value.is_finite() || value < 0.0 {
+        return None;
+    }
+    let secs = (value * scale).round() as u64;
+    if secs == 0 && value > 0.0 {
+        return None;
+    }
+    Some(secs)
 }
 
-/// Parses a size like `1KB`, `512MB`, `8GB` or a bare byte count.
-fn parse_size_bytes(text: &str) -> u64 {
-    let t = text.trim().to_ascii_uppercase();
-    let (num, scale) = if let Some(v) = t.strip_suffix("KB") {
+/// Parses a size like `1KB`, `512MB`, `8GB`, `2B` or a bare byte count.
+///
+/// `None` is an unparseable or negative value. The `B` suffix is a factor of
+/// one - the engine's end-to-end tests set a two-byte quota to force a drain -
+/// and an empty string means zero (no bytes given, no bytes configured).
+fn parse_size_bytes(text: &str) -> Option<u64> {
+    let t = text.trim();
+    if t.is_empty() {
+        return Some(0);
+    }
+    let upper = t.to_ascii_uppercase();
+    let (num, scale) = if let Some(v) = upper.strip_suffix("KB") {
         (v, 1024.0)
-    } else if let Some(v) = t.strip_suffix("MB") {
+    } else if let Some(v) = upper.strip_suffix("MB") {
         (v, 1024.0 * 1024.0)
-    } else if let Some(v) = t.strip_suffix("GB") {
+    } else if let Some(v) = upper.strip_suffix("GB") {
         (v, 1024.0 * 1024.0 * 1024.0)
-    } else if let Some(v) = t.strip_suffix('B') {
+    } else if let Some(v) = upper.strip_suffix('B') {
         (v, 1.0)
+    } else if upper.ends_with("TB") || upper.ends_with("PB") {
+        return None;
     } else {
-        (t.as_str(), 1.0)
+        (upper.as_str(), 1.0)
     };
-    let value: f64 = num.trim().parse().unwrap_or(0.0);
-    (value * scale) as u64
+    let value: f64 = num.trim().parse().ok()?;
+    if !value.is_finite() || value < 0.0 {
+        return None;
+    }
+    Some((value * scale) as u64)
+}
+
+/// Reads a `[buffer]`/`[storage]` byte setting, reporting the key on a bad value.
+///
+/// An absent key keeps the caller's default; an unparseable one stops startup
+/// with a message naming the field. Silently reading it as zero would disable a
+/// quota (or pick an arbitrary default), which is the opposite of what an
+/// operator who wrote `"512MiB"` asked for.
+fn configured_size(text: &str, key: &str) -> common::Result<Option<u64>> {
+    match toml_value(text, key) {
+        None => Ok(None),
+        Some(raw) if raw.trim().is_empty() => Ok(None),
+        Some(raw) => parse_size_bytes(&raw).map(Some).ok_or_else(|| {
+            common::Error::Invalid(format!(
+                "[buffer] {key}: '{raw}' is not a byte size (expected e.g. \"512MB\", \"2B\" or a bare byte count)"
+            ))
+        }),
+    }
+}
+
+/// The same for a duration setting.
+fn configured_interval(text: &str, key: &str) -> common::Result<Option<u64>> {
+    match toml_value(text, key) {
+        None => Ok(None),
+        Some(raw) if raw.trim().is_empty() => Ok(None),
+        Some(raw) => parse_interval_secs(&raw).map(Some).ok_or_else(|| {
+            common::Error::Invalid(format!(
+                "[buffer] {key}: '{raw}' is not a duration (expected e.g. \"30s\", \"1m\" or \"0s\" to disable)"
+            ))
+        }),
+    }
+}
+
+/// A `[storage]`/`[wal]` interval whose absent value is "off".
+///
+/// Those four triggers are opt-in in the reference (the shipped config sets
+/// them explicitly), so a missing key means `0`, not an error.
+fn interval_or_zero(text: &str, key: &str) -> common::Result<u64> {
+    Ok(configured_interval(text, key)?.unwrap_or(0))
 }
 
 fn main() {
@@ -1089,4 +1214,92 @@ fn run_conformance_blocking(slt_dir: &str) -> common::Result<()> {
         "{} .slt file(s) failed",
         failures.len()
     )))
+}
+
+#[cfg(test)]
+mod config_parse_tests {
+    use super::*;
+
+    /// A positive value a whole-second interval cannot express is refused, not
+    /// turned into `0` (which is the explicit off switch). An operator who
+    /// wrote `"250ms"` asked for a sub-second sweep, and silently disabling it
+    /// is the opposite of that.
+    #[test]
+    fn a_sub_second_interval_is_rejected_not_zeroed() {
+        assert_eq!(parse_interval_secs("0s"), Some(0));
+        assert_eq!(parse_interval_secs("30s"), Some(30));
+        assert_eq!(parse_interval_secs("1.5s"), Some(2));
+        assert_eq!(parse_interval_secs("250ms"), None);
+        assert_eq!(parse_interval_secs("abc"), None);
+        assert_eq!(parse_interval_secs("-5s"), None);
+    }
+
+    /// `B` is a factor of one, and an unparseable size is `None` - never `0`,
+    /// which would disable the quota it configures.
+    #[test]
+    fn a_byte_size_is_parsed_or_refused() {
+        assert_eq!(parse_size_bytes("2B"), Some(2));
+        assert_eq!(parse_size_bytes("4096"), Some(4096));
+        assert_eq!(parse_size_bytes("512MB"), Some(512 * 1024 * 1024));
+        assert_eq!(parse_size_bytes("1GB"), Some(1024 * 1024 * 1024));
+        assert_eq!(parse_size_bytes("512MiB"), None);
+        assert_eq!(parse_size_bytes("-1"), None);
+        assert_eq!(parse_size_bytes("1TB"), None);
+    }
+
+    /// The error names the field, so an operator can find it in the file.
+    #[test]
+    fn an_invalid_quota_names_its_field() {
+        let text = "unsealed_memory_quota = \"512MiB\"\n";
+        let err = configured_size(text, "unsealed_memory_quota")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unsealed_memory_quota"), "{err}");
+        assert!(err.contains("512MiB"), "{err}");
+
+        let text = "unsealed_reclaim_interval = \"250ms\"\n";
+        let err = configured_interval(text, "unsealed_reclaim_interval")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unsealed_reclaim_interval"), "{err}");
+
+        // An absent key keeps the caller's default; an explicit zero is kept.
+        assert_eq!(configured_size("", "unsealed_memory_quota").unwrap(), None);
+        assert_eq!(
+            configured_size("unsealed_memory_quota = \"0\"\n", "unsealed_memory_quota").unwrap(),
+            Some(0)
+        );
+    }
+
+    /// An inline comment after a quoted value is not part of the value.
+    ///
+    /// The shipped config documents each key with a trailing comment, and the
+    /// stricter validation would otherwise reject the size and stop startup.
+    #[test]
+    fn an_inline_comment_is_not_part_of_the_value() {
+        let text = "unsealed_memory_quota = \"512MB\" # container budget\n";
+        assert_eq!(
+            toml_value(text, "unsealed_memory_quota").as_deref(),
+            Some("512MB")
+        );
+        assert_eq!(
+            configured_size(text, "unsealed_memory_quota").unwrap(),
+            Some(512 * 1024 * 1024)
+        );
+        // A `#` inside the quotes is part of the value.
+        let text = "temp_dir = \"/var/inf#inity/tmp\"\n";
+        assert_eq!(
+            toml_value(text, "temp_dir").as_deref(),
+            Some("/var/inf#inity/tmp")
+        );
+        // No comment at all still works, and a bare number survives.
+        assert_eq!(
+            toml_value(
+                "unsealed_max_tables_per_round = 25\n",
+                "unsealed_max_tables_per_round"
+            )
+            .as_deref(),
+            Some("25")
+        );
+    }
 }

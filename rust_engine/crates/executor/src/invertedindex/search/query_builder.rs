@@ -980,7 +980,7 @@ impl TermLookup for MemoryColumnIndex {
             total_len: self.total_len(column),
             units,
         }];
-        let dead = std::collections::HashSet::new();
+        let dead = common::RowBitmap::new();
         let hits = crate::invertedindex::search::blockmax_wand_iterator::BlockMaxWandIterator::new(
             fields,
             topn,

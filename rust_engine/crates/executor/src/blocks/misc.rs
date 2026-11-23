@@ -122,10 +122,10 @@ pub(crate) struct BlockCursor<'a> {
     /// The block last decoded, with the `version` that says which of its slots
     /// are live.
     pub(crate) block: Option<(BlockId, Arc<MappedBlock>)>,
-    /// Rows deleted since the last checkpoint, as one set: `row` asks once per
-    /// row, and scanning (or cloning) the delete journal there made a point
-    /// read cost the journal's length.
-    pub(crate) dead: std::collections::HashSet<u64>,
+    /// Rows deleted since the last checkpoint, shared with the engine's
+    /// journal bitmap rather than copied: `row` asks once per row, and the
+    /// per-cursor copy of a `HashSet` was `O(deleted rows)` on every query.
+    pub(crate) dead: std::sync::Arc<common::RowBitmap>,
 }
 
 /// Receives one block's vectors; returns whether to keep walking.
@@ -260,7 +260,7 @@ impl<'a> BlockCursor<'a> {
             let live: std::collections::HashSet<usize> = run
                 .iter()
                 .copied()
-                .filter(|seq| !self.dead.contains(&(*seq as u64)))
+                .filter(|seq| !self.dead.contains(*seq as u64))
                 .collect();
             let mut pending = self.engine.buffered_rows_for(&self.table, &live);
             let mut wanted: std::collections::HashSet<usize> = Default::default();
@@ -431,7 +431,7 @@ impl<'a> BlockCursor<'a> {
             let kept: Vec<usize> = if has_dead {
                 slots
                     .into_iter()
-                    .filter(|slot| !self.dead.contains(&((base + *slot) as u64)))
+                    .filter(|slot| !self.dead.contains((base + *slot) as u64))
                     .collect()
             } else {
                 slots
@@ -444,7 +444,7 @@ impl<'a> BlockCursor<'a> {
         // decoded here so the caller scores them the same way.
         for (seq, values) in self.engine.pending_rows_of(&self.table) {
             {
-                if self.dead.contains(&(seq as u64)) {
+                if self.dead.contains(seq as u64) {
                     continue;
                 }
                 let Some(Value::Str(text)) = values.get(col) else {
@@ -537,7 +537,7 @@ impl<'a> BlockCursor<'a> {
             let live: std::collections::HashSet<usize> = run
                 .iter()
                 .copied()
-                .filter(|s| !self.dead.contains(s))
+                .filter(|s| !self.dead.contains(*s))
                 .map(|s| s as usize)
                 .collect();
             if live.is_empty() {
@@ -647,7 +647,7 @@ impl<'a> BlockCursor<'a> {
             let live: std::collections::HashSet<usize> = run
                 .iter()
                 .copied()
-                .filter(|seq| !self.dead.contains(&(*seq as u64)))
+                .filter(|seq| !self.dead.contains(*seq as u64))
                 .collect();
             let mut pending = self.engine.buffered_rows_for(&self.table, &live);
             let mut wanted: std::collections::HashSet<usize> = Default::default();
@@ -750,7 +750,7 @@ impl<'a> BlockCursor<'a> {
         // A delete the mirror has not written yet lives in the table's delete
         // log (`note_deleted_ids`); the block's `version` has it afterwards.
         // One set for the whole cursor: this runs once per row.
-        if self.dead.contains(&(seq as u64)) {
+        if self.dead.contains(seq as u64) {
             return Ok(None);
         }
         if let Some(values) = self.engine.pending_row(&self.table, seq) {

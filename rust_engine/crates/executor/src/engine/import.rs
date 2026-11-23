@@ -189,17 +189,35 @@ impl Engine {
     /// does, and those hooks carry the append path's triggers (the row capacity
     /// and the memory quota's waterlines); this flag turns them off for the
     /// table being imported into.
-    fn stage_import(&self, table: &str) -> ImportStaging<'_> {
-        let key = self.table_key(table);
-        self.tables
-            .lock()
-            .unwrap()
-            .entry(key.clone())
-            .or_default()
-            .importing += 1;
+    /// Marks `table` as having an import in flight, until the guard drops.
+    ///
+    /// **The marker and an index seal share one exclusion.** The dump takes
+    /// `flush_lock` *after* it has checked `import_in_flight`
+    /// (`index_build.rs::dump_index_transaction`), so a marker set without that
+    /// lock can land between the check and the seal: the dump then publishes a
+    /// chunk over a slice of the import's rows, which is exactly the split
+    /// `index_build.rs` says an import must avoid. Taking the lock here orders
+    /// the two - a dump either sees the marker or has already finished - and
+    /// the guard holds no guard across its life, only the marker.
+    ///
+    /// The marker means "these rows are not settled yet", not "uncommitted":
+    /// the import commits before it inserts into the tails (`import_literal_rows`
+    /// commits, then stages). What it protects is the segment's shape, so a
+    /// partial chunk cannot be published under it.
+    async fn stage_import(&self, table: &str) -> ImportStaging<'_> {
+        {
+            let _serial = self.storage.flush_lock.read().await;
+            let key = self.table_key(table);
+            self.tables
+                .lock()
+                .unwrap()
+                .entry(key)
+                .or_default()
+                .importing += 1;
+        }
         ImportStaging {
             engine: self,
-            key,
+            key: self.table_key(table),
             table: self.qualified_table(table),
             staged: Vec::new(),
             committed: false,
@@ -349,7 +367,7 @@ impl Engine {
         // dumps from the staging loop. Marking the table for the duration keeps
         // the append path's capacity/quota triggers off - see
         // `TableEntry::importing`.
-        let mut staging = self.stage_import(table);
+        let mut staging = self.stage_import(table).await;
         loop {
             let mut batch: Vec<Vec<Literal>> = Vec::with_capacity(Self::COPY_BATCH_ROWS);
             let mut eof = false;
@@ -462,7 +480,7 @@ impl Engine {
                     let base = range.base;
                     cursor = Some(next_cursor);
                     batches_all.push(take);
-                    self.note_index_insert(table, take).await;
+                    self.note_index_insert(table, take);
                     for (k, row) in batch[start..start + take].iter().enumerate() {
                         // The rows ride in the transaction only as its `ImportV2`
                         // extent; their values go to the block buffer at commit.
@@ -660,7 +678,7 @@ impl Engine {
         let opened = self.begin_import(table).await?;
         let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
-        self.note_index_insert(table, rows.len()).await;
+        self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
         t.set_op(TxnOp::Import {
             table: table.to_string(),
@@ -677,7 +695,7 @@ impl Engine {
         let schema = self.table_schema(table).unwrap_or_default();
         // `NewTxn::Import`: the indexes are populated once, at the end of the
         // transaction, not by the append path's triggers (see `stage_import`).
-        let _staging = self.stage_import(table);
+        let _staging = self.stage_import(table).await;
         let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(rows.len());
         for (k, row) in rows.iter().enumerate() {
             self.update_indexes_on_insert(table, base + k, row, &schema)?;
@@ -727,7 +745,7 @@ impl Engine {
         let opened = self.begin_import(table).await?;
         let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
         let base = range.base;
-        self.note_index_insert(table, rows.len()).await;
+        self.note_index_insert(table, rows.len());
         let mut t = self.txn.begin();
         t.set_op(TxnOp::Import {
             table: table.to_string(),
@@ -856,7 +874,7 @@ impl Engine {
             let base = range.base;
             *cursor = Some(next_cursor);
             batches_all.push(take);
-            self.note_index_insert(table, take).await;
+            self.note_index_insert(table, take);
             // The batch's values go into the append buffer **now**, not at the
             // commit: keeping the stored text until then meant holding every
             // row twice (its text and, after the commit, its values). On GIST
@@ -1010,7 +1028,7 @@ impl Engine {
         // Where the blocks this statement completes are written until it
         // commits (`NewTxn::Import`'s `TempDir/import<txn>`).
         let staging_root = self.import_staging_root(t.id);
-        let mut staging = self.stage_import(table);
+        let mut staging = self.stage_import(table).await;
         loop {
             // The records as their block-file bytes. A complete block is
             // written from these and never becomes text at all.
