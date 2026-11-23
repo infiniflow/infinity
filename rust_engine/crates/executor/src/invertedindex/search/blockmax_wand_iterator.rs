@@ -47,11 +47,13 @@ fn round_up(x: f64) -> f64 {
         return x;
     }
     let bits = x.to_bits();
-    // For a non-negative value the next representable float is `bits + 1`.
-    if x >= 0.0 {
-        f64::from_bits(bits + 1)
-    } else {
+    // Sign decides the direction, not `x >= 0.0`: `-0.0` compares equal to
+    // `0.0` but stepping its bits up moves toward zero. The sums here are never
+    // negative, so this only keeps the helper honest for its own sake.
+    if x.is_sign_negative() {
         f64::from_bits(bits - 1)
+    } else {
+        f64::from_bits(bits + 1)
     }
 }
 
