@@ -373,20 +373,11 @@ fn split_field_index(field_index: &str) -> (String, String) {
 }
 
 /// `GetTermListFromAnalyzer`: keep the shortest emitted form per position (the
-/// stem when one was emitted next to the original word).
+/// stem when one was emitted next to the original word, the word itself on a
+/// tie). The rule lives in one place, [`crate::fold_to_shorter_per_offset`], so
+/// the parsed-tree path and the `filter_fulltext` path cannot drift.
 fn root_terms(tokens: Vec<(String, u32)>) -> Vec<(String, u32)> {
-    let mut out: Vec<(String, u32)> = Vec::with_capacity(tokens.len());
-    for (text, offset) in tokens {
-        match out.last_mut() {
-            Some((last_text, last_offset)) if *last_offset == offset => {
-                if text.len() < last_text.len() {
-                    *last_text = text;
-                }
-            }
-            _ => out.push((text, offset)),
-        }
-    }
-    out
+    crate::fold_to_shorter_per_offset(tokens)
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -964,10 +955,10 @@ impl TermLookup for MemoryColumnIndex {
                 // A missing term simply drops that OR branch.
                 continue;
             }
-            let idf = ranker.idf(n, hits.len() as f64);
+            let idf = ranker.idf(n as f32, hits.len() as f32);
             units.push(crate::WandUnit {
                 stream: crate::WandStream::Term(crate::TermStream::from_owned(hits)),
-                weight: *boost,
+                weight: *boost as f32,
                 idf,
                 delta: None,
             });

@@ -116,6 +116,13 @@ fn json_escape(s: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
+            // RFC 8259 forbids a raw U+0000..=U+001F in a string, and a `/query`
+            // answer can carry one: `SELECT '\u{1}'` returns the control
+            // character in a cell. Writing it through produced a body no client
+            // could parse.
+            c if (c as u32) < 0x20 => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
             _ => out.push(c),
         }
     }
@@ -143,33 +150,35 @@ fn rows_json(columns: &[String], rows: &[Vec<String>]) -> String {
     format!("{{\"columns\":[{cols}],\"rows\":[{rs}]}}")
 }
 
-/// Extracts the `sql` field from a tiny JSON object like `{"sql":"..."}`.
-fn extract_sql(body: &str) -> Option<String> {
-    let key = body.find("\"sql\"")? + 5;
-    let rest = &body[key..];
-    let colon = rest.find(':')? + 1;
-    let mut chars = rest[colon..].chars().peekable();
-    while matches!(chars.peek(), Some(c) if c.is_whitespace()) {
-        chars.next();
-    }
-    if chars.next() != Some('"') {
-        return None;
-    }
-    let mut out = String::new();
-    let mut escaped = false;
-    for c in chars {
-        if escaped {
-            out.push(c);
-            escaped = false;
-        } else if c == '\\' {
-            escaped = true;
-        } else if c == '"' {
-            return Some(out);
-        } else {
-            out.push(c);
+/// Extracts the `sql` field from a JSON object like `{"sql":"..."}`.
+///
+/// Goes through the real JSON reader instead of scanning for the closing quote
+/// itself. The hand-rolled scanner treated `\` as "copy the next character
+/// verbatim", which is wrong for every escape that is not a single character:
+/// a client that sends `\u00fa` (Python's `json.dumps` default for a non-ASCII
+/// character) had the backslash dropped and the field stored the literal text
+/// `u00fa` — the whole enwiki body corrupted that way, 12 characters longer per
+/// non-ASCII code point. Parsing the document keeps `\uXXXX`, the surrogate
+/// pairs and the ordinary escapes on the one code path that already handles
+/// them.
+/// The string-valued `sql` field of an already-parsed document.
+///
+/// Separate from `parse_json` so the route can tell "this body is not JSON"
+/// from "this JSON has no `sql` string" - `parse_json` now also fails on an
+/// unpaired surrogate, which is a malformed body rather than a missing field.
+fn sql_of(doc: Json) -> Option<String> {
+    match doc {
+        Json::Obj(fields) => {
+            fields
+                .into_iter()
+                .find(|(k, _)| k == "sql")
+                .and_then(|(_, v)| match v {
+                    Json::Str(s) => Some(s),
+                    _ => None,
+                })
         }
+        _ => None,
     }
-    None
 }
 
 // ---------------------------------------------------------------------------
@@ -223,12 +232,27 @@ impl Json {
 }
 
 fn parse_json(text: &str) -> Option<Json> {
+    /// RFC 8259 whitespace: space, tab, line feed, carriage return. Not
+    /// `char::is_whitespace`, which also accepts vertical tab and form feed -
+    /// those are not JSON whitespace, so a body ending with `\x0b` would have
+    /// passed the end-of-input check.
     fn skip(s: &[u8], i: &mut usize) {
-        while *i < s.len() && (s[*i] as char).is_whitespace() {
+        while *i < s.len() && matches!(s[*i], b' ' | b'\t' | b'\n' | b'\r') {
             *i += 1;
         }
     }
-    fn value(s: &[u8], i: &mut usize) -> Option<Json> {
+    /// The deepest nesting `value` descends into before giving up.
+    ///
+    /// `value` recurses per object member and array element; without a limit a
+    /// body of tens of thousands of nested arrays in a field `sql_of` later
+    /// ignores overflows the serving thread's stack, and a Rust stack overflow
+    /// aborts the process instead of failing the request. 128 is far past
+    /// anything the REST front-end uses and far below what a stack holds.
+    const MAX_DEPTH: u32 = 128;
+    fn value(s: &[u8], i: &mut usize, depth: u32) -> Option<Json> {
+        if depth > MAX_DEPTH {
+            return None;
+        }
         skip(s, i);
         if *i >= s.len() {
             return None;
@@ -250,7 +274,7 @@ fn parse_json(text: &str) -> Option<Json> {
                         return None;
                     }
                     *i += 1;
-                    let v = value(s, i)?;
+                    let v = value(s, i, depth + 1)?;
                     out.push((key, v));
                     skip(s, i);
                     if *i < s.len() && s[*i] == b',' {
@@ -275,7 +299,7 @@ fn parse_json(text: &str) -> Option<Json> {
                     return Some(Json::Arr(out));
                 }
                 loop {
-                    let v = value(s, i)?;
+                    let v = value(s, i, depth + 1)?;
                     out.push(v);
                     skip(s, i);
                     if *i < s.len() && s[*i] == b',' {
@@ -312,10 +336,26 @@ fn parse_json(text: &str) -> Option<Json> {
                     *i += 1;
                 }
                 let text = std::str::from_utf8(&s[start..*i]).ok()?;
-                text.parse::<f64>().ok()?;
+                // `parse::<f64>` is not a grammar check: it accepts `007` and
+                // `1.`, neither of which JSON allows, so a malformed body would
+                // reach `engine.execute` through the `/query` validation. The
+                // grammar is small enough to check directly.
+                if !is_json_number(text) {
+                    return None;
+                }
                 Some(Json::Num(text.to_string()))
             }
         }
+    }
+    /// Reads the four hex digits of a `\uXXXX` escape and advances `i`.
+    fn hex4(s: &[u8], i: &mut usize) -> Option<u32> {
+        let digits = s.get(*i..*i + 4)?;
+        let mut cp = 0u32;
+        for &d in digits {
+            cp = (cp << 4) | u32::from((d as char).to_digit(16)? as u8);
+        }
+        *i += 4;
+        Some(cp)
     }
     fn string(s: &[u8], i: &mut usize) -> Option<String> {
         if *i >= s.len() || s[*i] != b'"' {
@@ -341,16 +381,51 @@ fn parse_json(text: &str) -> Option<Json> {
                         b'b' => out.push(8),
                         b'f' => out.push(12),
                         b'u' => {
-                            let hex = std::str::from_utf8(s.get(*i..*i + 4)?).ok()?;
-                            let cp = u32::from_str_radix(hex, 16).ok()?;
-                            *i += 4;
-                            let ch = char::from_u32(cp).unwrap_or('\u{fffd}');
+                            let cp = hex4(s, i)?;
+                            // A character below the BMP is escaped as a UTF-16
+                            // surrogate pair (`\ud83d\ude00` for U+1F600), and
+                            // neither half is a `char` on its own. Decoding them
+                            // one by one wrote two U+FFFD and stored `��` where
+                            // the client sent `😀`. RFC 8259 requires the pair;
+                            // an unpaired half is rejected rather than silently
+                            // replaced, so a bad escape never becomes data.
+                            let cp = match cp {
+                                0xD800..=0xDBFF => {
+                                    // High surrogate: the low half must follow
+                                    // immediately as another `\uXXXX` escape.
+                                    if s.get(*i..*i + 2)? != b"\\u" {
+                                        return None;
+                                    }
+                                    *i += 2;
+                                    let lo = hex4(s, i)?;
+                                    if !(0xDC00..=0xDFFF).contains(&lo) {
+                                        return None;
+                                    }
+                                    0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00)
+                                }
+                                // A lone low surrogate is not a character.
+                                0xDC00..=0xDFFF => return None,
+                                cp => cp,
+                            };
+                            let ch = char::from_u32(cp)?;
                             let mut buf = [0u8; 4];
                             out.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
                         }
-                        other => out.push(other),
+                        // The escaping characters, which is all RFC 8259
+                        // allows. Anything else is not a JSON escape: copying
+                        // the byte through (the old `other => out.push(other)`)
+                        // turned `\q` into `q` and handed the caller a body
+                        // that was never valid.
+                        b'"' => out.push(b'"'),
+                        b'\\' => out.push(b'\\'),
+                        b'/' => out.push(b'/'),
+                        _ => return None,
                     }
                 }
+                // RFC 8259 requires U+0000..=U+001F inside a string to be an
+                // escape. Copying one through (`out.push(c)`) accepted a body
+                // that is not JSON, and `/query` then executed its SQL.
+                c if c < 0x20 => return None,
                 _ => out.push(c),
             }
         }
@@ -358,8 +433,63 @@ fn parse_json(text: &str) -> Option<Json> {
     }
     let bytes = text.as_bytes();
     let mut i = 0usize;
-    let v = value(bytes, &mut i)?;
+    let v = value(bytes, &mut i, 0)?;
+    // The whole body has to be the document. Without this, `{"sql":"SELECT 1;"}junk`
+    // parsed as the object and the rest was silently ignored, so a malformed
+    // body reached the engine instead of being answered with `bad json`.
+    skip(bytes, &mut i);
+    if i != bytes.len() {
+        return None;
+    }
     Some(v)
+}
+
+/// RFC 8259 number grammar: `-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?`.
+///
+/// Written out rather than delegated to `str::parse::<f64>` so the caller can
+/// tell "not a number" from "a number JSON does not spell that way": the
+/// parser accepts `007`, `+1`, `1.` and `.5`, and a `/query` body carrying any
+/// of them in an unused field is malformed, not merely unusual.
+fn is_json_number(text: &str) -> bool {
+    let b = text.as_bytes();
+    let mut i = 0usize;
+    if i < b.len() && b[i] == b'-' {
+        i += 1;
+    }
+    match b.get(i) {
+        // A leading zero stands alone; any other digit may open the integer.
+        Some(b'0') => i += 1,
+        Some(b'1'..=b'9') => {
+            while i < b.len() && b[i].is_ascii_digit() {
+                i += 1;
+            }
+        }
+        _ => return false,
+    }
+    if i < b.len() && b[i] == b'.' {
+        i += 1;
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == start {
+            return false;
+        }
+    }
+    if i < b.len() && matches!(b[i], b'e' | b'E') {
+        i += 1;
+        if i < b.len() && matches!(b[i], b'+' | b'-') {
+            i += 1;
+        }
+        let start = i;
+        while i < b.len() && b[i].is_ascii_digit() {
+            i += 1;
+        }
+        if i == start {
+            return false;
+        }
+    }
+    i == b.len()
 }
 
 /// Restricts a list of identifiers to the ones we accept as names.
@@ -1452,7 +1582,16 @@ pub async fn route(
         return (200, "ok".to_string());
     }
     if method == "POST" && path == "/query" {
-        return match extract_sql(body) {
+        // Two different faults, two different messages: a body that is not JSON
+        // at all (which now includes an unpaired surrogate, since `parse_json`
+        // rejects those) and a well-formed document without a string `sql`
+        // field. Reporting "missing sql" for the first sent the client looking
+        // for a field it had already sent.
+        let doc = match parse_json(body) {
+            Some(doc) => doc,
+            None => return (400, "{\"error\":\"bad json\"}".to_string()),
+        };
+        return match sql_of(doc) {
             None => (400, "{\"error\":\"missing sql\"}".to_string()),
             Some(sql) => match engine.execute(&sql).await {
                 Ok(results) => {
@@ -3403,6 +3542,185 @@ mod tests {
     /// A standalone node, the same registry `Server::bind` installs.
     fn leader() -> PeerManager {
         PeerManager::new("leader", "127.0.0.1", 23820)
+    }
+
+    /// The two legal JSON spellings of one string must decode to the same
+    /// bytes. A character above the BMP arrives as a UTF-16 surrogate pair
+    /// (`\ud83d\ude00`); decoding the halves one at a time gave two U+FFFD and
+    /// stored `��` for `😀`, so a REST import silently corrupted every such
+    /// row while still answering 200.
+    #[test]
+    fn json_escapes_decode_utf16_surrogate_pairs() {
+        let direct = parse_json("{\"body\":\"A\u{1F600}B\"}").unwrap();
+        let escaped = parse_json("{\"body\":\"A\\ud83d\\ude00B\"}").unwrap();
+        let text = |j: &Json| j.get("body").and_then(Json::as_str).unwrap().to_string();
+        assert_eq!(text(&escaped), "A\u{1F600}B");
+        assert_eq!(text(&escaped), text(&direct));
+        // A pair at the very start and the end of the string, and back to back.
+        assert_eq!(
+            text(&parse_json("{\"body\":\"\\ud83d\\ude00\\ud83d\\ude01\"}").unwrap()),
+            "\u{1F600}\u{1F601}"
+        );
+        // A BMP escape still works, including one that is itself a two-byte char.
+        assert_eq!(
+            text(&parse_json("{\"body\":\"\\u00e9\\u4e2d\"}").unwrap()),
+            "é中"
+        );
+    }
+
+    /// `/query` has to decode the same escapes the REST routes do. Its own
+    /// hand-rolled scanner copied the byte after a backslash verbatim, so
+    /// `\u00fa` (what Python's `json.dumps` emits for `ú` by default) reached
+    /// the parser as `u00fa` - every non-ASCII character in a bulk import lost
+    /// its backslash and the row grew by up to 12 characters per code point.
+    #[test]
+    fn the_query_route_decodes_unicode_escapes() {
+        // The exact byte sequence a default `json.dumps({"sql": ...})` sends.
+        let body = "{\"sql\":\"SELECT 'Arkt\\u00far' AS x;\"}";
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("SELECT 'Arktúr' AS x;")
+        );
+        // A non-BMP character arrives as a surrogate pair inside the SQL text.
+        let body = "{\"sql\":\"SELECT '\\ud83d\\ude00';\"}";
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("SELECT '😀';")
+        );
+        // Ordinary escapes still work, and a missing field is still None.
+        let body = "{\"sql\":\"a\\nb\"}";
+        assert_eq!(
+            sql_of(parse_json(body).expect("json")).as_deref(),
+            Some("a\nb")
+        );
+        assert!(sql_of(parse_json("{}").expect("json")).is_none());
+        assert!(parse_json("not json").is_none());
+
+        // The document must be the whole body: trailing content is malformed,
+        // trailing whitespace is not.
+        assert!(
+            parse_json("{\"body\":\"x\"}junk").is_none(),
+            "trailing content must be rejected"
+        );
+        assert!(
+            parse_json("{\"body\":\"x\"}  \n\t").is_some(),
+            "trailing whitespace is still a valid body"
+        );
+        // A raw control byte inside a string is not JSON: RFC 8259 requires
+        // U+0000..=U+001F to be escaped. Accepting one let `/query` run SQL
+        // from a body that no reader would have accepted.
+        assert!(
+            parse_json("{\"a\":\"x\u{1}y\"}").is_none(),
+            "a raw control byte must be rejected"
+        );
+        // The escaped spelling is still fine.
+        assert!(parse_json("{\"a\":\"x\\u0001y\"}").is_some());
+
+        // Unknown escape letters are rejected: `\q` is not a JSON escape, and
+        // copying the byte through turned it into a plain `q`.
+        assert!(
+            parse_json("{\"body\":\"a\\q\"}").is_none(),
+            "an unknown escape must be rejected"
+        );
+        assert_eq!(
+            sql_of(parse_json("{\"body\":\"a\\\\b\\/c\\\"d\"}").expect("json")).as_deref(),
+            None,
+            "a valid body with the three escaping characters still parses"
+        );
+
+        // Numbers follow the JSON grammar: `007` and `1.` are not JSON.
+        assert!(parse_json("{\"n\":007}").is_none(), "leading zero");
+        assert!(parse_json("{\"n\":1.}").is_none(), "trailing dot");
+        assert!(parse_json("{\"n\":+1}").is_none(), "leading plus");
+        assert!(parse_json("{\"n\":-1.5e-3}").is_some(), "a normal number");
+        assert!(parse_json("{\"n\":0}").is_some(), "zero is fine");
+
+        // Nesting is bounded: a body deep enough to overflow the parser's
+        // stack is rejected instead of aborting the process.
+        let deep = format!("{{\"unused\":{}{}}}", "[".repeat(200), "]".repeat(200));
+        assert!(parse_json(&deep).is_none(), "deep nesting must be rejected");
+        let shallow = format!(
+            "{{\"unused\":{}{},\"sql\":\"SELECT 1;\"}}",
+            "[".repeat(8),
+            "]".repeat(8)
+        );
+        assert!(
+            sql_of(parse_json(&shallow).expect("json")).is_some(),
+            "ordinary nesting still parses"
+        );
+
+        // Only RFC 8259 whitespace counts: vertical tab and form feed are not
+        // JSON whitespace, so they are trailing content and must be rejected.
+        assert!(
+            parse_json("{\"body\":\"x\"}\u{0b}").is_none(),
+            "vertical tab is not JSON whitespace"
+        );
+        assert!(
+            parse_json("{\"body\":\"x\"}\u{0c}").is_none(),
+            "form feed is not JSON whitespace"
+        );
+
+        // The route tells the two faults apart: a body `parse_json` rejects is
+        // "bad json", a well-formed one without a `sql` string is "missing sql".
+        // An unpaired surrogate belongs to the first case even though a `sql`
+        // field is present.
+        assert!(
+            parse_json("{\"sql\":\"SELECT '\\ud83d';\"}").is_none(),
+            "an unpaired surrogate is malformed JSON, not a missing field"
+        );
+        assert!(sql_of(parse_json("{}").expect("json")).is_none());
+    }
+
+    /// A surrogate half with no partner is not a character. Rejecting the body
+    /// keeps the bad escape out of the store instead of writing U+FFFD where
+    /// the client meant something else.
+    #[test]
+    fn json_escapes_reject_unpaired_surrogates() {
+        assert!(parse_json("{\"body\":\"\\ud83d\"}").is_none(), "lone high");
+        assert!(parse_json("{\"body\":\"\\ude00\"}").is_none(), "lone low");
+        assert!(
+            parse_json("{\"body\":\"\\ud83dX\"}").is_none(),
+            "high followed by a plain byte"
+        );
+        assert!(
+            parse_json("{\"body\":\"\\ud83d\\ud83d\"}").is_none(),
+            "two high halves"
+        );
+        assert!(
+            parse_json("{\"body\":\"\\ud83d\\u0041\"}").is_none(),
+            "high followed by a BMP escape"
+        );
+        // A truncated escape is not an escape either.
+        assert!(parse_json("{\"body\":\"\\ud83\"}").is_none(), "short hex");
+    }
+
+    /// `rows_json` must emit valid JSON for any cell, including the control
+    /// characters a `SELECT` can hand back. A raw U+0001 in a string makes the
+    /// whole response unparseable.
+    #[test]
+    fn json_escape_covers_the_control_characters() {
+        let cell = "a\u{1}b\u{1f}c\td".to_string();
+        let body = rows_json(&["c".to_string()], &[vec![cell.clone()]]);
+        assert!(
+            !body.contains('\u{1}') && !body.contains('\u{1f}'),
+            "a raw control character reached the body"
+        );
+        // The reader rejects a raw control character, so parsing the answer is
+        // the check that the escaping is complete.
+        let parsed = parse_json(&body).expect("the answer is valid JSON");
+        let row = match &parsed {
+            Json::Obj(fields) => fields
+                .iter()
+                .find(|(k, _)| k == "rows")
+                .map(|(_, v)| v.clone())
+                .expect("rows"),
+            _ => panic!("object"),
+        };
+        assert_eq!(
+            row,
+            Json::Arr(vec![Json::Arr(vec![Json::Str(cell)])]),
+            "the cell survives the round trip"
+        );
     }
 
     #[tokio::test]

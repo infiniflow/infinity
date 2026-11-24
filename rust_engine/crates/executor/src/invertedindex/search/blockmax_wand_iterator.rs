@@ -39,6 +39,37 @@ use std::collections::{BinaryHeap, HashSet};
 use crate::WAND_BLOCK;
 use crate::{WandField, WandStream, WandUnit};
 
+/// The next `f32` above `x` (toward `+inf`).
+fn round_up32(x: f32, ulps: u32) -> f32 {
+    if !x.is_finite() || x == f32::INFINITY || x == 0.0 {
+        return x;
+    }
+    let bits = x.to_bits();
+    if x.is_sign_negative() {
+        f32::from_bits(bits - ulps)
+    } else {
+        f32::from_bits(bits + ulps)
+    }
+}
+
+/// The next `f64` above `x` (toward `+inf`), used where a bound must never be
+/// rounded down. `x.next_up()` is not stable, and the step only has to cover one
+/// ulp, so the bits are walked directly.
+fn round_up(x: f64) -> f64 {
+    if !x.is_finite() || x == f64::INFINITY {
+        return x;
+    }
+    let bits = x.to_bits();
+    // Sign decides the direction, not `x >= 0.0`: `-0.0` compares equal to
+    // `0.0` but stepping its bits up moves toward zero. The sums here are never
+    // negative, so this only keeps the helper honest for its own sake.
+    if x.is_sign_negative() {
+        f64::from_bits(bits - 1)
+    } else {
+        f64::from_bits(bits + 1)
+    }
+}
+
 /// MAX_DOC_PER_RECORD (index_defines.cppm:43): the fixed run of documents that
 /// forms one posting block, i.e. the granularity of block_max_tf /
 /// block_max_percentage. SkipListReader returns one entry per block.
@@ -53,79 +84,118 @@ const PERCENTAGE_SCALE: f64 = u16::MAX as f64;
 /// idf = ln(1 + (N - df + 0.5) / (df + 0.5)), plus the optional delta_term added
 /// to the tf norm. `bm25_param_k1` / `bm25_param_b` override the two constants
 /// (`bound_select_statement_impl.cpp:239-252`).
+///
+/// Every quantity is `f32`, like the reference: `k1`, `b`, `delta`, and the
+/// derived `bm25_common_score_` / `f1` / `f2` / `f3` / `f4` / `avg_column_len_`
+/// are all `float` in `TermDocIterator` and `PhraseDocIterator`
+/// (`term_doc_iterator_impl.cpp:55-77`, `phrase_doc_iterator_impl.cpp:41-56`),
+/// and every accumulator in the WAND is `float` too
+/// (`blockmax_wand_iterator_impl.cpp:328,349,402`). Computing in `f64` and
+/// rounding once at the end does not reproduce that: the difference is ~1e-3
+/// on a score of 15, enough to swap two documents at the top-n boundary.
 #[derive(Clone)]
 pub(crate) struct Bm25Ranker {
-    pub k1: f64,
-    pub b: f64,
-    pub delta: f64,
+    pub k1: f32,
+    pub b: f32,
+    pub delta: f32,
 }
 
 impl Bm25Ranker {
     /// The reference defaults (`kBM25K1 = 1.2`, `kBM25B = 0.75`).
-    pub fn new(delta: f64) -> Self {
+    pub fn new(delta: f32) -> Self {
         Self::with_params(1.2, 0.75, delta)
     }
 
     /// `bm25_param_k1=<f>` / `bm25_param_b=<f>`: the values
     /// `bound_select_statement_impl.cpp:239-252` writes into `BM25Params`.
-    pub fn with_params(k1: f64, b: f64, delta: f64) -> Self {
+    pub fn with_params(k1: f32, b: f32, delta: f32) -> Self {
         Self { k1, b, delta }
     }
 
-    pub fn idf(&self, n_docs: f64, df: f64) -> f64 {
-        (1.0 + (n_docs - df + 0.5) / (df + 0.5)).ln()
+    /// `smooth_idf = log1p((total_df - doc_freq + 0.5F) / (doc_freq + 0.5F))`
+    /// (`term_doc_iterator_impl.cpp:70`): the division is `float`, then
+    /// `std::log1p` on the float promotes to `double`, and the result is stored
+    /// back into a `float`.
+    pub fn idf(&self, n_docs: f32, df: f32) -> f32 {
+        let ratio = ((n_docs - df) + 0.5) / (df + 0.5);
+        (1.0f64 + f64::from(ratio)).ln() as f32
     }
 
     /// idf * (tf_norm + delta) * weight, with
     /// tf_norm = (k1+1)*tf / (tf + k1*((1-b) + b*dl/avgdl)).
     #[cfg(test)]
-    pub fn score(&self, tf: f64, dl: f64, avgdl: f64, idf: f64, weight: f64) -> f64 {
+    pub fn score(&self, tf: f32, dl: f32, avgdl: f32, idf: f32, weight: f32) -> f32 {
         self.score_with(tf, dl, avgdl, idf, weight, self.delta)
     }
 
     /// [`Self::score`] with the unit's own `delta` (`delta_term` for a term,
     /// `delta_phrase` for a phrase).
+    ///
+    /// `TermDocIterator::BM25Score` (`term_doc_iterator_impl.cpp:154-175`)
+    /// evaluates `p = f1 + f2 * doc_len` and then
+    /// `bm25_common_score_ * (tf / (tf + p) + f4)` — every step in `float`, and
+    /// `f1`/`f2`/`f4` are the precomputed members, not a re-derivation. The
+    /// shape is reproduced here with the same intermediate values so the
+    /// rounding matches.
     pub fn score_with(
         &self,
-        tf: f64,
-        dl: f64,
-        avgdl: f64,
-        idf: f64,
-        weight: f64,
-        delta: f64,
-    ) -> f64 {
-        let norm = (self.k1 + 1.0) * tf
-            / (tf + self.k1 * ((1.0 - self.b) + self.b * dl / avgdl.max(1e-9)));
-        idf * (norm + delta) * weight
+        tf: f32,
+        dl: f32,
+        avgdl: f32,
+        idf: f32,
+        weight: f32,
+        delta: f32,
+    ) -> f32 {
+        let f1 = self.f1();
+        let f2 = self.f2(avgdl);
+        let f4 = self.f4(delta);
+        let common = self.common(idf, weight);
+        let p = f1 + f2 * dl;
+        common * (tf / (tf + p) + f4)
     }
 
     /// `f4 = delta / (k1 + 1)` for an arbitrary per-unit delta
     /// (`term_doc_iterator_impl.cpp:76`).
-    pub fn f4(&self, delta: f64) -> f64 {
+    pub fn f4(&self, delta: f32) -> f32 {
         delta / (self.k1 + 1.0)
     }
 
-    /// tf_norm <= k1+1, so this is a safe upper bound for pruning.
-    pub fn upper_bound(&self, idf: f64, weight: f64) -> f64 {
-        idf * (self.k1 + 1.0 + self.delta.max(0.0)) * weight
+    /// The whole-term bound: `tf_norm <= k1+1`, so this covers every score the
+    /// term can produce.
+    ///
+    /// In `f32` it does not, quite: `score_with` evaluates `common * (tf/(tf+p)
+    /// + f4)` and this evaluates `idf * (k1 + 1 + delta) * weight`, and the two
+    /// round differently. With `df = 1`, `n = 1000`, `delta = 3` and
+    /// `tf = dl = avg = 2^25` the score is `23.663778305` against a bound of
+    /// `23.663772583`. Pruning uses this bound for the termination ledger and
+    /// for the pivot, so a document above a user threshold could be skipped.
+    /// The result carries the same `1 + 2^-20` margin the block bound uses.
+    pub fn upper_bound(&self, idf: f32, weight: f32) -> f32 {
+        let bound = idf * (self.k1 + 1.0 + self.delta.max(0.0)) * weight;
+        round_up32(bound * (1.0 + 2f32.powi(-20)), 1)
     }
 
     /// bm25_common_score_ (term_doc_iterator_impl.cpp:71):
     /// weight * idf * (k1 + 1). Both the whole-term bound and every block bound
     /// are this factor times a tf-only term.
-    pub fn common(&self, idf: f64, weight: f64) -> f64 {
+    pub fn common(&self, idf: f32, weight: f32) -> f32 {
         weight * idf * (self.k1 + 1.0)
     }
 
     /// f1 = k1 * (1 - b) (term_doc_iterator_impl.cpp:73).
-    pub fn f1(&self) -> f64 {
+    pub fn f1(&self) -> f32 {
         self.k1 * (1.0 - self.b)
+    }
+
+    /// f2 = k1 * b / avgdl (term_doc_iterator_impl.cpp:74).
+    pub fn f2(&self, avgdl: f32) -> f32 {
+        self.k1 * self.b / avgdl.max(1e-9)
     }
 
     /// f3 = k1 * b / avgdl * u16::MAX (term_doc_iterator_impl.cpp:74-75), the
     /// tf/doc-length ratio term of BlockMaxBM25Score.
-    pub fn f3(&self, avgdl: f64) -> f64 {
-        self.k1 * self.b / avgdl.max(1e-9) * PERCENTAGE_SCALE
+    pub fn f3(&self, avgdl: f32) -> f32 {
+        self.f2(avgdl) * (PERCENTAGE_SCALE as f32)
     }
 }
 
@@ -189,20 +259,20 @@ struct Cursor<'a> {
     /// doc-id sort permuted the cursors.
     ord: usize,
     term: usize,
-    weight: f64,
+    weight: f32,
     /// bm25_common_score_; zero for similarity=boolean.
-    common: f64,
+    common: f32,
     /// BM25ScoreUpperBound() of the whole term.
-    upper_bound: f64,
+    upper_bound: f32,
     /// f1, f3, f4 of TermDocIterator::InitBM25Info.
-    f1: f64,
-    f3: f64,
-    f4: f64,
+    f1: f32,
+    f3: f32,
+    f4: f32,
     /// Field statistics of this unit's BM25 score.
-    avg: f64,
-    idf: f64,
+    avg: f32,
+    idf: f32,
     /// `delta_term` for a term, `delta_phrase` for a phrase.
-    delta: f64,
+    delta: f32,
     /// The posting stream, read one block at a time.
     stream: WandStream<'a>,
     /// iter_->SeekDoc position, cached so the cursors can be sorted. `None`
@@ -213,8 +283,11 @@ struct Cursor<'a> {
     /// BlockMaxBM25Score() cache: the block it was computed for, its bound and
     /// the block's last document (used by the block-skip path).
     block_index: u64,
-    block_max: f64,
+    block_max: f32,
     block_last_doc: u64,
+    /// `(last, max_tf, pct)` of the block `block_index` names, so `block_last`
+    /// and `block_max` agree and neither re-reads the stream.
+    block_stats_cache: (u64, f32, u16),
 }
 
 impl<'a> Cursor<'a> {
@@ -237,41 +310,88 @@ impl<'a> Cursor<'a> {
         self.stream.seek_block(doc);
         self.cur = None;
         self.done = false;
+        // The cursor left the block its bound was computed for; drop the cached
+        // pair so `block_last()`/`block_max()` answer for the block it lands in.
+        // `block_bounds` recomputes whenever `block_index` no longer matches the
+        // stream's block id, and `u64::MAX` can never match one.
+        self.block_index = u64::MAX;
     }
 
     /// BlockLastDocID(): the last document of the current block.
+    ///
+    /// Refreshes on first use after a `seek`: the cursor may have moved and the
+    /// cached pair belongs to the block it left.
     fn block_last(&mut self) -> u64 {
+        self.block_bounds();
         self.block_last_doc
+    }
+
+    /// The block's `(last, max_tf, pct)`, recomputed whenever the cursor is in a
+    /// block whose bounds are not cached yet. `block_last()` and `block_max()`
+    /// both read through here, so a cursor that was `seek`-ed can never answer
+    /// with the bounds of the block it left.
+    fn block_bounds(&mut self) -> (u64, f32, u16) {
+        let id = self.stream.block_id();
+        if self.block_index != id {
+            let (last, max_tf, pct) = self.stream.block_stats();
+            self.block_index = id;
+            self.block_last_doc = last;
+            self.block_stats_cache = (last, max_tf as f32, pct);
+        }
+        self.block_stats_cache
     }
 
     /// BlockMaxBM25Score() (term_doc_iterator_impl.cpp:91-102): the block's
     /// largest tf and largest tf/doc-length ratio, fed through the same BM25
     /// shape as the exact score. Cached per block like the reference's
     /// block_max_bm25_score_cache_end_id_.
-    fn block_max(&mut self, mode: WandMode) -> f64 {
-        let id = self.stream.block_id();
-        if self.block_index == id {
-            return self.block_max;
-        }
-        // `BlockMaxPhraseScore` for a phrase unit: the minimum over its terms',
-        // since a phrase can occur no more often than any one of them.
-        let (last, max_tf, pct) = self.stream.block_stats();
+    ///
+    /// The cache key is the block **identity**, which `seek` invalidates: a
+    /// block-level seek left the old block's pair in place until the next
+    /// `load`, and the WAND reads `block_last()` *before* it asks for the bound
+    /// to decide whether a cursor still covers a candidate. Serving the
+    /// previous block's pair there made a cursor that had moved to a later block
+    /// keep claiming it covered rows it had already passed.
+    fn block_max(&mut self, mode: WandMode) -> f32 {
+        let (_, max_tf, pct) = self.block_bounds();
         let value = match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
             WandMode::Bm25 => {
                 // `bm25_common_score_ * (1/(1 + f1/block_max_tf +
                 // f3/block_max_percentage) + f4)` with the stored `u16`
-                // percentage (`term_doc_iterator_impl.cpp:98-100`), so the bound
-                // is bit-for-bit the reference's.
-                let norm =
-                    1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / f64::from(pct.max(1)));
-                (self.common * (norm + self.f4)).min(self.upper_bound)
+                // percentage (`term_doc_iterator_impl.cpp:98-100`), in `float`.
+                //
+                // Rounded up: the bound and the exact score are different
+                // expressions, and in `f32` the bound can land a couple of ulps
+                // *below* the score it covers (with `tf = dl = avg = 1216` and
+                // `pct = 65535` the score is `1.4293134`, the bound
+                // `1.4293131`), which would prune a document that clears the
+                // threshold.
+                // A coefficient can overflow: `bm25_param_k1=2e35` with
+                // `avg = 20` makes `f3` infinite (the parameter is only checked
+                // for being non-negative), `f3 / pct` is infinite too, and the
+                // norm collapses to `0` - a zero bound for a block whose scores
+                // are finite. Fall back to the whole-term bound, which is the
+                // largest value any block can reach.
+                if !self.f3.is_finite() || !self.f1.is_finite() {
+                    return self.upper_bound;
+                }
+                let norm = 1.0 / (1.0 + self.f1 / max_tf.max(1.0) + self.f3 / (pct.max(1) as f32));
+                // The margin must survive the cap. In exact arithmetic
+                // `norm + f4 <= 1 + delta/(k1+1)`, so `common * (norm + f4)`
+                // never exceeds `upper_bound`; with the margin the left side can
+                // pass it by a rounding step (a large `delta` does it by more),
+                // and a plain `min(upper_bound)` would then clip exactly the
+                // margin that keeps the bound above the score. Both sides are
+                // widened by the same factor, so the `min` can only pick the
+                // larger of two bounds.
+                let margin = 1.0 + 2f32.powi(-20);
+                let bound = round_up32((self.common * (norm + self.f4)) * margin, 1);
+                bound.min(round_up32(self.upper_bound * margin, 1))
             }
         };
-        self.block_index = id;
         self.block_max = value;
-        self.block_last_doc = last;
         value
     }
 }
@@ -296,6 +416,17 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     heap: BinaryHeap<Reverse<(u64, usize)>>,
     /// Sum of upper_bound over the cursors in the heap, i.e. the whole query's
     /// upper bound minus everything already retired.
+    ///
+    /// Kept in `f64` although every `upper_bound` is an `f32`: this number is a
+    /// *pruning* ledger, and pruning may only ever be too generous. The ledger
+    /// is maintained by adding a cursor's bound at birth and subtracting the
+    /// same bound at retirement, and an `f32` sum does not cancel - adding
+    /// `16777216f32` and `1f32` yields `16777216f32`, so retiring the big
+    /// cursor leaves `0` where `1` is still owed and the search stops before a
+    /// live document that qualifies on its own. Summing the (exact) `f32`
+    /// bounds in `f64` makes the addition and the subtraction exact for any
+    /// realistic cursor count, so a retired cursor removes exactly what it
+    /// contributed.
     total_upper: f64,
     /// The cursors the last pivot parked on the candidate, in doc order. This is
     /// the reference's [0, pivot_] slice: what offer() counts matches over and
@@ -308,7 +439,7 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     naive: bool,
     /// Top-k, sorted by score (desc) then doc id (asc), like the scan path.
     best: Vec<(u64, f64)>,
-    threshold: f64,
+    threshold: f32,
     /// doc_id_ / bm25_score_cache_ of the reference: the last candidate Next()
     /// stopped on and its exact score.
     doc_id: Option<u64>,
@@ -329,7 +460,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         fields: Vec<WandField<'a>>,
         k: usize,
         dead: &'a common::RowBitmap,
-        delta: f64,
+        delta: f32,
         min_should: usize,
         mode: WandMode,
     ) -> Self {
@@ -342,8 +473,14 @@ impl<'a> BlockMaxWandIterator<'a> {
                 total_len,
                 units,
             } = field;
-            let n = n_docs.max(1) as f64;
-            let avg = (total_len as f64 / n).max(1e-9);
+            let n = n_docs.max(1);
+            // `avg_column_len_ = doc_len * 1.0 / doc_cnt` into a `float`
+            // (term_doc_iterator_impl.cpp:66): the reference divides in
+            // `double` and rounds the quotient once. Dividing two `f32`s
+            // instead loses precision in the *numerator* first once
+            // `total_len` passes 2^24 - `16777217 / 5000` is
+            // `3355.443115` that way and `3355.443359` through `double`.
+            let avg = ((total_len as f64 / n as f64) as f32).max(1e-9);
             for (ui, unit) in units.into_iter().enumerate() {
                 let WandUnit {
                     mut stream,
@@ -383,16 +520,17 @@ impl<'a> BlockMaxWandIterator<'a> {
                     block_index: u64::MAX,
                     block_max: 0.0,
                     block_last_doc: u64::MAX,
+                    block_stats_cache: (u64::MAX, 0.0, 0),
                 });
                 cursors.last_mut().unwrap().refresh();
             }
         }
         let mut heap = BinaryHeap::with_capacity(cursors.len());
-        let mut total_upper = 0.0;
+        let mut total_upper: f64 = 0.0;
         for cursor in &cursors {
             if let Some(doc) = cursor.cur {
                 heap.push(Reverse((doc, cursor.ord)));
-                total_upper += cursor.upper_bound;
+                total_upper = round_up(total_upper + f64::from(cursor.upper_bound));
             }
         }
         Self {
@@ -409,7 +547,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             prefix: Vec::new(),
             naive: false,
             best: Vec::new(),
-            threshold: f64::NEG_INFINITY,
+            threshold: f32::NEG_INFINITY,
             doc_id: None,
             candidate_score: 0.0,
             score_evaluations: 0,
@@ -434,7 +572,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// (`bound_select_statement_impl.cpp:239-252`), so every coefficient derived
     /// from k1/b - the whole-term bound, `common`, f1, f3, f4 - is recomputed
     /// here. `similarity=boolean` never touches BM25 and is left alone.
-    pub fn with_bm25_params(mut self, k1: f64, b: f64) -> Self {
+    pub fn with_bm25_params(mut self, k1: f32, b: f32) -> Self {
         if self.mode == WandMode::Boolean {
             return self;
         }
@@ -448,12 +586,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
         // The pruning bound is the sum over the cursors that still have a
         // document; a retired cursor contributes nothing.
-        self.total_upper = self
-            .cursors
-            .iter()
-            .filter(|c| c.cur.is_some())
-            .map(|c| c.upper_bound)
-            .sum();
+        self.recompute_upper_bound();
         self.ranker = ranker;
         self
     }
@@ -464,7 +597,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// `physical_match_impl.cpp`), so documents whose bound cannot reach it are
     /// skipped instead of decoded and then dropped. `t <= 0` means "no
     /// threshold" - the reference's `threshold_ <= 0.0f` shortcut.
-    pub fn with_threshold(mut self, t: f64) -> Self {
+    pub fn with_threshold(mut self, t: f32) -> Self {
         if t > 0.0 {
             self.threshold = self.threshold.max(t);
         }
@@ -612,8 +745,27 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.heap_ops += 1;
                 self.heap.push(Reverse((doc, cursor.ord)))
             }
-            None => self.total_upper -= cursor.upper_bound,
+            None => self.recompute_upper_bound(),
         }
+    }
+
+    /// Recomputes the live bound from the cursors still in play.
+    ///
+    /// Retiring a cursor used to subtract its bound from the running ledger,
+    /// which loses precision in the direction that matters: `2^53 + 1` is
+    /// `2^53` even in `f64`, so removing the `2^53` bound left `0` while
+    /// another cursor still contributed `1`, and the search stopped early.
+    /// Summing what is left avoids the subtraction entirely; each addition is
+    /// rounded up so the total can only ever be too large, never too small.
+    fn recompute_upper_bound(&mut self) {
+        let mut total = 0.0f64;
+        for cursor in &self.cursors {
+            if cursor.cur.is_none() {
+                continue;
+            }
+            total = round_up(total + f64::from(cursor.upper_bound));
+        }
+        self.total_upper = total;
     }
 
     /// Keeps the candidate if it survives minimum_should_match, the tombstone
@@ -658,7 +810,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // `UpdateScoreThreshold` only ever raises the bar
             // (`blockmax_wand_iterator_impl.cpp:233-246`), so a user
             // `threshold=` survives a weak k-th score.
-            self.threshold = self.threshold.max(self.best[self.k - 1].1);
+            self.threshold = self.threshold.max(self.best[self.k - 1].1 as f32);
         }
     }
 
@@ -696,18 +848,40 @@ impl<'a> BlockMaxWandIterator<'a> {
             // '<' (not '<='): a document that ties the k-th score can still win
             // on the smaller doc id, and the heap is already doc-ordered, so
             // this needs no extra bookkeeping.
-            if self.total_upper < self.threshold {
+            //
+            // The ledger is the *exact* sum of the `f32` bounds, but the score
+            // this bar stands in for is accumulated in `f32` (see
+            // `score_prefix`), and a chain of `f32` additions can end above the
+            // exact sum - those roundings go both ways, and stopping on the
+            // exact value would then cut a document whose real score clears the
+            // bar. Each of the `n` additions can raise the value by at most one
+            // ulp (`f32::EPSILON`), so the bar is the exact sum widened by
+            // `n * EPSILON`: an upper bound on any order of accumulation.
+            let live = self.heap.len() as f64;
+            let bound = self.total_upper * (1.0 + live * f64::from(f32::EPSILON));
+            if bound < f64::from(self.threshold) {
                 break;
             }
             // (1) FindPivotOptimized: the pivot is the first prefix whose upper
             // bound reaches the threshold, plus everything tied on its document.
-            let mut sum = 0.0;
+            //
+            // The running sum is widened by the same `n * EPSILON` factor as the
+            // termination bar, because this loop adds the bounds in **document**
+            // order while `score_prefix` adds the same numbers in **creation**
+            // order; the two orders round differently, and a partial sum that
+            // reads below the bar here can still be a score above it. Stopping
+            // the pivot too early is what loses the document: no pivot means the
+            // round ends and that candidate is never scored.
+            let mut sum: f64 = 0.0;
+            let mut taken = 0usize;
             let mut pivot = None;
             while let Some(Reverse((doc, i))) = self.heap.pop() {
                 self.heap_ops += 1;
-                sum += self.cursors[i].upper_bound;
+                sum += f64::from(self.cursors[i].upper_bound);
+                taken += 1;
                 self.prefix.push(i);
-                if sum >= self.threshold {
+                let widened = sum * (1.0 + taken as f64 * f64::from(f32::EPSILON));
+                if widened >= f64::from(self.threshold) {
                     pivot = Some(doc);
                     break;
                 }
@@ -741,12 +915,16 @@ impl<'a> BlockMaxWandIterator<'a> {
             // cursor whose block ends before the candidate contributes nothing
             // (it has no posting there); one that has to move first gets a
             // block-level seek, which then decides which of the two it is.
-            let mut sum_at_doc = 0.0;
+            // Summed in `f64` with each step rounded up: this is the same
+            // document-order sum as the pivot and, like it, stands in for a
+            // score that `score_prefix` accumulates in creation order.
+            let mut sum_at_doc: f64 = 0.0;
             for k in 0..self.prefix.len() {
                 let i = self.prefix[k];
                 if self.cursors[i].cur != Some(doc) {
                     if self.cursors[i].block_last() >= doc {
-                        sum_at_doc += self.cursors[i].block_max(self.mode);
+                        let bound = self.cursors[i].block_max(self.mode);
+                        sum_at_doc = round_up(sum_at_doc + f64::from(bound));
                         continue;
                     }
                     self.cursors[i].seek(doc);
@@ -755,19 +933,30 @@ impl<'a> BlockMaxWandIterator<'a> {
                         continue;
                     }
                 }
-                sum_at_doc += self.cursors[i].block_max(self.mode);
+                let bound = self.cursors[i].block_max(self.mode);
+                sum_at_doc = round_up(sum_at_doc + f64::from(bound));
             }
             // (3) Decision, the same shape as the reference's: score only when
             // every prefix cursor is parked on the candidate, and only return a
             // document whose exact score beats the k-th.
-            if sum_at_doc > self.threshold {
+            //
+            // `sum_at_doc` adds the bounds in document order; the exact score
+            // `score_prefix` produces adds the same numbers in creation order.
+            // Those two orders round differently in `f32`, so a candidate whose
+            // score clears the bar can still read below it here, and acting on
+            // that (returning false, or skipping the document) loses it. The
+            // comparison is widened by `n * EPSILON` for the same reason as the
+            // termination bar; the bounds themselves are exact `f32` values.
+            let parked = self.prefix.len();
+            let widened_at_doc = sum_at_doc * (1.0 + parked as f64 * f64::from(f32::EPSILON));
+            if widened_at_doc > f64::from(self.threshold) {
                 if self
                     .prefix
                     .iter()
                     .all(|&i| self.cursors[i].cur == Some(doc))
                 {
                     let score = self.score_prefix();
-                    if score > self.threshold {
+                    if score > f64::from(self.threshold) {
                         self.doc_id = Some(doc);
                         self.candidate_score = score;
                         return true;
@@ -917,7 +1106,8 @@ impl<'a> BlockMaxWandIterator<'a> {
         // block ends first forward by one block.
         let mut next_doc = start;
         loop {
-            let mut sum_range = 0.0;
+            let mut sum_range: f64 = 0.0;
+            let mut live_range = 0usize;
             let mut min_last = u64::MAX;
             let mut earliest = None;
             for k in 0..self.prefix.len() {
@@ -930,7 +1120,8 @@ impl<'a> BlockMaxWandIterator<'a> {
                     // Its block ends before the range: it contributes nothing.
                     continue;
                 }
-                sum_range += self.cursors[i].block_max(self.mode);
+                sum_range += f64::from(self.cursors[i].block_max(self.mode));
+                live_range += 1;
                 if last < min_last {
                     min_last = last;
                     earliest = Some(i);
@@ -939,7 +1130,15 @@ impl<'a> BlockMaxWandIterator<'a> {
             let Some(i) = earliest else { break };
             // '>' like the reference: a range that can only tie cannot produce a
             // document that beats the k-th (ties never win on a larger doc id).
-            if sum_range > self.threshold {
+            //
+            // Widened by `n * EPSILON` for the same reason as the termination
+            // bar: this sum is in document order, the score it protects is
+            // summed in creation order, and skipping a range whose real score
+            // clears the threshold drops the documents in it. The bounds here
+            // are exact `f32` values, so a `f64` sum plus the accumulation
+            // allowance covers every order.
+            let widened = sum_range * (1.0 + live_range as f64 * f64::from(f32::EPSILON));
+            if widened > f64::from(self.threshold) {
                 break;
             }
             let skip_to = match up_to {
@@ -969,7 +1168,12 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// document.
     fn score_prefix(&mut self) -> f64 {
         let ranker = self.ranker.clone();
-        let mut score = 0.0;
+        // The reference's `float sum_score = 0.0f` (`blockmax_wand_iterator_impl.
+        // cpp:402`): the terms' scores are accumulated in `float`, one at a
+        // time, and only the total leaves the iterator. Accumulating in `f64`
+        // and rounding once gives a different value, which is enough to swap
+        // documents at a top-n boundary.
+        let mut score: f32 = 0.0;
         // Sum in cursor creation order (field-major, then term) so the value is
         // independent of the document order the heap handed us, matching the
         // scan path bit for bit. Doc order is not needed after this point.
@@ -980,7 +1184,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     let i = self.prefix[k];
                     let cursor = &mut self.cursors[i];
                     let tf = cursor.stream.tf();
-                    let dl = f64::from(cursor.stream.len());
+                    let dl = cursor.stream.len() as f32;
                     score += ranker.score_with(
                         tf,
                         dl,
@@ -1003,7 +1207,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             let block = self.cursors[self.prefix[k]].block_index;
             self.max_scored_block = self.max_scored_block.max(block);
         }
-        score
+        f64::from(score)
     }
 }
 
@@ -1018,7 +1222,7 @@ mod tests {
         postings: &[(&str, &'a [(u64, u32)])],
         doc_len: &'a [(u64, u32)],
         n: usize,
-        weights: Vec<f64>,
+        weights: Vec<f32>,
     ) -> WandField<'a> {
         let ranker = Bm25Ranker::new(0.0);
         let units = postings
@@ -1027,7 +1231,7 @@ mod tests {
             .map(|(i, (_term, list))| WandUnit {
                 stream: WandStream::Term(TermStream::from_slice(list, doc_len)),
                 weight: weights.get(i).copied().unwrap_or(1.0),
-                idf: ranker.idf(n.max(1) as f64, list.len() as f64),
+                idf: ranker.idf(n.max(1) as f32, list.len() as f32),
                 delta: None,
             })
             .collect();
@@ -1042,13 +1246,13 @@ mod tests {
     fn ranker_matches_the_reference_formula() {
         let r = Bm25Ranker::new(0.0);
         let idf = r.idf(4.0, 3.0);
-        assert!((idf - (1.0f64 + 1.5 / 3.5).ln()).abs() < 1e-12);
+        assert!((idf - ((1.0f64 + 1.5 / 3.5).ln() as f32)).abs() < 1e-6);
         // tf=1, dl=2, avg=2.25
         let expected = idf * (2.2 * 1.0 / (1.0 + 1.2 * (0.25 + 0.75 * 2.0 / 2.25)));
-        assert!((r.score(1.0, 2.0, 2.25, idf, 1.0) - expected).abs() < 1e-12);
+        assert!((r.score(1.0, 2.0, 2.25, idf, 1.0) - expected).abs() < 1e-6);
         // delta adds to the norm
         let rd = Bm25Ranker::new(1.0);
-        assert!((rd.score(1.0, 2.0, 2.25, idf, 1.0) - (expected + idf)).abs() < 1e-12);
+        assert!((rd.score(1.0, 2.0, 2.25, idf, 1.0) - (expected + idf)).abs() < 1e-6);
     }
 
     #[test]
@@ -1092,10 +1296,10 @@ mod tests {
         let lens: HashMap<u64, u32> = doc_len.iter().copied().collect();
         let dead = common::RowBitmap::new();
         let ranker = Bm25Ranker::new(0.0);
-        let n = 400.0f64;
+        let n = 400.0f32;
         let total_len: u64 = doc_len.iter().map(|(_, l)| *l as u64).sum();
-        let avg = total_len as f64 / n;
-        let idf = ranker.idf(n, postings.len() as f64);
+        let avg = (total_len as f64 / n as f64) as f32;
+        let idf = ranker.idf(n, postings.len() as f32);
         let dl = |row: u64| *lens.get(&row).unwrap_or(&1);
         let mut it = BlockMaxWandIterator::new(
             vec![field(&[("alpha", &postings)], &doc_len, 400, vec![1.7])],
@@ -1114,11 +1318,328 @@ mod tests {
             let (last, _, _) = cursor.stream.block_stats();
             let bound = cursor.block_max(WandMode::Bm25);
             for (doc, tf) in postings.iter().filter(|(d, _)| *d >= from && *d <= last) {
-                let exact = ranker.score(*tf as f64, f64::from(dl(*doc)), avg, idf, 1.7);
-                assert!(exact <= bound + 1e-12, "doc {doc}: {exact} > {bound}");
+                let exact = ranker.score(*tf as f32, dl(*doc) as f32, avg, idf, 1.7);
+                assert!(exact <= bound + 1e-4, "doc {doc}: {exact} > {bound}");
             }
             from = last + 1;
             cursor.seek(from);
+        }
+    }
+
+    /// The pruning ledger must bound the score the iterator will actually
+    /// produce, which is accumulated in `f32`.
+    ///
+    /// Summing the exact `f32` bounds in `f64` keeps each addend exact, but the
+    /// score is still summed in `f32` (`sum_score` in the reference), and a
+    /// chain of `f32` additions can end up *above* the exact sum. Six boolean
+    /// fields with weights `[1, s, s, s, s, s]` (`s = 3 * 2^-25`) sum to
+    /// `1 + 3.75 * 2^-23` exactly while the `f32` accumulation rounds up to
+    /// `1 + 5 * 2^-23`; a threshold in between then stops the search on a
+    /// document whose real score clears it.
+    #[test]
+    fn the_ledger_bounds_the_f32_score_it_is_compared_against() {
+        let doc_len: Vec<(u64, u32)> = vec![(0, 10)];
+        let dead = common::RowBitmap::new();
+        let s = 3.0f32 * 2f32.powi(-25);
+        let weights = [1.0f32, s, s, s, s, s];
+        let threshold = 1.0f32 + 4.0 * 2f32.powi(-23);
+        // All six fields match document 0.
+        let t: &[(u64, u32)] = &[(0, 1)];
+        let make = || {
+            weights
+                .iter()
+                .map(|w| field(&[("t", t)], &doc_len, 1, vec![*w]))
+                .collect::<Vec<_>>()
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the ledger stopped a document whose f32 score clears the threshold"
+        );
+        assert_eq!(pruned.len(), 1, "document 0 qualifies");
+    }
+
+    /// Retiring a cursor must not lose a bound that `f64` cannot represent
+    /// beside the retired one.
+    ///
+    /// The ledger is maintained by subtracting the retired cursor's bound, and
+    /// even `f64` rounds: `2^53 + 1` is `2^53`, so removing the `2^53` bound
+    /// leaves `0` where the other cursor still contributes `1`. A `BOOST` far
+    /// from 1 is what makes the large bound reachable.
+    #[test]
+    fn retiring_a_huge_cursor_keeps_the_remaining_bound() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let a: &[(u64, u32)] = &[(0, 1)];
+        let b: &[(u64, u32)] = &[(1, 1)];
+        let make = || {
+            vec![
+                field(&[("a", a)], &doc_len, 2, vec![2f32.powi(53)]),
+                field(&[("b", b)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the ledger lost the small bound when the huge cursor retired"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 must survive");
+        assert_eq!(pruned[0].0, 1);
+    }
+
+    /// The pivot sum has to be as conservative as the score it stands in for.
+    ///
+    /// `score_prefix` sums the prefix in *creation* order, but the pivot loop
+    /// sums the cursors the heap hands it, which is *document* order, and it
+    /// stops at the first partial sum that reaches the bar. Two orders of the
+    /// same addends give different `f32` totals, so a prefix the pivot never
+    /// completes can still score above the threshold when the document is
+    /// finally scored - and then no pivot is found and the document is lost.
+    ///
+    /// Eight boolean fields, weights `[1, s, s, s, s, s, s, s]` with
+    /// `s = 3 * 2^-25`: the first field matches only row 1, the rest match rows
+    /// 0 and 1, row 0 is deleted. The document-order partial sum reaches only
+    /// `1 + 5 * 2^-23` where creation order gives `1 + 7 * 2^-23`, so a bar of
+    /// `1 + 6 * 2^-23` is cleared by the score and missed by the pivot.
+    #[test]
+    fn the_pivot_bound_covers_the_scoring_order() {
+        let doc_len: Vec<(u64, u32)> = vec![(0, 10), (1, 10)];
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let s = 3.0f32 * 2f32.powi(-25);
+        // Field 0 (weight 1) hits only row 1; the rest (weight s) hit both rows.
+        let only_1: &[(u64, u32)] = &[(1, 1)];
+        let both: &[(u64, u32)] = &[(0, 1), (1, 1)];
+        let make = || {
+            let mut fields = vec![field(&[("t", only_1)], &doc_len, 2, vec![1.0])];
+            for _ in 0..7 {
+                fields.push(field(&[("t", both)], &doc_len, 2, vec![s]));
+            }
+            fields
+        };
+        let threshold = 1.0f32 + 6.0 * 2f32.powi(-23);
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(threshold)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "the pivot sum missed a document the score clears the bar for"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 qualifies");
+        assert_eq!(pruned[0].0, 1);
+    }
+
+    /// A rounded threshold must not make the pruning switch change the answer.
+    ///
+    /// `threshold=0.99999999` rounds to `1.0f32`, exactly the score of a
+    /// document matching one boolean term. The pruned and the naive path must
+    /// still agree on which documents survive.
+    ///
+    /// This covers the iterator only; the end-to-end version, where the
+    /// caller's filter is the second half of the bug, is
+    /// `threshold_is_a_strict_lower_bound_and_prunes_the_scan` in `tests_ut`.
+    #[test]
+    fn a_rounded_threshold_prunes_and_filters_identically() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = common::RowBitmap::new();
+        let t: &[(u64, u32)] = &[(0, 1), (1, 1)];
+        // Two identical fields: a document matching both scores `2.0`, and one
+        // matching a single field scores `1.0` - exactly the rounded bar.
+        let make = || {
+            vec![
+                field(&[("t", t)], &doc_len, 2, vec![1.0]),
+                field(&[("t", t)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let bar = 0.99999999f32;
+        assert_eq!(bar, 1.0, "the bar must round up to 1.0 for this test");
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(bar)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(bar)
+            .with_naive()
+            .run();
+        assert_eq!(pruned, naive, "block_max must not change the result set");
+        assert_eq!(pruned.len(), 2, "score 2.0 clears the rounded bar");
+    }
+
+    /// A retired cursor must not shrink the remaining-bound ledger below the
+    /// true bound of the cursors that are still live.
+    ///
+    /// `total_upper` is maintained incrementally: it starts as the sum of every
+    /// cursor's bound and subtracts a cursor's bound when that cursor runs out.
+    /// With `f32` the sum rounds, and subtracting the already-rounded addend
+    /// does not cancel exactly - `16777216f32 + 1f32` is `16777216f32`, so the
+    /// retirement of the big cursor leaves `0` where `1` is still owed.
+    ///
+    /// Boost `16777216` is reachable: a `BOOST` factor goes through `f32`.
+    /// Field `a` then has bound `16777216` and field `b` has `1`; `a` matches
+    /// only deleted row 0, `b` matches live row 1. Once `a` is exhausted the
+    /// ledger must still hold `1` for `b`, otherwise the search stops before
+    /// scoring row 1 - which qualifies on its own.
+    #[test]
+    fn retiring_a_cursor_keeps_the_remaining_bound() {
+        let doc_len: Vec<(u64, u32)> = (0..2).map(|d| (d, 10)).collect();
+        let dead = {
+            let mut d = common::RowBitmap::new();
+            d.insert(0);
+            d
+        };
+        let a: &[(u64, u32)] = &[(0, 1)];
+        let b: &[(u64, u32)] = &[(1, 1)];
+        let make = || {
+            vec![
+                field(&[("a", a)], &doc_len, 2, vec![16_777_216.0]),
+                field(&[("b", b)], &doc_len, 2, vec![1.0]),
+            ]
+        };
+        let pruned = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .run();
+        let naive = BlockMaxWandIterator::new(make(), 5, &dead, 0.0, 1, WandMode::Boolean)
+            .with_threshold(0.5)
+            .with_naive()
+            .run();
+        assert_eq!(
+            pruned, naive,
+            "pruning dropped a live document the naive scan keeps"
+        );
+        assert_eq!(pruned.len(), 1, "row 1 must survive");
+        assert_eq!(pruned[0].0, 1);
+    }
+
+    /// An overflowing `f3` must not collapse the block bound to zero.
+    ///
+    /// `bm25_param_k1` is only checked for being non-negative, so `2e35` is
+    /// accepted; with `b = 0.75` and `avg = 20` the `k1*b/avg*u16::MAX` that
+    /// becomes `f3` overflows to infinity, `f3/pct` is infinite, and the norm
+    /// `1/(1 + ...)` is `0`. A block bound of zero prunes every document in it.
+    #[test]
+    fn an_overflowing_coefficient_falls_back_to_the_term_bound() {
+        let ranker = Bm25Ranker::with_params(2e35, 0.75, 0.0);
+        let idf = ranker.idf(2.0, 2.0);
+        let avg = 20.0f32;
+        // The block's statistics: one occurrence, the corpus average length.
+        let f3 = ranker.f3(avg);
+        assert!(
+            !f3.is_finite(),
+            "f3 must overflow for this test to mean anything"
+        );
+        let postings: Vec<(u64, u32)> = vec![(0, 1), (1, 10)];
+        let doc_len: Vec<(u64, u32)> = vec![(0, 20), (1, 20)];
+        let field = field(&[("t", &postings)], &doc_len, 2, vec![1.0]);
+        let dead = common::RowBitmap::new();
+        let mut it = BlockMaxWandIterator::new(vec![field], 1, &dead, 0.0, 1, WandMode::Bm25)
+            .with_bm25_params(2e35, 0.75);
+        let cursor = &mut it.cursors[0];
+        let id = cursor.stream.block_id();
+        cursor.block_index = id;
+        cursor.block_stats_cache = (1, 1.0, 65535);
+        let bound = cursor.block_max(WandMode::Bm25);
+        assert!(bound > 0.0, "the block bound collapsed to {bound}");
+        assert!(
+            bound >= cursor.upper_bound * 0.5,
+            "the fallback is the whole-term bound, not a fraction of it"
+        );
+        let _ = idf;
+    }
+
+    /// The whole-term bound must cover the term's score, which `f32` rounding
+    /// makes false for the plain formula.
+    ///
+    /// `upper_bound` multiplies `idf * (k1 + 1 + delta) * weight`; `score_with`
+    /// multiplies `common * (tf/(tf+p) + f4)`. With `df = 1`, `n = 1000`,
+    /// `delta = 3`, `tf = dl = avg = 2^25` and weight `0.6997575163841248` the
+    /// score is `23.663778305` and the plain bound `23.663772583`, so pruning
+    /// would stop on a document that clears a threshold of `23.663776398`.
+    #[test]
+    fn the_term_bound_covers_the_term_score() {
+        let ranker = Bm25Ranker::new(3.0);
+        let (n, df) = (1000.0f32, 1.0f32);
+        let idf = ranker.idf(n, df);
+        let tf = 2f32.powi(25);
+        for w in [0.699_757_5_f32, 0.1, 1.0] {
+            let score = ranker.score(tf, tf, tf, idf, w);
+            let bound = ranker.upper_bound(idf, w);
+            assert!(score <= bound, "w={w}: score {score} > upper bound {bound}");
+        }
+    }
+
+    /// `BlockMaxBM25Score` must not fall below the exact score of the block it
+    /// describes - through the production path, cap included.
+    ///
+    /// The bound evaluates a different expression than `score_with`
+    /// (`1/(1 + f1/max_tf + f3/pct)` against `tf/(tf + f1 + f2*dl)`), so the two
+    /// round differently: at `tf = dl = avg = 1216` with a full percentage the
+    /// exact score is `1.4293134` and the raw bound `1.4293131`, three ulps
+    /// below. A document whose score just clears the threshold would then be
+    /// pruned as uncompetitive.
+    ///
+    /// The `2^24` rows are the ones where the raw bound passes `upper_bound` by
+    /// a rounding step and `.min` binds - without widening the cap, the margin
+    /// is removed there and the bound drops back below the score.
+    ///
+    /// `pct = 65535` claims the block's longest document is the corpus average,
+    /// which only bounds the block when `dl >= avg`; that is the point sampled.
+    #[test]
+    fn block_maximum_never_falls_below_the_exact_score() {
+        // `delta = 100` is where the raw bound passes `upper_bound` by more
+        // than a rounding step, so `.min` genuinely binds there.
+        for delta in [0.0f32, 0.5, 3.0, 100.0] {
+            let ranker = Bm25Ranker::new(delta);
+            let idf = ranker.idf(1000.0, 1.0);
+            for (avg, tf) in [(1216.0f32, 1216.0f32), (16_777_216.0, 1_048_576.0)] {
+                for w in [0.1f32, 0.7, 1.7] {
+                    let postings: Vec<(u64, u32)> = vec![(0, tf as u32)];
+                    let doc_len: Vec<(u64, u32)> = vec![(0, tf as u32)];
+                    let mut field = field(&[("t", &postings)], &doc_len, 1, vec![w]);
+                    field.total_len = (avg * 1000.0) as u64;
+                    field.n_docs = 1000;
+                    if let Some(unit) = field.units.first_mut() {
+                        unit.idf = idf;
+                    }
+                    let dead = common::RowBitmap::new();
+                    let mut it =
+                        BlockMaxWandIterator::new(vec![field], 1, &dead, delta, 1, WandMode::Bm25);
+                    let cursor = &mut it.cursors[0];
+                    // Pin the block statistics the bound reads: the largest tf
+                    // the block holds, and a full percentage (the block's
+                    // longest document is the corpus average).
+                    let id = cursor.stream.block_id();
+                    cursor.block_index = id;
+                    cursor.block_stats_cache = (0, tf, 65535);
+                    let exact = ranker.score(tf, tf, avg, idf, w);
+                    let bound = cursor.block_max(WandMode::Bm25);
+                    assert!(
+                        exact <= bound,
+                        "delta={delta} avg={avg} w={w}: exact {exact} > block_max {bound}"
+                    );
+                }
+            }
         }
     }
 
@@ -1267,11 +1788,11 @@ mod tests {
         lens: &HashMap<u64, u32>,
         n: usize,
         total_len: u64,
-        weights: &[f64],
+        weights: &[f32],
         terms: &[String],
         k: usize,
         dead: &common::RowBitmap,
-        delta: f64,
+        delta: f32,
         min_should: usize,
         mode: WandMode,
     ) -> Vec<(u64, f64)> {
@@ -1284,10 +1805,10 @@ mod tests {
         }
         candidates.sort_unstable();
         candidates.dedup();
-        let avg = (total_len as f64 / n.max(1) as f64).max(1e-9);
+        let avg = ((total_len as f64 / n.max(1) as f64) as f32).max(1e-9);
         let mut scored = Vec::new();
         for doc in candidates {
-            let mut score = 0.0;
+            let mut score = 0.0f32;
             let mut seen_terms = HashSet::new();
             let mut matched = 0;
             for (ti, term) in terms.iter().enumerate() {
@@ -1302,9 +1823,9 @@ mod tests {
                 let w = weights.get(ti).copied().unwrap_or(1.0);
                 match mode {
                     WandMode::Bm25 => {
-                        let tf = list[pos].1 as f64;
-                        let dl = f64::from(*lens.get(&doc).unwrap_or(&1));
-                        let idf = ranker.idf(n.max(1) as f64, list.len() as f64);
+                        let tf = list[pos].1 as f32;
+                        let dl = *lens.get(&doc).unwrap_or(&1) as f32;
+                        let idf = ranker.idf(n.max(1) as f32, list.len() as f32);
                         score += ranker.score(tf, dl, avg, idf, w);
                     }
                     WandMode::Boolean => score += w,
@@ -1317,7 +1838,7 @@ mod tests {
             if hits < min_should.max(1) || dead.contains(doc) {
                 continue;
             }
-            scored.push((doc, score));
+            scored.push((doc, f64::from(score)));
         }
         scored.sort_by(|a, b| {
             b.1.partial_cmp(&a.1)
@@ -1373,7 +1894,7 @@ mod tests {
                         &lens_slice,
                     )),
                     weight: weights.get(i).copied().unwrap_or(1.0),
-                    idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
+                    idf: ranker.idf(DOCS as f32, postings[t].len() as f32),
                     delta: None,
                 })
                 .collect();
@@ -1490,7 +2011,7 @@ mod tests {
                             &lens_slice,
                         )),
                         weight: weights[i],
-                        idf: ranker.idf(DOCS as f64, postings[t].len() as f64),
+                        idf: ranker.idf(DOCS as f32, postings[t].len() as f32),
                         delta: None,
                     })
                     .collect();
@@ -1593,9 +2114,9 @@ mod tests {
         }
         let lens: Vec<(u64, u32)> = (0..DOCS).map(|d| (d, 100)).collect();
         let ranker = Bm25Ranker::new(0.0);
-        let n = DOCS as f64;
-        let idf_a = ranker.idf(n, a.len() as f64);
-        let idf_b = ranker.idf(n, b.len() as f64);
+        let n = DOCS as f32;
+        let idf_a = ranker.idf(n, a.len() as f32);
+        let idf_b = ranker.idf(n, b.len() as f32);
         let make = || {
             let cursor = crate::PhraseCursor::new(
                 vec![

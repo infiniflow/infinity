@@ -8637,16 +8637,35 @@ impl Engine {
             let mut fields: Vec<WandField<'_>> = Vec::with_capacity(held.len());
             for (boost, guard) in &held {
                 let text: &TextIndex = guard;
-                let n = text.total_docs().max(1) as f64;
+                // `TermDocIterator::InitBM25Info` (`term_doc_iterator_impl.cpp:
+                // 62-71`): `total_df_` is the document count, the division is
+                // `float`, and the result is stored back into a `float`.
+                let n = text.total_docs().max(1) as f32;
                 let idf_of = |term: &str| {
-                    let df = text.term_df(term).max(1) as f64;
-                    (1.0 + (n - df + 0.5) / (df + 0.5)).ln()
+                    let df = text.term_df(term).max(1) as f32;
+                    let ratio = ((n - df) + 0.5) / (df + 0.5);
+                    (1.0f64 + f64::from(ratio)).ln() as f32
                 };
                 let mut wand_units: Vec<WandUnit<'_>> = Vec::with_capacity(units.len());
+                // The field boost, rounded once: the reference pushes every
+                // factor down as a `float` and multiplies `float *= float`
+                // (`query_node.cppm:87`, `PushDownWeight(float)`), and the
+                // streaming arms below read this same `f32` value. Multiplying
+                // the two in `f64` first and rounding the product gave a
+                // different weight for the same query (`1.00000004` squared is
+                // `1.0000001192` that way and `1.0` the other), so the two
+                // paths could score one document differently.
+                let field_boost = *boost as f32;
                 for (phrase, toks, uboost, slop) in &units {
                     // Boolean similarity ignores per-term boosts (one point per
                     // matched unit, weighted by the field boost).
-                    let weight = if boolean { *boost } else { boost * uboost };
+                    // `weight_` is a `float` on every iterator
+                    // (`term_doc_iterator_impl.cpp:106`).
+                    let weight: f32 = if boolean {
+                        field_boost
+                    } else {
+                        field_boost * (*uboost as f32)
+                    };
                     if boolean {
                         // `similarity=boolean` counts matched *terms*, not units:
                         // a phrase contributes one cursor per term, and the
@@ -8658,7 +8677,7 @@ impl Engine {
                             }
                             wand_units.push(WandUnit {
                                 stream: WandStream::Term(cursor),
-                                weight: *boost,
+                                weight: *boost as f32,
                                 idf: 0.0,
                                 delta: None,
                             });
@@ -8674,12 +8693,14 @@ impl Engine {
                             .map(|t| text.term_stream_capture(t, true))
                             .collect();
                         let cursor = PhraseCursor::new(children, *slop);
-                        let idf: f64 = toks.iter().map(|t| idf_of(t)).sum();
+                        // `PhraseDocIterator::InitBM25Info` sums the terms'
+                        // idf in `float` (`phrase_doc_iterator_impl.cpp:48`).
+                        let idf: f32 = toks.iter().map(|t| idf_of(t)).sum();
                         wand_units.push(WandUnit {
                             stream: WandStream::Phrase(cursor),
                             weight,
                             idf,
-                            delta: Some(delta_phrase),
+                            delta: Some(delta_phrase as f32),
                         });
                         continue;
                     }
@@ -8710,7 +8731,7 @@ impl Engine {
                 fields,
                 topn.max(1),
                 &dead,
-                delta_term,
+                delta_term as f32,
                 min_should,
                 mode,
             );
@@ -8718,11 +8739,19 @@ impl Engine {
                 iterator = iterator.with_filter(filter);
             }
             if bm25_k1 != 1.2 || bm25_b != 0.75 {
-                iterator = iterator.with_bm25_params(bm25_k1, bm25_b);
+                iterator = iterator.with_bm25_params(bm25_k1 as f32, bm25_b as f32);
             }
             // `threshold=` raises the pruning bar, like the reference's
             // `UpdateScoreThreshold` (`blockmax_wand_iterator_impl.cpp:233`).
-            if let Some(t) = threshold {
+            // The iterator, its scores and the reference's `threshold_` are all
+            // `f32`, so the bar is rounded to `f32` **once** and that same value
+            // is what the final filter uses. Two bars for one query make
+            // `block_max` decide the answer: `threshold=0.99999999` rounds to
+            // `1.0`, so a document scoring exactly `1.0` clears the pruning bar
+            // and was then dropped by the `f64` comparison, while
+            // `block_max=false` - which applies only that comparison - kept it.
+            let threshold_f32 = threshold.map(|t| t as f32);
+            if let Some(t) = threshold_f32 {
                 iterator = iterator.with_threshold(t);
             }
             if naive_scan {
@@ -8732,7 +8761,7 @@ impl Engine {
             let scored: Vec<(usize, f64)> = hits
                 .into_iter()
                 .map(|(seq, score)| (seq as usize, score))
-                .filter(|(_, score)| threshold.map(|t| *score > t).unwrap_or(true))
+                .filter(|(_, score)| threshold_f32.map(|t| *score > f64::from(t)).unwrap_or(true))
                 .collect();
             // For plain OR terms this path is the whole answer: an empty result
             // is empty, and falling through would redo the same work on the
@@ -8969,16 +8998,24 @@ impl Engine {
                         scored.push((doc as usize, bscore));
                     }
                 } else {
-                    let mut score = 0.0f64;
+                    // `float sum_score` in the reference
+                    // (`blockmax_wand_iterator_impl.cpp:402`).
+                    let mut score = 0.0f32;
                     // Units matched in *any* field, for `minimum_should_match`.
                     let mut unit_hits = vec![false; units.len()];
                     for (f, (_, boost, _)) in field_specs.iter().enumerate() {
-                        let len = field_texts[f].doc_len_opt(doc).unwrap_or(0) as f64;
-                        let avg_len = avg_lens[f];
-                        let idf_of = |ti: usize| -> f64 {
-                            let df = dfs[f].get(ti).copied().unwrap_or(0).max(1) as f64;
-                            (1.0 + (n_docs as f64 - df + 0.5) / (df + 0.5)).ln()
+                        let boost = *boost as f32;
+                        let len = field_texts[f].doc_len_opt(doc).unwrap_or(0) as f32;
+                        let avg_len = avg_lens[f] as f32;
+                        let idf_of = |ti: usize| -> f32 {
+                            let df = dfs[f].get(ti).copied().unwrap_or(0).max(1) as f32;
+                            let ratio = ((n_docs as f32 - df) + 0.5) / (df + 0.5);
+                            (1.0f64 + f64::from(ratio)).ln() as f32
                         };
+                        let bm25_k1 = bm25_k1 as f32;
+                        let bm25_b = bm25_b as f32;
+                        let delta_term = delta_term as f32;
+                        let delta_phrase = delta_phrase as f32;
                         let cursors = &mut field_cursors[f];
                         let tf_of =
                             |cursors: &mut Vec<MergeCursor<'_>>, ti: usize| -> Option<u32> {
@@ -9030,9 +9067,9 @@ impl Engine {
                                 // `"a b"~N`: a sloppy phrase scores with the
                                 // fractional frequency the reference's
                                 // `GetSloppyPhraseMatchData` produces.
-                                let freq = if *slop == 0 {
+                                let freq: f32 = if *slop == 0 {
                                     phrase_freq_lists(&phrase_positions[..unit.len()], unit.len())
-                                        as f64
+                                        as f32
                                 } else {
                                     phrase_freq_lists_sloppy(
                                         &phrase_positions[..unit.len()],
@@ -9044,7 +9081,10 @@ impl Engine {
                                     continue;
                                 }
                                 unit_hits[ui] = true;
-                                let idf_sum: f64 = unit
+                                // `PhraseDocIterator::InitBM25Info` sums the
+                                // terms' idf in `float`
+                                // (`phrase_doc_iterator_impl.cpp:48`).
+                                let idf_sum: f32 = unit
                                     .iter()
                                     .map(|t| {
                                         let ti = query_terms
@@ -9058,10 +9098,9 @@ impl Engine {
                                         }
                                     })
                                     .sum();
-                                let tf = freq;
-                                let norm = (bm25_k1 + 1.0) * tf
-                                    / (tf + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
-                                score += idf_sum * (norm + delta_phrase) * boost * uboost;
+                                let norm = (bm25_k1 + 1.0) * freq
+                                    / (freq + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
+                                score += idf_sum * (norm + delta_phrase) * (boost * uboost as f32);
                                 continue;
                             }
                             for term in unit {
@@ -9073,10 +9112,10 @@ impl Engine {
                                 };
                                 unit_hits[ui] = true;
                                 let idf = idf_of(ti);
-                                let tf = tf as f64;
+                                let tf = tf as f32;
                                 let norm = (bm25_k1 + 1.0) * tf
                                     / (tf + bm25_k1 * (1.0 - bm25_b + bm25_b * len / avg_len));
-                                score += idf * (norm + delta_term) * boost * uboost;
+                                score += idf * (norm + delta_term) * (boost * uboost as f32);
                             }
                         }
                     }
@@ -9091,12 +9130,12 @@ impl Engine {
                             .map(|((_, u, _, _), _)| u.len())
                             .sum()
                     };
-                    score += rank_bonus;
+                    score += rank_bonus as f32;
                     if hits >= min_should
                         && hits > 0
-                        && threshold.map(|t| score > t).unwrap_or(true)
+                        && threshold.map(|t| score > t as f32).unwrap_or(true)
                     {
-                        scored.push((doc as usize, score));
+                        scored.push((doc as usize, f64::from(score)));
                     }
                 }
             }
