@@ -545,11 +545,12 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     /// or converting `f32 -> f64` per iteration.
     upper_bounds: Vec<f64>,
     /// The live cursors kept sorted by `(doc_id, cursor_ord)` packed into a
-    /// single `u64` (`(doc << 16) | ord`). Keeping an L1-resident sorted array
-    /// lets `FindPivotOptimized` scan sequentially and re-merge only the moved
-    /// prefix after each round, with 8-byte comparisons instead of 16-byte tuples.
-    order: Vec<u64>,
-    order_scratch: Vec<u64>,
+    /// `u128` (`(doc << 32) | ord`) so cursor indices above 65,535 never
+    /// overflow into `doc_id`. Keeping an L1-resident sorted array lets
+    /// `FindPivotOptimized` scan sequentially and re-merge only the moved
+    /// prefix after each round.
+    order: Vec<u128>,
+    order_scratch: Vec<u128>,
     scratch_blocks: Vec<(u64, f32, usize)>,
     /// Number of leading entries in `order` that form the current round's
     /// pivot prefix.
@@ -679,12 +680,12 @@ impl<'a> BlockMaxWandIterator<'a> {
             let ub = f64::from(cursor.upper_bound);
             upper_bounds.push(ub);
             if let Some(doc) = cursor.cur {
-                order.push((doc << 16) | (cursor.ord as u64));
+                order.push((u128::from(doc) << 32) | (cursor.ord as u128));
                 total_upper = round_up(total_upper + ub);
             }
         }
         order.sort_unstable();
-        let order_scratch = vec![0u64; order.len()];
+        let order_scratch = vec![0u128; order.len()];
         let num_cursors = cursors.len();
         Self {
             fields: field_count,
@@ -865,7 +866,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             WandMode::Bm25 => {
                 let mut seen = HashSet::new();
                 for &entry in &self.order[..self.prefix_len] {
-                    let i = (entry & 0xffff) as usize;
+                    let i = (entry & 0xffff_ffff) as usize;
                     seen.insert(self.cursors[i].term);
                 }
                 seen.len()
@@ -907,13 +908,13 @@ impl<'a> BlockMaxWandIterator<'a> {
         let mut advances = 0u64;
         let mut ops = 0u64;
         for read in 0..count {
-            let i = (self.order[read] & 0xffff) as usize;
+            let i = (self.order[read] & 0xffff_ffff) as usize;
             let cursor = &mut self.cursors[i];
             let doc_opt = cursor.seek_and_ensure(target);
             advances += 1;
             if let Some(doc) = doc_opt {
                 ops += 1;
-                self.order[write] = (doc << 16) | (i as u64);
+                self.order[write] = (u128::from(doc) << 32) | (i as u128);
                 write += 1;
             } else {
                 retired = true;
@@ -1036,7 +1037,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             WandMode::Bm25 => {
                 let mut seen = HashSet::new();
                 for &entry in &self.order[..self.prefix_len] {
-                    let i = (entry & 0xffff) as usize;
+                    let i = (entry & 0xffff_ffff) as usize;
                     seen.insert(self.cursors[i].term);
                 }
                 seen.len()
@@ -1143,13 +1144,13 @@ impl<'a> BlockMaxWandIterator<'a> {
                 thresh_f64
             };
             for (pos, &entry) in self.order.iter().enumerate() {
-                let i = (entry & 0xffff) as usize;
+                let i = (entry & 0xffff_ffff) as usize;
                 sum += self.upper_bounds[i];
                 if sum >= thresh_conserv {
                     let count = pos + 1;
                     let widened = sum * (1.0 + (count as f64) * eps_f64);
                     if widened >= thresh_f64 {
-                        pivot = Some(entry >> 16);
+                        pivot = Some((entry >> 32) as u64);
                         idx = count;
                         break;
                     }
@@ -1158,7 +1159,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             let Some(doc) = pivot else {
                 break;
             };
-            while idx < self.order.len() && (self.order[idx] >> 16) == doc {
+            while idx < self.order.len() && ((self.order[idx] >> 32) as u64) == doc {
                 idx += 1;
             }
             self.heap_ops += idx as u64;
@@ -1187,8 +1188,8 @@ impl<'a> BlockMaxWandIterator<'a> {
             let mut sum_at_doc: f64 = 0.0;
             for k in 0..self.prefix_len {
                 let entry = self.order[k];
-                let i = (entry & 0xffff) as usize;
-                if (entry >> 16) != doc {
+                let i = (entry & 0xffff_ffff) as usize;
+                if ((entry >> 32) as u64) != doc {
                     if let Some(last) = self.cursors[i].block_last_at_or_after() {
                         if last >= doc {
                             let bound = if self.cursors[i].cur.is_some() {
@@ -1264,7 +1265,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// Moves the prefix cursors that sit before doc up to it and restores order.
     fn advance_prefix(&mut self, doc: u64) {
         let mut move_count = self.prefix_len;
-        while move_count > 0 && (self.order[move_count - 1] >> 16) == doc {
+        while move_count > 0 && ((self.order[move_count - 1] >> 32) as u64) == doc {
             move_count -= 1;
         }
         self.prefix_len = 0;
@@ -1286,7 +1287,7 @@ impl<'a> BlockMaxWandIterator<'a> {
     fn skip_to(&mut self, next: u64) {
         self.jumps += 1;
         let mut end = self.prefix_len;
-        while end < self.order.len() && (self.order[end] >> 16) < next {
+        while end < self.order.len() && ((self.order[end] >> 32) as u64) < next {
             self.heap_ops += 1;
             end += 1;
         }
@@ -1328,7 +1329,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.doc_id = None;
                 return false;
             };
-            let doc = first >> 16;
+            let doc = (first >> 32) as u64;
             // Same pushdown as the pruned path: a document the filter rejects is
             // never scored, so the cursors hop to the next admitted row.
             if let Some(filter) = self.filter {
@@ -1342,7 +1343,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 }
             }
             for &entry in &self.order {
-                if (entry >> 16) != doc {
+                if ((entry >> 32) as u64) != doc {
                     break;
                 }
                 self.heap_ops += 1;
@@ -1362,14 +1363,14 @@ impl<'a> BlockMaxWandIterator<'a> {
     fn skip_blocks(&mut self, from: u64) -> u64 {
         let start = from + 1;
         let prefix_len = self.prefix_len;
-        let up_to = self.order.get(prefix_len).map(|&e| e >> 16);
+        let up_to = self.order.get(prefix_len).map(|&e| (e >> 32) as u64);
 
         // (1) + (2) init: Reposition the block cursor only (phase 1) and collect
         // `(last, bound, cursor_idx)` for phase 2 in a single pass over `0..prefix_len`.
         let mut next_doc = start;
         self.scratch_blocks.clear();
         for k in 0..prefix_len {
-            let i = (self.order[k] & 0xffff) as usize;
+            let i = (self.order[k] & 0xffff_ffff) as usize;
             if !self.cursors[i].cur.is_some_and(|cur| cur >= start)
                 && !self.cursors[i]
                     .block_last_at_or_after()
@@ -1490,7 +1491,7 @@ impl<'a> BlockMaxWandIterator<'a> {
         // scan path bit for bit. Doc order is not needed after this point.
         self.prefix.clear();
         for &entry in &self.order[..self.prefix_len] {
-            self.prefix.push((entry & 0xffff) as usize);
+            self.prefix.push((entry & 0xffff_ffff) as usize);
         }
         self.prefix.sort_unstable();
         match self.mode {

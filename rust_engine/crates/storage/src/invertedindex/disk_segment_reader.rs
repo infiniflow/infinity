@@ -1132,17 +1132,28 @@ impl<'a> TermDocCursor<'a> {
         self.at >= self.rows.len() && self.left == 0
     }
 
-    fn ensure_tfs(&mut self) {
+    fn ensure_tfs(&mut self) -> bool {
         if self.tfs_decoded {
-            return;
+            return true;
         }
         self.tfs.clear();
         if let Some(payload) = self.tf_payload {
-            let _ = crate::invertedindex::format::decode_u32_block_all_into(payload, &mut self.tfs);
+            if crate::invertedindex::format::decode_u32_block_all_into(payload, &mut self.tfs)
+                .is_err()
+                || self.tfs.len() != self.rows.len()
+            {
+                self.tfs.clear();
+                self.rows.clear();
+                self.ordinals.clear();
+                self.at = 0;
+                self.left = 0;
+                return false;
+            }
         } else {
             self.tfs.resize(self.rows.len(), 1);
         }
         self.tfs_decoded = true;
+        true
     }
 
     /// Decodes the next mini-block. Returns false at the end of the list.
@@ -1345,7 +1356,9 @@ impl<'a> TermDocCursor<'a> {
         if self.at >= self.rows.len() {
             return None;
         }
-        self.ensure_tfs();
+        if !self.ensure_tfs() {
+            return None;
+        }
         Some((
             &self.rows[self.at..],
             &self.tfs[self.at..],
@@ -1368,7 +1381,9 @@ impl<'a> TermDocCursor<'a> {
 
     /// Term frequency at absolute index `abs_i` in the current decoded block.
     pub fn tf_at(&mut self, abs_i: usize) -> u32 {
-        self.ensure_tfs();
+        if !self.ensure_tfs() {
+            return 0;
+        }
         self.tfs.get(abs_i).copied().unwrap_or(0)
     }
 
@@ -1429,7 +1444,9 @@ impl<'a> TermDocCursor<'a> {
         if !self.ensure() {
             return None;
         }
-        self.ensure_tfs();
+        if !self.ensure_tfs() {
+            return None;
+        }
         let row = *self.rows.get(self.at)?;
         let tf = self.tfs.get(self.at).copied().unwrap_or(0);
         let ordinal = self.ordinals.get(self.at).copied().unwrap_or(u32::MAX);
@@ -1438,20 +1455,18 @@ impl<'a> TermDocCursor<'a> {
 
     /// `GetCurrentTF` for the document [`Self::doc`] returned.
     pub fn tf(&mut self) -> u32 {
-        if !self.ensure() {
+        if !self.ensure() || !self.ensure_tfs() {
             return 0;
         }
-        self.ensure_tfs();
         self.tfs.get(self.at).copied().unwrap_or(0)
     }
 
     /// `GetCurrentPosition`: the current document's token offsets, in order.
     /// Empty when the term carries no position list.
     pub fn positions(&mut self) -> &[u32] {
-        if !self.ensure() || self.pos_bytes.is_none() {
+        if !self.ensure() || self.pos_bytes.is_none() || !self.ensure_tfs() {
             return &[];
         }
-        self.ensure_tfs();
         while self.consumed < self.at {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
             self.consume_doc(tf);
@@ -1471,7 +1486,9 @@ impl<'a> TermDocCursor<'a> {
         if !self.track_positions || self.pos_bytes.is_none() || self.consumed >= self.rows.len() {
             return;
         }
-        self.ensure_tfs();
+        if !self.ensure_tfs() {
+            return;
+        }
         while self.consumed < self.rows.len() {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
             self.consume_doc(tf);

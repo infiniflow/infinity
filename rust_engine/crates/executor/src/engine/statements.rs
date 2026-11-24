@@ -9372,19 +9372,22 @@ impl Engine {
             return Ok(None);
         };
         let driver = SearchDriver::new(field2analyzer, default_field);
-        let Ok(tree) = driver.parse_single_with_fields(columns, query) else {
-            // A `column:term` naming a column outside `columns` is not "no
-            // syntax": falling back would search `title:foo` as ordinary text and
-            // answer a different question. The reference resolves field names
-            // against every index of the table, so such a leaf finds no postings -
-            // match nothing instead of guessing.
-            let outside = query_field_qualifiers(query)
-                .into_iter()
-                .any(|field| !columns.split(',').any(|spec| column_of(spec) == field));
-            if outside {
-                return Ok(Some(Vec::new()));
+        let tree = match driver.parse_single_with_fields(columns, query) {
+            Ok(tree) => tree,
+            Err(err) => {
+                // A `column:term` naming a column outside `columns` is not "no
+                // syntax": falling back would search `title:foo` as ordinary text and
+                // answer a different question. The reference resolves field names
+                // against every index of the table, so such a leaf finds no postings -
+                // match nothing instead of guessing.
+                let outside = query_field_qualifiers(query)
+                    .into_iter()
+                    .any(|field| !columns.split(',').any(|spec| column_of(spec) == field));
+                if outside {
+                    return Ok(Some(Vec::new()));
+                }
+                return Err(Error::Invalid(format!("parser: {err}")));
             }
-            return Ok(None);
         };
         let dead = self.tombstone_set(table)?;
         let schema = self.table_schema(table)?;

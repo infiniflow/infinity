@@ -1937,23 +1937,21 @@ impl TextIndex {
     }
 
     /// True when the unsealed segment has reached `mem_index_capacity` rows and
-    /// should be sealed, or when a previous seal failed and its tail is still
-    /// waiting to be written.
+    /// should be sealed, when a previous seal failed and its tail is still
+    /// waiting to be written, or when the resident tail exceeds the safety byte
+    /// ceiling (1 GiB).
     ///
-    /// The **only** bound is the reference's row count
+    /// The primary bound is the reference's row count
     /// (`new_txn_index_impl.cpp:1381`, `memory_indexer->GetRowCount() >=
-    /// mem_index_capacity`). A byte bound used to sit here as well, and because
-    /// 100 k enwiki documents reach 64 MiB long before 65,536 rows it cut the
-    /// same import into 11 chunks where the reference writes 2 - 39.9 % more
-    /// bytes on disk (each chunk repeats the dictionary) and longer queries
-    /// (11 posting sources per term instead of 2). Resident memory is bounded by
-    /// the unsealed-quota reclaim tick instead, which is where the reference
-    /// bounds it too.
+    /// mem_index_capacity`), with a 1 GiB safety byte ceiling so huge documents
+    /// cannot grow unboundedly when `memindex_quota` is 0 (disabled).
     pub(crate) fn should_seal(&self, capacity: usize) -> bool {
+        const TEXT_SEGMENT_SAFETY_BYTES: usize = 1024 * 1024 * 1024;
         if self.inflight.is_some() {
             return true;
         }
-        capacity > 0 && self.mem.pending_docs() >= capacity
+        (capacity > 0 && self.mem.pending_docs() >= capacity)
+            || self.mem.mem_used() >= TEXT_SEGMENT_SAFETY_BYTES
     }
 
     /// Takes the work of one seal, so the caller can [`SealJob::write`] it with

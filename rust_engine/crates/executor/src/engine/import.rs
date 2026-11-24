@@ -416,7 +416,10 @@ impl Engine {
                         let trim = types_for_scan
                             .get(i)
                             .is_none_or(|t| !super::types::is_text_type(t));
-                        match normalize_cell_cow(&f, trim) {
+                        let normalize_vector = types_for_scan.get(i).is_none_or(|t| {
+                            !super::types::is_text_type(t) && !super::types::is_json_type(t)
+                        });
+                        match super::state::normalize_csv_cell_cow(&f, trim, normalize_vector) {
                             std::borrow::Cow::Borrowed(_) => f,
                             std::borrow::Cow::Owned(o) => o,
                         }
@@ -769,6 +772,36 @@ impl Engine {
             // statement commits, exactly like the CSV path.
             if self.has_block_layout(table) {
                 self.write_blocks_commit(table, ts)?;
+            }
+            // Feed secondary, full-text, HNSW and IVF memory indexes before
+            // `populate_import_indexes` seals their tails (mirrors the CSV
+            // staging loop so JSONL/JSON/CSR/Parquet imports populate
+            // existing FULLTEXT and vector indexes too).
+            let schema = self.table_schema(table).unwrap_or_default();
+            let secondary_targets = self.secondary_targets(table, &schema);
+            let needs_texts = self.has_text_or_vector_indexes(table);
+            let mut texts_by_row: Vec<(usize, Vec<String>)> = if needs_texts {
+                Vec::with_capacity(rows.len())
+            } else {
+                Vec::new()
+            };
+            for (k, row) in rows.iter().enumerate() {
+                self.insert_secondary_keys(&secondary_targets, base + k, row)?;
+                if needs_texts {
+                    texts_by_row.push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                }
+            }
+            if needs_texts {
+                let text_batch: Vec<(usize, &[String])> = texts_by_row
+                    .iter()
+                    .map(|(seq, cells)| (*seq, cells.as_slice()))
+                    .collect();
+                self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                    .await;
+                self.note_hnsw_insert_batch(table, &text_batch).await;
+                for (seq, texts) in &texts_by_row {
+                    self.note_ivf_insert(table, *seq as u64, texts);
+                }
             }
             // `PopulateIndex(…, kImport)`: the chunks are written inside the
             // import transaction, with its ts, before the rows are visible. The

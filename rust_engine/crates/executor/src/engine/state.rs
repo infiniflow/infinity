@@ -313,7 +313,7 @@ pub(crate) fn innermost_groups(text: &str) -> Vec<Vec<String>> {
             .collect()
     } else {
         let items: Vec<String> = inner
-            .split(',')
+            .split(|c: char| c == ',' || c.is_ascii_whitespace())
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
@@ -9327,11 +9327,58 @@ pub(crate) fn csv_fields(line: &str, delim: char) -> Vec<String> {
 /// The fast path is unchanged: a cell that needs no trim is borrowed straight
 /// out of the line, so a plain numeric/text `COPY` still allocates no `String`
 /// per field (16.7 M allocations on 8.4 M two-column rows).
+#[cfg(test)]
 pub(crate) fn normalize_cell_cow(s: &str, trim: bool) -> std::borrow::Cow<'_, str> {
     if !trim {
         return std::borrow::Cow::Borrowed(s);
     }
     let t = s.trim();
+    if t.len() == s.len() {
+        std::borrow::Cow::Borrowed(s)
+    } else {
+        std::borrow::Cow::Owned(t.to_string())
+    }
+}
+
+/// Normalises a CSV cell on the import path with vector/array bracket
+/// normalisation for non-text, non-JSON columns (e.g. `"[2 3 4]"` → `"[2,3,4]"`).
+pub(crate) fn normalize_csv_cell_cow(
+    s: &str,
+    trim: bool,
+    normalize_vector: bool,
+) -> std::borrow::Cow<'_, str> {
+    if !trim {
+        return std::borrow::Cow::Borrowed(s);
+    }
+    let t = s.trim();
+    if normalize_vector && t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
+        let mut out = String::from("[");
+        let mut first = true;
+        for token in t[1..t.len() - 1]
+            .split([',', ' ', '\t'])
+            .filter(|x| !x.is_empty())
+        {
+            if !first {
+                out.push(',');
+            }
+            first = false;
+            let lead = token.len() - token.trim_start_matches('[').len();
+            let trail = token.len() - token.trim_end_matches(']').len();
+            let core = &token[lead..token.len() - trail];
+            for _ in 0..lead {
+                out.push('[');
+            }
+            match core.parse::<f64>() {
+                Ok(f) => out.push_str(&fmt_num(f)),
+                Err(_) => out.push_str(core),
+            }
+            for _ in 0..trail {
+                out.push(']');
+            }
+        }
+        out.push(']');
+        return std::borrow::Cow::Owned(out);
+    }
     if t.len() == s.len() {
         std::borrow::Cow::Borrowed(s)
     } else {
@@ -9447,20 +9494,20 @@ fn fmt_cpp_float(sci: &str, negative: bool) -> String {
     let exponent: i32 = exponent.parse().expect("exponent");
     let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
     let count = digits.len() as i32;
-    if exponent < -4 || exponent >= count {
-        let mut out = String::new();
-        if negative {
-            out.push('-');
-        }
-        out.push_str(&digits[..1]);
-        if count > 1 {
-            out.push('.');
-            out.push_str(&digits[1..]);
-        }
-        out.push('e');
-        out.push(if exponent < 0 { '-' } else { '+' });
-        out.push_str(&format!("{:02}", exponent.abs()));
-        return out;
+    let mut sci_out = String::new();
+    if negative {
+        sci_out.push('-');
+    }
+    sci_out.push_str(&digits[..1]);
+    if count > 1 {
+        sci_out.push('.');
+        sci_out.push_str(&digits[1..]);
+    }
+    sci_out.push('e');
+    sci_out.push(if exponent < 0 { '-' } else { '+' });
+    sci_out.push_str(&format!("{:02}", exponent.abs()));
+    if !(-4..16).contains(&exponent) {
+        return sci_out;
     }
     let mut out = String::new();
     if negative {
@@ -9480,12 +9527,16 @@ fn fmt_cpp_float(sci: &str, negative: bool) -> String {
         }
     } else {
         out.push_str("0.");
-        for _ in 0..(-exponent - 1) {
+        for _ in 0..(-exponent - 1) as usize {
             out.push('0');
         }
         out.push_str(&digits);
     }
-    out
+    if out.len() <= sci_out.len() {
+        out
+    } else {
+        sci_out
+    }
 }
 
 pub(crate) fn fmt_num(f: f64) -> String {
@@ -11440,6 +11491,17 @@ mod merge_extend_ut {
         let mut all_docs: Vec<(u64, u32)> = docs.clone();
         all_docs.extend((DOCS..DOCS + TAIL).map(|row| (row, 131)));
         let total_len: u64 = all_docs.iter().map(|(_, l)| u64::from(*l)).sum();
+        let owned_flats: Vec<Vec<(u64, u32, u32)>> = (0..TERMS)
+            .map(|t| {
+                let mut list: Vec<(u64, u32, u32)> = postings[&format!("term{t}")]
+                    .iter()
+                    .map(|(row, tf, _)| (*row, *tf, all_docs[*row as usize].1))
+                    .collect();
+                // The tail hits every term once per row.
+                list.extend((DOCS..DOCS + TAIL).map(|row| (row, 1, 131)));
+                list
+            })
+            .collect();
         let dead = common::RowBitmap::new();
         for k in [1usize, 3, 10, 25, 50, 100] {
             let sealed_units: Vec<crate::WandUnit<'_>> = (0..TERMS)
@@ -11469,21 +11531,10 @@ mod merge_extend_ut {
             )
             .run();
 
-            let flats: Vec<Vec<(u64, u32)>> = (0..TERMS)
-                .map(|t| {
-                    let mut list: Vec<(u64, u32)> = postings[&format!("term{t}")]
-                        .iter()
-                        .map(|(row, tf, _)| (*row, *tf))
-                        .collect();
-                    // The tail hits every term once per row.
-                    list.extend((DOCS..DOCS + TAIL).map(|row| (row, 1)));
-                    list
-                })
-                .collect();
-            let mem_units: Vec<crate::WandUnit<'_>> = flats
+            let mem_units: Vec<crate::WandUnit<'_>> = owned_flats
                 .iter()
                 .map(|list| crate::WandUnit {
-                    stream: crate::WandStream::Term(crate::TermStream::from_slice(list, &all_docs)),
+                    stream: crate::WandStream::Term(crate::TermStream::from_owned(list.clone())),
                     weight: 1.0,
                     idf: 1.0,
                     delta: None,
