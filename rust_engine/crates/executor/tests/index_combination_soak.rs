@@ -73,9 +73,9 @@
 //!
 //! ## What this caught
 //!
-//! Five defects, all found by the checks below and all fixed in the engine
+//! Six defects, all found by the checks below and all fixed in the engine
 //! (`filter_text_pushdown_is_wrong_under_concurrent_writes` is the regression
-//! test for the first; the other four are what the two lanes assert):
+//! test for the first; the rest are what the two lanes assert):
 //!
 //! 1. **`WHERE filter_text(…)` matched the whole table while a writer ran.**
 //!    `RowFulltextProvider::postings` fell back to "keep every row" when
@@ -131,6 +131,19 @@
 //!    were being replaced, read through a mapping that failed to open. The scan
 //!    now drops the mapping and retries once on a fresh generation
 //!    (`MappedBlock`, `Engine::block_written`) before answering NotFound.
+//! 6. **The block floor was engine-wide, not per table.** `Engine::recover_blocks`
+//!    returned the *newest* `create` across every table and the reopen replayed
+//!    the WAL above it, so the fastest table's checkpoint skipped the tail of a
+//!    slower one:
+//!
+//!    ```text
+//!    ix_08: 238 rows after restart, expected 325
+//!    ```
+//!
+//!    Retried after the reopen it stayed short, so these were not probing races.
+//!    Fixed by [`Engine::recover_block_floors`] and
+//!    `TxnManager::recover_into_floors`: the floor is looked up per row command's
+//!    table, and a table missing from the map replays from zero.
 //!
 //! Item 4 is why the lanes inject a restart into every round: nothing but a
 //! `drop(engine)` + reopen exercises the replay floor, and every one of the four
@@ -711,14 +724,28 @@ async fn diagnose(engine: &Engine, table: &str) -> String {
         format!("SELECT COUNT(*) FROM {table} WHERE id = 0;"),
         format!("SELECT COUNT(*) FROM {table} WHERE id >= 0;"),
         format!("SELECT COUNT(*) FROM {table} WHERE id IS NOT NULL;"),
-        format!("SELECT MIN(id) FROM {table} WHERE id >= 0;"),
-        format!("SELECT COUNT(*) FROM {table} GROUP BY c1;"),
+        format!("SELECT MIN(id), MAX(id) FROM {table} WHERE id >= 0;"),
     ] {
         out.push(match query(engine, &sql).await {
             Ok(rows) => format!("{sql} -> {rows:?}"),
             Err(err) => format!("{sql} -> {err}"),
         });
     }
+    // Which slice of ids the scan can see. A hole in the middle is a block the
+    // reader does not list; a missing tail is a checkpoint that never published.
+    let mut bands = Vec::new();
+    for low in (0..4096).step_by(256) {
+        let sql = format!(
+            "SELECT COUNT(*) FROM {table} WHERE id >= {low} AND id < {};",
+            low + 256
+        );
+        match number(engine, &sql).await {
+            Ok(0) => {}
+            Ok(n) => bands.push(format!("[{low},{})={n}", low + 256)),
+            Err(err) => bands.push(format!("[{low},+) err {err}")),
+        }
+    }
+    out.push(format!("bands {}", bands.join(" ")));
     out.join(" | ")
 }
 

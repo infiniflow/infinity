@@ -3326,11 +3326,32 @@ impl Engine {
     /// gets the same floor from its checkpoint record; with the row KV gone
     /// (plan C) the files are the only place it can come from.
     pub fn recover_blocks(&self) -> Result<u64> {
-        let mut newest = 0u64;
+        Ok(self
+            .recover_block_floors()?
+            .values()
+            .copied()
+            .max()
+            .unwrap_or(0))
+    }
+
+    /// The same rebuild, reported **per table**: the newest ts a table's block
+    /// files already hold.
+    ///
+    /// A restart replays the WAL above this floor, and the floor has to be the
+    /// table's own. One number for the whole engine is whatever the *fastest*
+    /// table reached: a checkpoint that finished on table A raised it above
+    /// rows table B still had only in its append buffer, and the replay skipped
+    /// them - a tail of B lost at every reopen that raced a checkpoint
+    /// (`ix_08: 238 rows after restart, expected 325`).
+    pub fn recover_block_floors(&self) -> Result<std::collections::HashMap<String, u64>> {
+        let mut floors = std::collections::HashMap::new();
         for meta in self.storage.catalog.list_tables()? {
-            newest = newest.max(self.restore_blocks(&meta.name)?);
+            let floor = self.restore_blocks(&meta.name)?;
+            // The replay names a table the way the WAL does (`default_db.t`), so
+            // the key has to be that form even when the catalog lists a bare one.
+            floors.insert(self.qualified_table(&meta.name), floor);
         }
-        Ok(newest)
+        Ok(floors)
     }
 
     /// Rebuilds a table's rows **and the append/delete journals** from its block
