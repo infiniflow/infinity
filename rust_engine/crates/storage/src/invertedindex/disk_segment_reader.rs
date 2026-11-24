@@ -1212,17 +1212,28 @@ impl<'a> TermDocCursor<'a> {
             // crosses a block boundary naturally (no `seek`, no hop) would
             // otherwise hand back the old block's last document positions.
             self.consumed = 0;
-            self.rows.reserve(take);
-            self.ordinals.reserve(take);
             let doc_count = self.reader.doc_count() as u32;
             let base = self.reader.base_row_id;
-            for &delta in &self.delta_buf {
-                self.last_ordinal = self.last_ordinal.wrapping_add(delta);
-                if self.last_ordinal < doc_count {
-                    self.rows.push(base + u64::from(self.last_ordinal));
-                    self.ordinals.push(self.last_ordinal);
+            self.rows.resize(take, 0);
+            self.ordinals.resize(take, 0);
+            let mut last = self.last_ordinal;
+            let mut valid = 0usize;
+            for ((&delta, row_out), ord_out) in self
+                .delta_buf
+                .iter()
+                .zip(&mut self.rows)
+                .zip(&mut self.ordinals)
+            {
+                last = last.wrapping_add(delta);
+                if last < doc_count {
+                    *row_out = base + u64::from(last);
+                    *ord_out = last;
+                    valid += 1;
                 }
             }
+            self.last_ordinal = last;
+            self.rows.truncate(valid);
+            self.ordinals.truncate(valid);
             if !self.rows.is_empty() {
                 // Keep the doc skip list on the block that was just decoded: an
                 // item is keyed by its block's **last** doc id, so seeking to
@@ -1304,7 +1315,9 @@ impl<'a> TermDocCursor<'a> {
         // Land the position stream on the occurrence the hop skipped so the
         // decode that follows starts from the right record; a list without
         // positions ignores it.
-        self.seek_positions(prev_ttf);
+        if self.track_positions {
+            self.seek_positions(prev_ttf);
+        }
         Some(true)
     }
 
@@ -1589,7 +1602,9 @@ impl<'a> TermDocCursor<'a> {
         // The doc skip list already counted the occurrences the hop skipped; the
         // position skip list turns that count into a record offset, so only the
         // landed record's prefix is dropped (one record, not the whole prefix).
-        self.seek_positions(prev_ttf);
+        if self.track_positions {
+            self.seek_positions(prev_ttf);
+        }
         self.fill()
     }
 

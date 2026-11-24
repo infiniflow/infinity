@@ -2690,7 +2690,16 @@ impl<'a> MergeCursor<'a> {
             {
                 self.next += 1;
             }
-            self.sources[self.next].skip_block_shallow(target)
+            loop {
+                match self.sources[self.next].skip_block_shallow(target) {
+                    Some(true) => break Some(true),
+                    Some(false) => break Some(false),
+                    None if self.next + 1 < self.sources.len() => {
+                        self.next += 1;
+                    }
+                    None => break None,
+                }
+            }
         } else {
             return Some(false);
         };
@@ -2858,10 +2867,10 @@ pub(crate) struct TermStream<'a> {
     /// Keep each posting's token offsets (phrase children need them).
     pub(crate) capture: bool,
     pub(crate) pos: PosArena,
-    /// When true, `tfs` and `lens` are not copied into `TermStream`; instead
-    /// `tf()` / `len()` read lazily from `merge.sources[0]` (`Source::Segment`)
-    /// at `seg_base + self.at`.
-    pub(crate) lazy_segment: bool,
+    /// When `Some(src_idx)`, `tfs` and `lens` are not copied into `TermStream`;
+    /// instead `tf()` / `len()` read lazily from `merge.sources[src_idx]`
+    /// (`Source::Segment`) at `seg_base + self.at`.
+    pub(crate) lazy_source: Option<usize>,
     pub(crate) seg_base: usize,
 }
 
@@ -2899,7 +2908,7 @@ impl<'a> TermStream<'a> {
             max_pct: 0.0,
             capture,
             pos: PosArena::default(),
-            lazy_segment: false,
+            lazy_source: None,
             seg_base: 0,
         }
     }
@@ -2994,7 +3003,7 @@ impl<'a> TermStream<'a> {
         self.pos.clear();
         self.at = 0;
         self.stats_ready = false;
-        self.lazy_segment = false;
+        self.lazy_source = None;
         // The stored bound of the block the sources are on; `None` degrades to
         // one 128-posting window and a bound computed from the postings.
         self.stored = self.merge.block_stats();
@@ -3029,12 +3038,67 @@ impl<'a> TermStream<'a> {
                         if n > 0 {
                             self.docs.extend_from_slice(&rows[..n]);
                             cur.skip(n);
-                            self.lazy_segment = true;
+                            self.lazy_source = Some(0);
                             self.seg_base = base;
                         }
                     }
                 }
             } else {
+                let mut left = WAND_BLOCK - self.docs.len();
+                while left > 0
+                    && self.merge.extend_block(
+                        &mut self.docs,
+                        &mut self.tfs,
+                        &mut self.lens,
+                        left,
+                        until,
+                    )
+                {
+                    left = WAND_BLOCK.saturating_sub(self.docs.len());
+                }
+            }
+        } else if self.merge.concat {
+            let mut handled = false;
+            if self.merge.cached.is_none() {
+                self.merge.cached = self.merge.pull_concat();
+            }
+            if let Some(doc) = self.merge.cached {
+                if doc <= until {
+                    let src_idx = self.merge.next;
+                    if let Source::Segment(cur) = &mut self.merge.sources[src_idx] {
+                        if cur.doc().is_some() {
+                            let base = cur.pos();
+                            if let Some(rows) = cur.block_rows() {
+                                let n = rows
+                                    .iter()
+                                    .position(|row| *row > until)
+                                    .unwrap_or(rows.len())
+                                    .min(WAND_BLOCK);
+                                // Only take the lazy zero-copy path when this single
+                                // segment block satisfies the entire TermStream block
+                                // (i.e. `rows` runs up to `until` or `WAND_BLOCK`),
+                                // otherwise fall back to `extend_block` which can
+                                // pull from subsequent concatenated sources.
+                                if n > 0
+                                    && (n == WAND_BLOCK || rows.len() > n || cur.is_exhausted())
+                                {
+                                    self.docs.extend_from_slice(&rows[..n]);
+                                    cur.skip(n);
+                                    self.merge.cached = None;
+                                    self.lazy_source = Some(src_idx);
+                                    self.seg_base = base;
+                                    handled = true;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    handled = true;
+                }
+            } else {
+                handled = true;
+            }
+            if !handled {
                 let mut left = WAND_BLOCK - self.docs.len();
                 while left > 0
                     && self.merge.extend_block(
@@ -3094,8 +3158,8 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return 0;
         }
-        if self.lazy_segment {
-            if let Source::Segment(cur) = &mut self.merge.sources[0] {
+        if let Some(src_idx) = self.lazy_source {
+            if let Source::Segment(cur) = &mut self.merge.sources[src_idx] {
                 return cur.tf_at(self.seg_base + self.at);
             }
         }
@@ -3108,8 +3172,8 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return 1;
         }
-        if self.lazy_segment {
-            if let Source::Segment(cur) = &mut self.merge.sources[0] {
+        if let Some(src_idx) = self.lazy_source {
+            if let Source::Segment(cur) = &mut self.merge.sources[src_idx] {
                 return cur.doc_len_at_abs(self.seg_base + self.at);
             }
         }
@@ -3138,33 +3202,42 @@ impl<'a> TermStream<'a> {
             if !self.load() {
                 return;
             }
-            let Some(doc) = self.docs.get(self.at).copied() else {
-                return;
-            };
-            if doc >= target {
+            if target <= self.last {
+                let rest = &self.docs[self.at..];
+                if rest[0] >= target {
+                    return;
+                }
+                let linear_end = rest.len().min(8);
+                for (offset, &d) in rest[1..linear_end].iter().enumerate() {
+                    if d >= target {
+                        self.at += 1 + offset;
+                        return;
+                    }
+                }
+                if linear_end == rest.len() {
+                    self.at = self.docs.len();
+                    return;
+                }
+                self.at += linear_end + rest[linear_end..].partition_point(|&d| d < target);
                 return;
             }
             // The target is past this block: leave `at` at the end so `load`
             // refills, and let the cursor seek - it is the layer that owns the
             // skip list. Walking the block first would pay a step per posting
             // for a jump the skip list covers in one decode.
-            if target > self.last {
-                self.at = self.docs.len();
-                // The block this cursor was scored against is no longer the
-                // block it sits in: `load` has not run yet, so `stored` still
-                // holds the *old* block's (last, max_tf, pct) and `block_last()`
-                // would keep claiming the cursor covers rows it has already
-                // passed. The WAND reads exactly that pair to decide a cursor
-                // "still covers the candidate" and adds its block bound without
-                // seeking - a stale bound made it skip a term whose posting was
-                // on the pivot document, so the document scored from only the
-                // other term (a real answer change on enwiki: 15.15 vs 10.92).
-                self.stored = None;
-                self.stats_ready = false;
-                self.merge.advance(target);
-                continue;
-            }
-            self.at += 1;
+            self.at = self.docs.len();
+            // The block this cursor was scored against is no longer the
+            // block it sits in: `load` has not run yet, so `stored` still
+            // holds the *old* block's (last, max_tf, pct) and `block_last()`
+            // would keep claiming the cursor covers rows it has already
+            // passed. The WAND reads exactly that pair to decide a cursor
+            // "still covers the candidate" and adds its block bound without
+            // seeking - a stale bound made it skip a term whose posting was
+            // on the pivot document, so the document scored from only the
+            // other term (a real answer change on enwiki: 15.15 vs 10.92).
+            self.stored = None;
+            self.stats_ready = false;
+            self.merge.advance(target);
         }
     }
 
@@ -3196,7 +3269,7 @@ impl<'a> TermStream<'a> {
                 self.at = 0;
                 self.stored = None;
                 self.stats_ready = false;
-                self.lazy_segment = false;
+                self.lazy_source = None;
                 match self.merge.block_last_shallow() {
                     Some(last) => self.last = last,
                     None => {
@@ -3254,8 +3327,8 @@ impl<'a> TermStream<'a> {
             let mut max_tf = 0u32;
             let mut best_tf = 0u64;
             let mut best_len = 1u64;
-            if self.lazy_segment {
-                if let Source::Segment(cur) = &mut self.merge.sources[0] {
+            if let Some(src_idx) = self.lazy_source {
+                if let Source::Segment(cur) = &mut self.merge.sources[src_idx] {
                     for i in 0..self.docs.len() {
                         let abs_i = self.seg_base + i;
                         let tf = cur.tf_at(abs_i);
