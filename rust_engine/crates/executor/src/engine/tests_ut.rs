@@ -877,6 +877,16 @@ mod tests {
         // Make the cache one row short of the table: that is the cold path a bulk
         // load which bypassed the DML hooks takes, and it is what puts a rebuild
         // on the query path while a cache is still in place.
+        //
+        // The row is appended **after** the index was built and then dropped from
+        // the memory tail. Removing a row of the build itself no longer works:
+        // `CREATE INDEX` now seals its tail (the reference's trailing
+        // `DumpSegmentMemIndex`), so every posting is sealed and
+        // `index_delete_row` would only mark the row `overridden` without making
+        // the cache shorter.
+        e.execute("INSERT INTO raced VALUES (30, 'title30', 'harmful chemical row30');")
+            .await
+            .unwrap();
         {
             let tkey = e.table_key("raced");
             let shared = {
@@ -892,9 +902,9 @@ mod tests {
                     .expect("the index is cached")
             };
             let mut index = shared.write().await;
-            crate::engine::state::index_delete_row(&mut index, 0);
+            crate::engine::state::index_delete_row(&mut index, 30);
             assert!(
-                index.total_docs() < 30,
+                index.total_docs() < 31,
                 "the cache has to look short of the table"
             );
         }

@@ -404,14 +404,25 @@ impl Engine {
                     }
                     continue;
                 }
-                // One allocation per cell, not two: `normalize_cell` hands back
-                // the field unchanged for the plain numeric/text cells that
+                // A text cell keeps the file's bytes (the reference stores the
+                // raw `string_view`), so only a parsed type is trimmed. One
+                // allocation per cell, not two: `normalize_cell_cow` hands the
+                // field back unchanged for the plain numeric/text cells that
                 // make up most of a `COPY`.
                 let mut cells: Vec<String> = fields
                     .into_iter()
-                    .map(|f| match normalize_cell_cow(&f) {
-                        std::borrow::Cow::Borrowed(_) => f,
-                        std::borrow::Cow::Owned(o) => o,
+                    .enumerate()
+                    .map(|(i, f)| {
+                        let trim = types_for_scan
+                            .get(i)
+                            .is_none_or(|t| !super::types::is_text_type(t));
+                        let normalize_vector = types_for_scan.get(i).is_none_or(|t| {
+                            !super::types::is_text_type(t) && !super::types::is_json_type(t)
+                        });
+                        match super::state::normalize_csv_cell_cow(&f, trim, normalize_vector) {
+                            std::borrow::Cow::Borrowed(_) => f,
+                            std::borrow::Cow::Owned(o) => o,
+                        }
                     })
                     .collect();
                 if cells.len() > types_for_scan.len() {
@@ -525,6 +536,19 @@ impl Engine {
                         for (seq, texts) in &texts_by_row {
                             self.note_ivf_insert(table, *seq as u64, texts);
                         }
+                        // `PopulateFtIndexInner` checks the row capacity after
+                        // **every block** it inserts and dumps the moment an
+                        // index holds `mem_index_capacity` rows
+                        // (`new_txn_index_impl.cpp:1406`), then starts a fresh
+                        // memory indexer for the rest. The chunk boundaries an
+                        // import leaves are therefore fixed by the row count,
+                        // not by where the statement ends - a 100 k-row file
+                        // with the default 65,536 comes out as 65,536 + 34,464
+                        // on both engines. Sealing only once at the end wrote a
+                        // single chunk instead, which merged the two indexes'
+                        // dictionaries into one and made the on-disk layout
+                        // differ from the reference's.
+                        self.seal_text_over_capacity(table).await;
                     }
                     total += take;
                     staged += take;
@@ -609,6 +633,13 @@ impl Engine {
     /// Inserts one row per JSON object (keyed by column name). Sparse columns
     /// come as `{index: value}` objects (float) or index arrays (bit);
     /// everything else is a scalar.
+    ///
+    /// The rows then take [`Self::import_literal_rows`], the same commit every
+    /// other `COPY` format uses. This used to commit them here instead, with a
+    /// hand-written transaction that published the rows but never wrote their
+    /// block: `COPY … FORMAT JSONL` left chunks on disk and no `seg_0`, so the
+    /// rows read back fine until the process restarted and then `count(*)` was
+    /// 0 while `CSV` was unaffected (a silent loss of the whole file).
     pub(crate) async fn insert_json_objects(
         &self,
         table: &str,
@@ -675,55 +706,8 @@ impl Engine {
         if rows.is_empty() {
             return Ok(QueryResult::Inserted { count: 0 });
         }
-        let opened = self.begin_import(table).await?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
-        let base = range.base;
-        self.note_index_insert(table, rows.len());
-        let mut t = self.txn.begin();
-        t.set_op(TxnOp::Import {
-            table: table.to_string(),
-        });
-        // `PrepareCommitImport` seals the segment and writes its rows into the
-        // block as part of the transaction, after it commits.
-        let turn = self.txn.reserve_commit_ts();
-        let ts = turn.ts();
-        let _ts = self.txn.commit_at_deferred(t, ts).await?;
-        let _visible = BottomGuard::new(&self.txn, _ts);
-        self.note_append(table, rows.len(), true, Some(_ts));
-        self.note_import_ts(table, (base >> 32) as u32, _ts);
-        self.publish_rows(table, base, &rows)?;
-        let schema = self.table_schema(table).unwrap_or_default();
-        // `NewTxn::Import`: the indexes are populated once, at the end of the
-        // transaction, not by the append path's triggers (see `stage_import`).
-        let _staging = self.stage_import(table).await;
-        let mut texts_by_row: Vec<(usize, Vec<String>)> = Vec::with_capacity(rows.len());
-        for (k, row) in rows.iter().enumerate() {
-            self.update_indexes_on_insert(table, base + k, row, &schema)?;
-            texts_by_row.push((base + k, row.iter().map(|v| v.to_slt_string()).collect()));
-        }
-        let text_batch: Vec<(usize, &[String])> = texts_by_row
-            .iter()
-            .map(|(seq, cells)| (*seq, cells.as_slice()))
-            .collect();
-        self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
-            .await;
-        // One batch for the HNSW graphs, so the build uses the bucket fan-out
-        // (see `note_hnsw_insert_batch`).
-        let vector_batch: Vec<(usize, &[String])> = texts_by_row
-            .iter()
-            .map(|(seq, cells)| (*seq, cells.as_slice()))
-            .collect();
-        self.note_hnsw_insert_batch(table, &vector_batch).await;
-        for (seq, texts) in &texts_by_row {
-            self.note_ivf_insert(table, *seq as u64, texts);
-        }
-        let segment = (base >> 32) as u32;
-        drop(_staging);
-        crate::engine::state::with_read_ts_override_async(u64::MAX, async {
-            self.populate_import_indexes(table, &[segment], _ts).await;
-        })
-        .await;
-        Ok(QueryResult::Inserted { count: rows.len() })
+        self.import_literal_rows(table, rows, std::time::Duration::ZERO)
+            .await
     }
 
     /// Writes `table` to a file (`COPY t TO …`): CSV, JSONL, or the binary
@@ -738,19 +722,41 @@ impl Engine {
         rows: Vec<Vec<Literal>>,
         t_read: std::time::Duration,
     ) -> Result<QueryResult> {
+        let total_rows = rows.len();
+        if total_rows == 0 {
+            return Ok(QueryResult::Inserted { count: 0 });
+        }
         let profile = std::env::var_os("INFINITY_PROFILE_IMPORT").is_some();
         let t1 = std::time::Instant::now();
-        // `ApplySegmentIDs`: a segment of the statement's own, with no append
-        // record yet - the records are written when it commits.
-        let opened = self.begin_import(table).await?;
-        let (range, _cursor) = self.reserve_import_rows(table, rows.len(), opened).await?;
-        let base = range.base;
-        self.note_index_insert(table, rows.len());
+        // `ApplySegmentIDs`: stage every capacity-sized segment extent first so
+        // the entire COPY commits in a single transaction, matching the CSV
+        // path's one-transaction contract.
+        let mut extents: Vec<(usize, Vec<Vec<Literal>>)> = Vec::new();
+        let mut segments: Vec<u32> = Vec::new();
+        let mut cmds = Vec::new();
+        let mut rest = rows;
+        while !rest.is_empty() {
+            let take = rest.len().min(Self::SEGMENT_CAPACITY);
+            let tail = rest.split_off(take);
+            let opened = self.begin_import(table).await?;
+            let (range, _cursor) = self.reserve_import_rows(table, rest.len(), opened).await?;
+            let base = range.base;
+            let segment = (base >> 32) as u32;
+            cmds.push(self.import_command(table, segment)?);
+            if !segments.contains(&segment) {
+                segments.push(segment);
+            }
+            extents.push((base, rest));
+            rest = tail;
+        }
+        for (_, chunk) in &extents {
+            self.note_index_insert(table, chunk.len());
+        }
         let mut t = self.txn.begin();
         t.set_op(TxnOp::Import {
             table: table.to_string(),
         });
-        t.set_typed_commands(vec![self.import_command(table, (base >> 32) as u32)?]);
+        t.set_typed_commands(cmds);
         let t_encode = t1.elapsed();
         let t2 = std::time::Instant::now();
         // `PrepareCommitImport` -> `CommitBottomAppend`: the block and the
@@ -762,14 +768,15 @@ impl Engine {
         let t_commit = t2.elapsed();
         let t3 = std::time::Instant::now();
         let _visible = BottomGuard::new(&self.txn, ts);
-        self.note_append(table, rows.len(), true, Some(ts));
+        self.note_append(table, total_rows, true, Some(ts));
         // The published live-row count, as `INSERT` reports it: the cache
         // freshness and index coverage gates compare against it.
-        self.note_live_rows(table, rows.len() as isize);
-        let segment = (base >> 32) as u32;
-        let imported = self.segment_rows(table, segment as usize) as u64;
-        self.note_import_rows(table, segment, imported);
-        self.note_import_ts(table, segment, ts);
+        self.note_live_rows(table, total_rows as isize);
+        for &segment in &segments {
+            let imported = self.segment_rows(table, segment as usize) as u64;
+            self.note_import_rows(table, segment, imported);
+            self.note_import_ts(table, segment, ts);
+        }
         // The published rows and the block they land in are one step: a
         // checkpoint that ran between them would compute the block's bitmap
         // coverage from a journal that already had these rows but wrote the
@@ -783,18 +790,53 @@ impl Engine {
         // table's bottom for its duration: marked, so the block writer and the
         // index builders do not take the gate a second time.
         crate::engine::statements::HeldBottom::scope(&key, async {
-            self.publish_rows(table, base, &rows)?;
+            for (base, chunk) in &extents {
+                self.publish_rows(table, *base, chunk)?;
+            }
             // `AppendInBlock`: the import's block is readable as soon as the
             // statement commits, exactly like the CSV path.
             if self.has_block_layout(table) {
                 self.write_blocks_commit(table, ts)?;
+            }
+            // Feed secondary, full-text, HNSW and IVF memory indexes before
+            // `populate_import_indexes` seals their tails (mirrors the CSV
+            // staging loop so JSONL/JSON/CSR/Parquet imports populate
+            // existing FULLTEXT and vector indexes too).
+            let schema = self.table_schema(table).unwrap_or_default();
+            let secondary_targets = self.secondary_targets(table, &schema);
+            let needs_texts = self.has_text_or_vector_indexes(table);
+            let mut texts_by_row: Vec<(usize, Vec<String>)> = if needs_texts {
+                Vec::with_capacity(total_rows)
+            } else {
+                Vec::new()
+            };
+            for (base, chunk) in &extents {
+                for (k, row) in chunk.iter().enumerate() {
+                    self.insert_secondary_keys(&secondary_targets, *base + k, row)?;
+                    if needs_texts {
+                        texts_by_row
+                            .push((*base + k, row.iter().map(|v| v.to_slt_string()).collect()));
+                    }
+                }
+            }
+            if needs_texts {
+                let text_batch: Vec<(usize, &[String])> = texts_by_row
+                    .iter()
+                    .map(|(seq, cells)| (*seq, cells.as_slice()))
+                    .collect();
+                self.update_text_indexes_batch_async(table, &text_batch, &schema, None)
+                    .await;
+                self.note_hnsw_insert_batch(table, &text_batch).await;
+                for (seq, texts) in &texts_by_row {
+                    self.note_ivf_insert(table, *seq as u64, texts);
+                }
             }
             // `PopulateIndex(…, kImport)`: the chunks are written inside the
             // import transaction, with its ts, before the rows are visible. The
             // read is unbounded so the builders see the rows this commit just
             // wrote (`with_read_ts_override`).
             crate::engine::state::with_read_ts_override_async(u64::MAX, async {
-                self.populate_import_indexes(table, &[segment], ts).await;
+                self.populate_import_indexes(table, &segments, ts).await;
             })
             .await;
             Ok::<(), ::common::Error>(())
@@ -813,14 +855,10 @@ impl Engine {
         if profile {
             eprintln!(
                 "import profile: rows={} read={:?} encode={:?} commit={:?} bottom={:?}",
-                rows.len(),
-                t_read,
-                t_encode,
-                t_commit,
-                t_bottom
+                total_rows, t_read, t_encode, t_commit, t_bottom
             );
         }
-        Ok(QueryResult::Inserted { count: rows.len() })
+        Ok(QueryResult::Inserted { count: total_rows })
     }
 
     /// Stages one batch of parsed rows into the import transaction.

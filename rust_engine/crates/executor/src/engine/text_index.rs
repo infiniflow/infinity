@@ -1936,15 +1936,22 @@ impl TextIndex {
             .map(|row| row >> 32)
     }
 
-    /// True when the unsealed segment has reached either budget and should be
-    /// sealed (`MemoryIndexer::MemUsed` or `mem_index_capacity` rows), or when a
-    /// previous seal failed and its tail is still waiting to be written.
+    /// True when the unsealed segment has reached `mem_index_capacity` rows and
+    /// should be sealed, when a previous seal failed and its tail is still
+    /// waiting to be written, or when the resident tail exceeds the safety byte
+    /// ceiling (1 GiB).
+    ///
+    /// The primary bound is the reference's row count
+    /// (`new_txn_index_impl.cpp:1381`, `memory_indexer->GetRowCount() >=
+    /// mem_index_capacity`), with a 1 GiB safety byte ceiling so huge documents
+    /// cannot grow unboundedly when `memindex_quota` is 0 (disabled).
     pub(crate) fn should_seal(&self, capacity: usize) -> bool {
+        const TEXT_SEGMENT_SAFETY_BYTES: usize = 1024 * 1024 * 1024;
         if self.inflight.is_some() {
             return true;
         }
-        self.mem.mem_used() >= text_segment_bytes()
-            || (capacity > 0 && self.mem.pending_docs() >= capacity)
+        (capacity > 0 && self.mem.pending_docs() >= capacity)
+            || self.mem.mem_used() >= TEXT_SEGMENT_SAFETY_BYTES
     }
 
     /// Takes the work of one seal, so the caller can [`SealJob::write`] it with

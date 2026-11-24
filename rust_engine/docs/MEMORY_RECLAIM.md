@@ -378,7 +378,7 @@ unsealed_live(key) -> usize:
 | HNSW | ✅ `len() >= mem_index_capacity`（默认 65536） | `dump_hnsw_over_capacity`（`index_build.rs:4762`），调用点 `dml.rs:1090`、`:2961` |
 | 二级索引 | ✅ `row_count() >= mem_index_capacity` | `secondary_columns_over_capacity`（`index_build.rs:5014`），调用点 `dml.rs:1091`、`:2962` |
 | SPANN | ✅ `rows >= mem_dump_threshold(opts)` | `dump_spann_over_capacity`（`index_build.rs:4923`），调用点 `dml.rs:1164`、`import.rs:790` |
-| 全文 | ✅ `mem_used() >= text_segment_bytes()` 或 `pending_docs() >= capacity` | `should_seal`（`text_index.rs:1942`），调用点 `dml.rs:2441` |
+| 全文 | ✅ `pending_docs() >= capacity`（默认 65536） | `should_seal`（`text_index.rs:1952`），调用点 `dml.rs:2485`、`statements.rs:5136`（建索引循环）、`index_build.rs:1969`（导入 staging 循环） |
 | **IVF** | ❌ 无 | `ivf_mem` 只由 `note_ivf_insert` 追加；清空点只有 `seal_index_tail`、checkpoint、`admin.rs:812` |
 | **BMP / sparse** | ❌ 无 | `seal_sparse_index` 的调用点只有 `admin.rs:476`（compaction）与 `index_build.rs:1561`（dump） |
 | **多向量 PLAID** | ❌ 无 | 只有 `tail_bytes` 计费（`index_build.rs:4724`） |
