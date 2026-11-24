@@ -1947,6 +1947,51 @@ impl Engine {
         }
     }
 
+    /// Seals every full-text index of `table` that has reached
+    /// `mem_index_capacity` rows.
+    ///
+    /// This is the reference's in-loop dump: `PopulateFtIndexInner` inserts one
+    /// block at a time and, after each, checks
+    /// `memory_indexer->GetRowCount() >= mem_index_capacity`, dumps, and starts
+    /// a new memory indexer (`new_txn_index_impl.cpp:1400-1425`). An import
+    /// therefore leaves one chunk per full capacity worth of rows, and the
+    /// chunk boundaries depend only on the row count. Sealing a single time
+    /// once the statement ended produced one merged chunk instead, so the same
+    /// file laid out differently from the reference's.
+    ///
+    /// Called from the import's staging loop; `capacity == 0` (the option
+    /// turns the trigger off) leaves the whole tail for the end-of-import seal.
+    pub(crate) async fn seal_text_over_capacity(&self, table: &str) {
+        let capacity = self.memindex_capacity();
+        if capacity == 0 {
+            return;
+        }
+        let key = self.table_key(table);
+        let full: Vec<(u64, SharedTextIndex)> = self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&key)
+            .map(|entry| {
+                entry
+                    .text
+                    .iter()
+                    .map(|(id, shared)| (*id, shared.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (index_id, shared) in full {
+            let reached = {
+                let index = shared.read().await;
+                index.should_seal(capacity)
+            };
+            if !reached {
+                continue;
+            }
+            self.seal_text_index(table, index_id).await;
+        }
+    }
+
     /// Runs `publish` with the index directory's write gate held
     /// ([`crate::engine::text_index::dir_gate`]).
     ///

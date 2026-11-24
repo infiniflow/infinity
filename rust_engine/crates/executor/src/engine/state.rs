@@ -3255,22 +3255,6 @@ pub(crate) fn text_index_budget_bytes() -> usize {
     })
 }
 
-/// Size at which the current segment is sealed to disk. Only this much posting
-/// data stays resident per column; sealed segments are read through `mmap`,
-/// like the reference's on-disk segments.
-pub(crate) const TEXT_SEGMENT_BYTES: usize = 64 * 1024 * 1024;
-
-/// The segment budget, overridable for tests that need to exercise sealing.
-pub(crate) fn text_segment_bytes() -> usize {
-    static CAP: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *CAP.get_or_init(|| {
-        std::env::var("INFINITY_TEXT_SEGMENT_BYTES")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(TEXT_SEGMENT_BYTES)
-    })
-}
-
 /// The postings and corpus statistics a query sees: the sealed segments plus
 /// the unsealed tail, with stale (re-indexed) rows removed.
 pub(crate) struct MergedIndex {
@@ -6876,12 +6860,13 @@ pub(crate) async fn run_bottom(
         let table = append.table.as_str();
         if engine.any_in_memory_index() || engine.has_index_declaration(table) {
             let schema = engine.table_schema(table).unwrap_or_default();
+            let targets = engine.secondary_targets(table, &schema);
             // Tokenising and inserting the full-text terms happens once for the
             // whole append batch (one lock acquisition per column) instead of
             // once per row.
             let mut texts: Vec<(usize, Vec<String>)> = Vec::with_capacity(append.rows.len());
             for (k, row) in append.rows.iter().enumerate() {
-                engine.update_indexes_on_insert(table, append.seq_at(k), row, &schema)?;
+                engine.insert_secondary_keys(&targets, append.seq_at(k), row)?;
                 texts.push((
                     append.seq_at(k),
                     row.iter().map(|v| v.to_slt_string()).collect(),
@@ -8904,46 +8889,29 @@ pub(crate) fn csv_fields(line: &str, delim: char) -> Vec<String> {
     out
 }
 
-/// Normalises a CSV cell: vector-looking values are re-joined compactly
-/// (`[0.1, 0.2]` → `[0.1,0.2]`) so vector rendering is stable.
-/// [`normalize_cell`] without the copy when nothing changes.
+/// Normalises a CSV cell on the import path.
 ///
-/// A `COPY` of a plain numeric/text file leaves every cell untouched, so the
-/// import can borrow the field straight out of the line instead of allocating
-/// a `String` per cell - 16.7 M allocations on 8.4 M two-column rows.
-pub(crate) fn normalize_cell_cow(s: &str) -> std::borrow::Cow<'_, str> {
-    let t = s.trim();
-    if t.starts_with('[') && t.ends_with(']') && t.len() >= 2 {
-        // Split on commas/spaces, but peel any bracket characters off each token
-        // first so numbers adjacent to a bracket are normalised too
-        // (`[[0.0, 0.2]]` → `[[0,0.2]]`).
-        let mut out = String::from("[");
-        let mut first = true;
-        for token in t[1..t.len() - 1]
-            .split([',', ' '])
-            .filter(|x| !x.is_empty())
-        {
-            if !first {
-                out.push(',');
-            }
-            first = false;
-            let lead = token.len() - token.trim_start_matches('[').len();
-            let trail = token.len() - token.trim_end_matches(']').len();
-            let core = &token[lead..token.len() - trail];
-            for _ in 0..lead {
-                out.push('[');
-            }
-            match core.parse::<f64>() {
-                Ok(f) => out.push_str(&fmt_num(f)),
-                Err(_) => out.push_str(core),
-            }
-            for _ in 0..trail {
-                out.push(']');
-            }
-        }
-        out.push(']');
-        return std::borrow::Cow::Owned(out);
+/// A `VARCHAR` cell is the file's bytes, unmodified: the reference hands the raw
+/// `std::string_view` to `ColumnVector::AppendVarcharInner`, so leading and
+/// trailing spaces survive and a bracketed value is never re-joined. Rewriting
+/// every cell that merely *looked* like a vector corrupted real prose
+/// (`[[GeForce FX]]` became `[[GeForce,FX]]`, 2,719 lines of enwiki) and
+/// stripped the edge spaces of another 93,780; the caller therefore passes
+/// `trim = false` for a text column.
+///
+/// Every other type is *parsed* by the reference (`StringToValue`), so the port
+/// keeps trimming those cells before parsing. A vector column's compact
+/// `[1,2]` rendering is not produced here either - `encode_cell_stored` owns it,
+/// which is where the reference's `AppendEmbedding` equivalent lives.
+///
+/// The fast path is unchanged: a cell that needs no trim is borrowed straight
+/// out of the line, so a plain numeric/text `COPY` still allocates no `String`
+/// per field (16.7 M allocations on 8.4 M two-column rows).
+pub(crate) fn normalize_cell_cow(s: &str, trim: bool) -> std::borrow::Cow<'_, str> {
+    if !trim {
+        return std::borrow::Cow::Borrowed(s);
     }
+    let t = s.trim();
     if t.len() == s.len() {
         std::borrow::Cow::Borrowed(s)
     } else {

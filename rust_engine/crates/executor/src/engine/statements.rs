@@ -5135,6 +5135,16 @@ impl Engine {
             crate::engine::state::index_row_direct(&mut index, &doc);
             index.maybe_seal(self.memindex_capacity()).await;
         }
+        // The final chunk: `PopulateIndex` calls `DumpSegmentMemIndex` after
+        // `PopulateFtIndexInner` returns (`new_txn_index_impl.cpp:1162-1175`), so
+        // the rows past the last full capacity also land in a chunk of their own.
+        // Without this a 100 k-row build wrote only the first 65,536-row chunk
+        // and left the remaining 34,464 rows in memory: one chunk where the
+        // reference has two, and a tail a restart had to rebuild.
+        //
+        // `index` is still local (the seal below runs before the publish), so
+        // this is the in-place seal rather than `seal_text_index_at`.
+        index.seal().await;
         // The chunks on disk are consistent and complete now; only the publish
         // touches shared state, and it must not run with the gate held (it takes
         // `tables`, which the gate may not nest inside).
@@ -8358,27 +8368,22 @@ impl Engine {
                 .unwrap_or(false)
         });
         let query = arg_str(m.args.first()).unwrap_or_default();
-        // A query ending in a boolean keyword (`... OR NOT`) is incomplete.
-        let ends_with_op = query
-            .split_whitespace()
-            .last()
-            .map(|w| {
-                w.eq_ignore_ascii_case("or")
-                    || w.eq_ignore_ascii_case("and")
-                    || w.eq_ignore_ascii_case("not")
-            })
-            .unwrap_or(false);
-        // ... unless an explicit `operator=` supplies the default.
+        // An explicit `operator=` selects the term-list grammar (`kAnd`/`kOr`),
+        // which is what decides whether the query string is parsed as a boolean
+        // expression at all.
         let has_operator_opt = params.split(';').any(|p| {
             p.split_once('=')
                 .map(|(k, _)| k.trim().eq_ignore_ascii_case("operator"))
                 .unwrap_or(false)
         });
-        if ends_with_op && !has_operator_opt {
-            return Err(Error::Invalid(
-                "parser: incomplete boolean expression in the full-text query".into(),
-            ));
-        }
+        // A query that ends in a boolean keyword is **not** an error here. The
+        // reference's grammar reads `query clause` (juxtaposition) as an `Or`, so
+        // `revolution and` is two clauses and returns hits; only a *dangling*
+        // uppercase `AND`/`OR`/`NOT` reaches its parser and fails there, with its
+        // own message. This port used to reject on a case-insensitive match
+        // before parsing, which turned the very common trailing English word
+        // "and"/"or" into an error - 35 of 1000 enwiki queries - where the
+        // reference returned rows.
         let cols: Vec<usize> = match_columns(&m.column)
             .iter()
             .filter_map(|c| schema.iter().position(|s| s == c))

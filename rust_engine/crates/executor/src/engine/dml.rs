@@ -1483,20 +1483,11 @@ impl Engine {
         }
     }
 
-    /// Maintains declared indexes on insert.
-    pub(crate) fn update_indexes_on_insert(
-        &self,
-        table: &str,
-        seq: usize,
-        values: &[Literal],
-        schema: &[String],
-    ) -> Result<()> {
-        let targets = self.secondary_targets(table, schema);
-        self.insert_secondary_keys(&targets, seq, values)
-    }
-
-    /// [`Self::update_indexes_on_insert`] with the targets already resolved, for
-    /// a bulk load that resolves them once per batch.
+    /// Feeds one row into every secondary index of `table`, resolving the
+    /// targets first.
+    ///
+    /// Kept for the statement paths that insert one row at a time; a bulk load
+    /// resolves the targets once and calls [`Self::insert_secondary_keys`].
     pub(crate) fn insert_secondary_keys(
         &self,
         targets: &[SecondaryTarget],

@@ -42,6 +42,13 @@ use crate::query_builder::{
 /// True when `query` uses anything `query_units` cannot express: a boolean
 /// keyword, a group, or a `column:value` qualifier. Quoted text and `^boost` are
 /// left to the fast path.
+///
+/// The keywords are **uppercase only**, like the reference's lexer
+/// (`search_lexer.l:66-70` matches `AND`/`OR`/`NOT` literally, and flex is
+/// case-sensitive). The lowercase words are ordinary text there, and they are
+/// extremely common at the end of a real sentence ("revolution and"), so
+/// matching them case-insensitively sent 35 of 1000 enwiki queries down the
+/// boolean grammar, which then rejected them.
 pub(crate) fn has_query_syntax(query: &str) -> bool {
     let mut token = String::new();
     let mut in_quote = false;
@@ -297,5 +304,20 @@ mod tests {
         assert!(has_query_syntax("body:alpha"));
         // A keyword inside quotes is text, not an operator.
         assert!(!has_query_syntax("\"alpha AND beta\""));
+    }
+
+    /// The reference's lexer matches `AND`/`OR`/`NOT` literally
+    /// (`search_lexer.l:66-70`), so the lowercase words are ordinary text. A
+    /// case-insensitive match here sent 35 of 1000 enwiki queries - ones whose
+    /// prose happens to end in "and"/"or" - to the boolean grammar, which then
+    /// rejected them while the reference answered with rows.
+    #[test]
+    fn lowercase_boolean_words_are_text() {
+        assert!(!has_query_syntax("revolution and"));
+        assert!(!has_query_syntax("political philosophy or"));
+        assert!(!has_query_syntax("not"));
+        assert!(!has_query_syntax("harmful and chemical"));
+        // Uppercase in the same positions is still an operator.
+        assert!(has_query_syntax("revolution AND"));
     }
 }

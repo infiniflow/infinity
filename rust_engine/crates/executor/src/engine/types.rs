@@ -401,6 +401,17 @@ pub(crate) fn is_bit_type(type_text: &str) -> bool {
     type_text.to_ascii_uppercase().contains("BIT")
 }
 
+/// Whether the type text is a character column, whose `COPY` cell the reference
+/// stores byte for byte (`ColumnVector::AppendVarcharInner` takes the raw
+/// `std::string_view`, so leading and trailing spaces survive). Every other type
+/// is *parsed* (`DataType::StringToValue`), which is why only these skip the
+/// import path's trim.
+pub(crate) fn is_text_type(type_text: &str) -> bool {
+    let up = type_text.trim().to_ascii_uppercase();
+    let base = up.split('(').next().unwrap_or("").trim();
+    matches!(base, "VARCHAR" | "TEXT" | "STRING")
+}
+
 /// Whether the type text is a fixed-width embedding column
 /// (`EMBEDDING(...)` / `VECTOR(...)`).
 pub(crate) fn is_embedding_type(type_text: &str) -> bool {
@@ -957,6 +968,40 @@ pub(crate) fn sparse_dot(q: &[(usize, f64)], v: &[(usize, f64)]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `COPY` must not rewrite a text cell. The reference stores the raw
+    /// `std::string_view` (`ColumnVector::AppendVarcharInner`), so a bracketed
+    /// value keeps its spaces and its commas - rewriting it corrupted 2,719
+    /// lines of the enwiki corpus (`[[GeForce FX]]` became `[[GeForce,FX]]`).
+    #[test]
+    fn a_text_cell_keeps_the_file_bytes() {
+        for cell in [
+            "[[GeForce FX]]",
+            " [1.0 2.0] ",
+            "  leading and trailing  ",
+            "{{Redirect|Anarchist|the fictional character}}",
+        ] {
+            let kept = crate::engine::state::normalize_cell_cow(cell, !is_text_type("VARCHAR"));
+            assert_eq!(kept.as_ref(), cell, "a VARCHAR cell must survive verbatim");
+        }
+        // ...while a parsed type still trims, because the reference's
+        // `StringToValue` sees the untrimmed cell and its `from_chars` stops at
+        // the first space.
+        assert_eq!(
+            crate::engine::state::normalize_cell_cow(" 5 ", !is_text_type("INT")).as_ref(),
+            "5"
+        );
+    }
+
+    #[test]
+    fn text_types_are_the_character_columns() {
+        for t in ["VARCHAR", "varchar", "TEXT", "STRING", "VARCHAR(100)"] {
+            assert!(is_text_type(t), "{t} is a character column");
+        }
+        for t in ["INT", "BIGINT", "FLOAT", "JSON", "EMBEDDING(FLOAT,4)"] {
+            assert!(!is_text_type(t), "{t} is parsed, not stored verbatim");
+        }
+    }
 
     /// The loop `dot_quantized` replaced, kept here as the reference.
     fn scalar(a: &[f64], b: &[f64], qa: ElemType, qb: ElemType) -> f32 {
