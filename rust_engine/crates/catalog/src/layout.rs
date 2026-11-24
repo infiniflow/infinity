@@ -2406,10 +2406,17 @@ pub fn dropped_segments_with_ts(
 pub fn write_segments(store: &dyn MetaStore, set: &SegmentSet) -> Result<usize> {
     let mut written = 0usize;
     // A mirror rewrite can leave fewer blocks (or segments) than the previous
-    // one, so start from an empty segment layer for the table - except for the
-    // segments a compaction deprecated, whose records the reference keeps until
-    // `Cleanup` (the `drop|seg|` record is what makes a reader ignore them).
+    // one, so the previous layer has to go - except for the segments a
+    // compaction deprecated, whose records the reference keeps until `Cleanup`
+    // (the `drop|seg|` record is what makes a reader ignore them).
+    //
+    // It goes **after** the new records are in, not before. Deleting first
+    // opened a window in which the table had a segment and no blocks at all, and
+    // a query landing in it read the table as missing (`no blocks for table`)
+    // even though every row was committed. Publishing first means a reader sees
+    // the old layer or the new one, never neither.
     let dropped = dropped_segments(store, &set.db_id, &set.table_id)?;
+    let mut stale: Vec<Vec<u8>> = Vec::new();
     for prefix in [
         key::catalog_segment_prefix(&set.db_id, &set.table_id),
         format!("catalog|blk|{}|{}|", set.db_id, set.table_id),
@@ -2421,33 +2428,41 @@ pub fn write_segments(store: &dyn MetaStore, set: &SegmentSet) -> Result<usize> 
             if segment.is_some_and(|s| dropped.contains(&s)) {
                 continue;
             }
-            store.delete(&k)?;
+            stale.push(k);
         }
     }
+    // The keys this write publishes, so the sweep below cannot delete a record
+    // it just wrote.
+    let mut fresh: std::collections::HashSet<Vec<u8>> = std::collections::HashSet::new();
     for seg in &set.segments {
-        store.put(
-            key::catalog_segment_key(&set.db_id, &set.table_id, seg.segment_id).as_bytes(),
-            seg.create_ts.to_string().as_bytes(),
-        )?;
-        store.put(
-            key::catalog_segment_tag_key(
-                &set.db_id,
-                &set.table_id,
-                seg.segment_id,
-                "first_delete_ts",
-            )
-            .as_bytes(),
-            seg.first_delete_ts.to_string().as_bytes(),
-        )?;
+        let segment_key =
+            key::catalog_segment_key(&set.db_id, &set.table_id, seg.segment_id).into_bytes();
+        store.put(&segment_key, seg.create_ts.to_string().as_bytes())?;
+        fresh.insert(segment_key);
+        let tag_key = key::catalog_segment_tag_key(
+            &set.db_id,
+            &set.table_id,
+            seg.segment_id,
+            "first_delete_ts",
+        )
+        .into_bytes();
+        store.put(&tag_key, seg.first_delete_ts.to_string().as_bytes())?;
+        fresh.insert(tag_key);
         written += 2;
         for block in &seg.blocks {
-            store.put(
+            let block_key =
                 key::catalog_block_key(&set.db_id, &set.table_id, seg.segment_id, block.block_id)
-                    .as_bytes(),
-                block.commit_ts.to_string().as_bytes(),
-            )?;
+                    .into_bytes();
+            store.put(&block_key, block.commit_ts.to_string().as_bytes())?;
+            fresh.insert(block_key);
             written += 1;
         }
+    }
+    for k in stale {
+        if fresh.contains(&k) {
+            continue;
+        }
+        store.delete(&k)?;
     }
     // The reference writes `next_segment_id` as "0" when the table is created
     // and **never advances it** (`TableMeta::InitSet`,
