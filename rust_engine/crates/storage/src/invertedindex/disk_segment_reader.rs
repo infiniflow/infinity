@@ -935,6 +935,9 @@ impl SegmentIndexReader {
             rows: Vec::new(),
             tfs: Vec::new(),
             ordinals: Vec::new(),
+            delta_buf: Vec::new(),
+            tf_payload: None,
+            tfs_decoded: false,
             at: 0,
             last_ordinal: 0,
             df: meta.doc_freq as usize,
@@ -949,6 +952,7 @@ impl SegmentIndexReader {
             skiplist_at: None,
             block_max: None,
             pos_skip: 0,
+            track_positions: true,
             #[cfg(test)]
             blocks_decoded: 0,
             #[cfg(test)]
@@ -1050,6 +1054,13 @@ pub struct TermDocCursor<'a> {
     rows: Vec<u64>,
     tfs: Vec<u32>,
     ordinals: Vec<u32>,
+    /// Reusable buffer for decoding `doc_ids` deltas without per-block heap
+    /// allocations.
+    delta_buf: Vec<u32>,
+    /// Compressed `tfs` payload for the current block, decoded lazily when
+    /// `tf()` / `block()` / `posting()` / `positions()` actually reads it.
+    tf_payload: Option<&'a [u8]>,
+    tfs_decoded: bool,
     at: usize,
     /// Running document ordinal (the store is ordinal-coded, see the module
     /// docs) and the term's total document frequency.
@@ -1090,6 +1101,10 @@ pub struct TermDocCursor<'a> {
     /// the first `positions()` call. At most one record's worth
     /// (`MAX_POS_PER_RECORD`); a hop no longer replays the whole prefix.
     pos_skip: usize,
+    /// Whether `consume_to_end` should advance the position stream across
+    /// blocks. Plain BM25/boolean queries never call `positions()` and disable
+    /// this so they don't decode unused position lists.
+    track_positions: bool,
     /// Blocks decoded so far (the seek path's cost; tests assert on it).
     #[cfg(test)]
     blocks_decoded: usize,
@@ -1100,22 +1115,84 @@ pub struct TermDocCursor<'a> {
 }
 
 impl<'a> TermDocCursor<'a> {
+    /// Disables position stream decoding across block boundaries (for queries
+    /// that never call `positions()`).
+    pub fn disable_positions(&mut self) {
+        self.track_positions = false;
+    }
+
     /// `GetDF`: documents containing the term in this segment.
     pub fn df(&self) -> usize {
         self.df
+    }
+
+    /// Whether no undecoded or buffered postings remain, without decoding the
+    /// next block.
+    pub fn is_exhausted(&self) -> bool {
+        self.at >= self.rows.len() && self.left == 0
+    }
+
+    fn ensure_tfs(&mut self) {
+        if self.tfs_decoded {
+            return;
+        }
+        self.tfs.clear();
+        if let Some(payload) = self.tf_payload {
+            let _ = crate::invertedindex::format::decode_u32_block_all_into(payload, &mut self.tfs);
+        } else {
+            self.tfs.resize(self.rows.len(), 1);
+        }
+        self.tfs_decoded = true;
     }
 
     /// Decodes the next mini-block. Returns false at the end of the list.
     fn fill(&mut self) -> bool {
         while self.left > 0 {
             let take = self.left.min(POSTING_MINI_BLOCK);
-            let Ok((docs, tfs, _)) =
-                self.reader
-                    .decode_doc_block(self.doc_list, &mut self.off, take)
+            let Some(buf) = self.doc_list.get(self.off..) else {
+                self.left = 0;
+                return false;
+            };
+            let Ok(doc_used) =
+                crate::invertedindex::format::decode_u32_field_into(buf, &mut self.delta_buf)
             else {
                 self.left = 0;
                 return false;
             };
+            if self.delta_buf.len() != take {
+                self.left = 0;
+                return false;
+            }
+            self.off += doc_used;
+            let flags = self.reader.flags;
+            let tf_payload = if flags.has_term_frequency {
+                let Some(&words) = self.doc_list.get(self.off) else {
+                    self.left = 0;
+                    return false;
+                };
+                let start = self.off + 1;
+                let end = start + usize::from(words) * 4;
+                let Some(slice) = self.doc_list.get(start..end) else {
+                    self.left = 0;
+                    return false;
+                };
+                self.off = end;
+                Some(slice)
+            } else {
+                None
+            };
+            if flags.has_doc_payload {
+                let Some(pbuf) = self.doc_list.get(self.off..) else {
+                    self.left = 0;
+                    return false;
+                };
+                let Ok((_, pused)) = crate::invertedindex::format::decode_u16_block(pbuf, take)
+                else {
+                    self.left = 0;
+                    return false;
+                };
+                self.off += pused;
+            }
             self.left -= take;
             #[cfg(test)]
             {
@@ -1127,17 +1204,22 @@ impl<'a> TermDocCursor<'a> {
             self.rows.clear();
             self.tfs.clear();
             self.ordinals.clear();
+            self.tf_payload = tf_payload;
+            self.tfs_decoded = false;
             self.at = 0;
             // `consume_to_end` pushed `consumed` to the *previous* block's length;
             // the new block starts its own position accounting, so a cursor that
             // crosses a block boundary naturally (no `seek`, no hop) would
             // otherwise hand back the old block's last document positions.
             self.consumed = 0;
-            for (delta, tf) in docs.into_iter().zip(tfs) {
+            self.rows.reserve(take);
+            self.ordinals.reserve(take);
+            let doc_count = self.reader.doc_count() as u32;
+            let base = self.reader.base_row_id;
+            for &delta in &self.delta_buf {
                 self.last_ordinal = self.last_ordinal.wrapping_add(delta);
-                if let Some(row) = self.reader.row_of_doc(self.last_ordinal) {
-                    self.rows.push(row);
-                    self.tfs.push(tf);
+                if self.last_ordinal < doc_count {
+                    self.rows.push(base + u64::from(self.last_ordinal));
                     self.ordinals.push(self.last_ordinal);
                 }
             }
@@ -1151,10 +1233,17 @@ impl<'a> TermDocCursor<'a> {
                         if skiplist.current_doc_id() != block_last {
                             skiplist.skip_to(block_last);
                         }
-                        let (max_tf, pct) = skiplist.block_max_info();
-                        // `(0, 0)` means the list has no item here (a block the
-                        // writer's flush never reached): no bound to hand out.
-                        self.block_max = (max_tf > 0 && pct > 0).then_some((max_tf, pct));
+                        self.skiplist_at = Some(block_last);
+                        if skiplist.current_doc_id() == block_last {
+                            let (max_tf, pct) = skiplist.block_max_info();
+                            // `(0, 0)` means the list has no item here (a block the
+                            // writer's flush never reached): no bound to hand out.
+                            self.block_max = (max_tf > 0 && pct > 0).then_some((max_tf, pct));
+                        } else {
+                            // Trailing partial block past the last skip-list item:
+                            // no skip-list bound exists for it.
+                            self.block_max = None;
+                        }
                     }
                 }
                 return true;
@@ -1170,6 +1259,67 @@ impl<'a> TermDocCursor<'a> {
         self.block_max
     }
 
+    /// `PostingIterator::SkipTo` **without** decoding the landed block: the
+    /// block cursor moves to the block that holds `target` and the postings are
+    /// left untouched, which is what `TermDocIterator::NextShallow` pays for.
+    ///
+    /// `Some(true)` when the cursor moved (the caller reads
+    /// [`Self::block_last_only`] / [`Self::block_max_only`] for that block);
+    /// `Some(false)` when it did not have to or could not hop - the target is
+    /// inside the block it already stands on, or the list has no skip item - in
+    /// which case the caller must run the decoding `advance`; `None` when the
+    /// hop exhausted the list.
+    ///
+    /// Reporting "did not move" separately from "exhausted" matters: a hop that
+    /// did not move leaves the cursor exactly where it was, so the caller's
+    /// fallback seek starts from a consistent state.
+    pub fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
+        let skiplist = self.skiplist.as_mut()?;
+        let query = self.reader.ordinal_at_or_after(target)?;
+        // The skip list only moves forward; a target inside the current block
+        // needs the in-block walk of `advance`.
+        if self.skiplist_at.is_some_and(|at| query <= at) {
+            return Some(false);
+        }
+        // Peek before mutating: `skip_to` advances the list even when it finds
+        // nothing, so a miss is reported as exhaustion.
+        let Some(hit) = skiplist.skip_to(query) else {
+            self.exhaust();
+            return None;
+        };
+        let blocks = skiplist.get_skipped_item_count().max(0) as usize;
+        let prev_ttf = skiplist.get_prev_ttf();
+        let (max_tf, pct) = skiplist.block_max_info();
+        self.block_max = (max_tf > 0 && pct > 0).then_some((max_tf, pct));
+        self.skiplist_at = Some(hit.doc_id);
+        self.off = hit.offset as usize;
+        self.last_ordinal = hit.prev_doc_id;
+        self.left = self.df.saturating_sub(blocks * POSTING_MINI_BLOCK);
+        self.rows.clear();
+        self.tfs.clear();
+        self.ordinals.clear();
+        self.tf_payload = None;
+        self.tfs_decoded = false;
+        self.at = 0;
+        // Land the position stream on the occurrence the hop skipped so the
+        // decode that follows starts from the right record; a list without
+        // positions ignores it.
+        self.seek_positions(prev_ttf);
+        Some(true)
+    }
+
+    /// `BlockLastDocID()` of the block the cursor stands on, from the skip list
+    /// item - no posting bytes are decoded. `None` when no block is positioned.
+    pub fn block_last_only(&self) -> Option<u64> {
+        let last = self.skiplist_at?;
+        self.reader.row_of_doc(last)
+    }
+
+    /// `GetBlockMaxInfo()` of the positioned block from the skip list.
+    pub fn block_max_only(&self) -> Option<(u32, u16)> {
+        self.block_max
+    }
+
     fn ensure(&mut self) -> bool {
         self.at < self.rows.len() || self.fill()
     }
@@ -1178,15 +1328,41 @@ impl<'a> TermDocCursor<'a> {
     /// reads: rows, term frequencies and segment ordinals. A caller that wants
     /// the whole block can copy the slices instead of pulling one posting per
     /// call; `None` once the block is exhausted.
-    pub fn block(&self) -> Option<(&[u64], &[u32], &[u32])> {
+    pub fn block(&mut self) -> Option<(&[u64], &[u32], &[u32])> {
         if self.at >= self.rows.len() {
             return None;
         }
+        self.ensure_tfs();
         Some((
             &self.rows[self.at..],
             &self.tfs[self.at..],
             &self.ordinals[self.at..],
         ))
+    }
+
+    /// The rest of the decoded mini-block's row IDs without decoding `tfs`.
+    pub fn block_rows(&self) -> Option<&[u64]> {
+        if self.at >= self.rows.len() {
+            return None;
+        }
+        Some(&self.rows[self.at..])
+    }
+
+    /// Current cursor index within the decoded block.
+    pub fn pos(&self) -> usize {
+        self.at
+    }
+
+    /// Term frequency at absolute index `abs_i` in the current decoded block.
+    pub fn tf_at(&mut self, abs_i: usize) -> u32 {
+        self.ensure_tfs();
+        self.tfs.get(abs_i).copied().unwrap_or(0)
+    }
+
+    /// Document length at absolute index `abs_i` in the current decoded block.
+    pub fn doc_len_at_abs(&self, abs_i: usize) -> u32 {
+        let ordinal = self.ordinals.get(abs_i).copied().unwrap_or(u32::MAX);
+        self.reader.doc_len(ordinal).unwrap_or(1)
     }
 
     /// The document length of the block entry `i` positions ahead of the
@@ -1240,6 +1416,7 @@ impl<'a> TermDocCursor<'a> {
         if !self.ensure() {
             return None;
         }
+        self.ensure_tfs();
         let row = *self.rows.get(self.at)?;
         let tf = self.tfs.get(self.at).copied().unwrap_or(0);
         let ordinal = self.ordinals.get(self.at).copied().unwrap_or(u32::MAX);
@@ -1248,16 +1425,20 @@ impl<'a> TermDocCursor<'a> {
 
     /// `GetCurrentTF` for the document [`Self::doc`] returned.
     pub fn tf(&mut self) -> u32 {
-        self.ensure();
+        if !self.ensure() {
+            return 0;
+        }
+        self.ensure_tfs();
         self.tfs.get(self.at).copied().unwrap_or(0)
     }
 
     /// `GetCurrentPosition`: the current document's token offsets, in order.
     /// Empty when the term carries no position list.
     pub fn positions(&mut self) -> &[u32] {
-        if !self.ensure() {
+        if !self.ensure() || self.pos_bytes.is_none() {
             return &[];
         }
+        self.ensure_tfs();
         while self.consumed < self.at {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
             self.consume_doc(tf);
@@ -1274,6 +1455,10 @@ impl<'a> TermDocCursor<'a> {
     /// Positions of every document of the loaded block that was not consumed
     /// yet (the block is about to be replaced).
     fn consume_to_end(&mut self) {
+        if !self.track_positions || self.pos_bytes.is_none() || self.consumed >= self.rows.len() {
+            return;
+        }
+        self.ensure_tfs();
         while self.consumed < self.rows.len() {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
             self.consume_doc(tf);
@@ -1398,6 +1583,8 @@ impl<'a> TermDocCursor<'a> {
         self.rows.clear();
         self.tfs.clear();
         self.ordinals.clear();
+        self.tf_payload = None;
+        self.tfs_decoded = false;
         self.at = 0;
         // The doc skip list already counted the occurrences the hop skipped; the
         // position skip list turns that count into a record offset, so only the
@@ -1413,6 +1600,14 @@ impl<'a> TermDocCursor<'a> {
         self.rows.clear();
         self.tfs.clear();
         self.ordinals.clear();
+        self.tf_payload = None;
+        self.tfs_decoded = false;
+        // Nothing is positioned any more, so the skip-list answers must stop
+        // describing a block: `block_last_only`/`block_max_only` report `None`
+        // and a caller reading bounds sees an exhausted cursor instead of the
+        // last block it happened to hop through.
+        self.skiplist_at = None;
+        self.block_max = None;
     }
 
     /// Lands the position stream on occurrence `skip`.
@@ -1654,6 +1849,134 @@ mod tests {
         while let Some(doc) = cursor.doc() {
             assert_eq!(cursor.positions(), [(doc % 5) as u32], "doc {doc}");
             cursor.skip(1);
+        }
+    }
+
+    /// `skip_block_shallow` must agree with `advance` about which block holds a
+    /// target, must report "did not move" separately from "exhausted", and must
+    /// leave the cursor able to decode the block it hopped to.
+    #[tokio::test]
+    async fn skip_block_shallow_agrees_with_advance() {
+        let dir = tempfile::tempdir().unwrap();
+        let dir_str = dir.path().to_str().unwrap();
+        let docs: Vec<(u64, u32)> = (0..2000u64).map(|row| (row, 10)).collect();
+        let postings = BTreeMap::from([(
+            "t".to_string(),
+            (0..2000u64)
+                .filter(|row| row % 3 != 0)
+                .map(|row| (row, 1, vec![0]))
+                .collect::<Vec<_>>(),
+        )]);
+        let flags = crate::invertedindex::format::OPTION_FLAG_ALL;
+        write_segment_index(dir_str, "shal", 0, &docs, &postings, flags)
+            .await
+            .unwrap();
+        let reader = SegmentIndexReader::open(dir_str, "shal", 0, flags).unwrap();
+
+        let mut hops = 0;
+        let mut no_move = 0;
+        for target in 0..2000u64 {
+            // What `advance` finds, and the block that houses it.
+            let mut a = reader.term_doc_cursor("t").unwrap().unwrap();
+            a.advance(target);
+            let want = a.doc();
+
+            let mut b = reader.term_doc_cursor("t").unwrap().unwrap();
+            match b.skip_block_shallow(target) {
+                Some(true) => hops += 1,
+                Some(false) => no_move += 1,
+                None => continue,
+            }
+            let named = b.block_last_only();
+            let max_pair = b.block_max_only();
+            // Decoding the hopped block must start at or before `want` and end
+            // at the row the skip list named.
+            let Some(first) = b.doc() else {
+                assert!(
+                    want.is_none(),
+                    "target={target}: hop exhausted but advance found {want:?}"
+                );
+                continue;
+            };
+            let Some(want) = want else {
+                continue;
+            };
+            assert!(
+                first <= want,
+                "target={target}: hopped block starts at {first}, past {want}"
+            );
+            if let Some(named) = named {
+                assert!(
+                    want <= named,
+                    "target={target}: advance found {want}, past the block end {named} the hop named"
+                );
+            }
+            // The bound must exist once a block is positioned.
+            if b.block_max().is_some() {
+                assert!(
+                    max_pair.is_some(),
+                    "target={target}: decoded a block but no skip-list bound"
+                );
+            }
+        }
+        assert!(
+            hops > 0,
+            "every hop was a no-move: hops={hops} no_move={no_move}"
+        );
+
+        // A second call on the same cursor, with a target inside the block it
+        // already stands on, must report "did not move" (not exhaustion) so the
+        // caller runs the in-block walk.
+        let mut c = reader.term_doc_cursor("t").unwrap().unwrap();
+        assert_eq!(c.skip_block_shallow(1500), Some(true));
+        let inside = c.block_last_only().unwrap();
+        assert_eq!(
+            c.skip_block_shallow(inside.saturating_sub(1)),
+            Some(false),
+            "a target inside the current block must report no-move"
+        );
+        // The cursor is untouched by the refusal: it still decodes its block.
+        assert!(c.doc().unwrap() <= inside);
+
+        // Sequential `fill()` across a block boundary must keep `skiplist_at`
+        // in sync with the decoded block so a subsequent `skip_block_shallow`
+        // targeting that block (or the trailing partial block) reports no-move
+        // instead of calling `skiplist.skip_to` on an already-advanced list and
+        // skipping a whole block (or falsely exhausting).
+        let mut seq = reader.term_doc_cursor("t").unwrap().unwrap();
+        assert!(seq.doc().is_some());
+        let first_block_len = seq.block().unwrap().0.len();
+        seq.skip(first_block_len);
+        // `doc()` triggers `fill()` for block 2 without `seek_block_of`.
+        let block2_first = seq.doc().unwrap();
+        let block2_last = seq.block().unwrap().0.last().copied().unwrap();
+        assert_eq!(
+            seq.skip_block_shallow(block2_first),
+            Some(false),
+            "target inside sequentially filled block 2 must not skip block 2"
+        );
+        assert_eq!(seq.doc(), Some(block2_first));
+        assert_eq!(seq.block_last_only(), Some(block2_last));
+
+        // Walk to the trailing partial block (no skip-list item) and verify
+        // `skip_block_shallow` inside it does not falsely exhaust the cursor.
+        while let Some((rows, _, _)) = seq.block() {
+            let n = rows.len();
+            if n < POSTING_MINI_BLOCK {
+                break;
+            }
+            seq.skip(n);
+            if seq.doc().is_none() {
+                break;
+            }
+        }
+        if let Some(tail_first) = seq.doc() {
+            assert_eq!(
+                seq.skip_block_shallow(tail_first),
+                Some(false),
+                "target inside trailing partial block must not falsely exhaust"
+            );
+            assert_eq!(seq.doc(), Some(tail_first));
         }
     }
 

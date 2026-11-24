@@ -32,8 +32,7 @@
 //! query therefore pays for the documents it visits, not for the terms' whole
 //! document frequency.
 
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::HashSet;
 
 #[cfg(test)]
 use crate::WAND_BLOCK;
@@ -283,6 +282,7 @@ struct Cursor<'a> {
     /// BlockMaxBM25Score() cache: the block it was computed for, its bound and
     /// the block's last document (used by the block-skip path).
     block_index: u64,
+    block_max_index: u64,
     block_max: f32,
     block_last_doc: u64,
     /// `(last, max_tf, pct)` of the block `block_index` names, so `block_last`
@@ -291,12 +291,14 @@ struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    #[inline(always)]
     fn refresh(&mut self) {
         self.cur = self.stream.doc();
         self.done = self.cur.is_none();
     }
 
     /// Resolves a cursor that was only block-seeked.
+    #[inline(always)]
     fn ensure(&mut self) {
         if !self.done && self.cur.is_none() {
             self.refresh();
@@ -315,12 +317,74 @@ impl<'a> Cursor<'a> {
         // `block_bounds` recomputes whenever `block_index` no longer matches the
         // stream's block id, and `u64::MAX` can never match one.
         self.block_index = u64::MAX;
+        self.block_max_index = u64::MAX;
+    }
+
+    /// `NextShallow(target)` (`term_doc_iterator_impl.cpp:135`): move the block
+    /// cursor to the block that holds `target`, leaving the postings undecoded.
+    ///
+    /// The reference's phase 1 and 2 call this and then read
+    /// `BlockLastDocID()` / `BlockMaxBM25Score()`, which its leaf answers from
+    /// the skip-list item the hop landed on. `cur` stays `None` so this port's
+    /// accessors take the same path (`block_last_shallow`,
+    /// `block_max_shallow_or`) instead of decoding.
+    ///
+    /// `false` once the unit is exhausted.
+    fn seek_shallow(&mut self, doc: u64) -> bool {
+        match self.stream.skip_block_shallow(doc) {
+            Some(true) => {
+                self.cur = None;
+                self.done = false;
+                // The cached bounds belong to the block the cursor left.
+                self.block_index = u64::MAX;
+                self.block_max_index = u64::MAX;
+                true
+            }
+            Some(false) => false,
+            None => {
+                self.cur = None;
+                self.done = true;
+                self.block_index = u64::MAX;
+                self.block_max_index = u64::MAX;
+                false
+            }
+        }
+    }
+
+    /// `BlockLastDocID()` from the skip list, without decoding the block.
+    /// `None` when the cursor is cached (`cur` set -> use [`Self::block_last`])
+    /// or no skip item is positioned.
+    fn block_last_shallow(&mut self) -> Option<u64> {
+        if self.cur.is_some() {
+            return None;
+        }
+        self.stream.block_last_shallow()
+    }
+
+    /// `BlockMaxBM25Score()` from the skip list alone.
+    fn block_max_shallow_or(&mut self, mode: WandMode) -> Option<f32> {
+        if self.cur.is_some() {
+            return None;
+        }
+        let (max_tf, pct) = self.stream.block_max_shallow()?;
+        Some(self.bound_from(mode, max_tf as f32, pct))
+    }
+
+    /// `BlockLastDocID()` preferring the skip list, falling back to the decoded
+    /// block for a cursor that is already cached.
+    fn block_last_at_or_after(&mut self) -> Option<u64> {
+        match self.block_last_shallow() {
+            Some(last) => Some(last),
+            None if self.cur.is_some() => Some(self.block_last()),
+            None => None,
+        }
     }
 
     /// BlockLastDocID(): the last document of the current block.
     ///
     /// Refreshes on first use after a `seek`: the cursor may have moved and the
     /// cached pair belongs to the block it left.
+    #[inline(always)]
     fn block_last(&mut self) -> u64 {
         self.block_bounds();
         self.block_last_doc
@@ -330,6 +394,7 @@ impl<'a> Cursor<'a> {
     /// block whose bounds are not cached yet. `block_last()` and `block_max()`
     /// both read through here, so a cursor that was `seek`-ed can never answer
     /// with the bounds of the block it left.
+    #[inline(always)]
     fn block_bounds(&mut self) -> (u64, f32, u16) {
         let id = self.stream.block_id();
         if self.block_index != id {
@@ -352,9 +417,29 @@ impl<'a> Cursor<'a> {
     /// to decide whether a cursor still covers a candidate. Serving the
     /// previous block's pair there made a cursor that had moved to a later block
     /// keep claiming it covered rows it had already passed.
+    #[inline(always)]
     fn block_max(&mut self, mode: WandMode) -> f32 {
-        let (_, max_tf, pct) = self.block_bounds();
-        let value = match mode {
+        let id = self.stream.block_id();
+        if self.block_max_index != id {
+            if self.block_index != id {
+                let (last, max_tf, pct) = self.stream.block_stats();
+                self.block_index = id;
+                self.block_last_doc = last;
+                self.block_stats_cache = (last, max_tf as f32, pct);
+            }
+            let (_, max_tf, pct) = self.block_stats_cache;
+            self.block_max = self.bound_from(mode, max_tf, pct);
+            self.block_max_index = id;
+        }
+        self.block_max
+    }
+
+    /// The BM25 (or boolean) bound from a block's `(max tf, ratio u16)` pair.
+    ///
+    /// Split out of `block_max` so [`Self::block_max_shallow_or`] computes the
+    /// same value from a skip-list item without decoding the block.
+    fn bound_from(&self, mode: WandMode, max_tf: f32, pct: u16) -> f32 {
+        match mode {
             // One point per matched term, independent of tf and length.
             WandMode::Boolean => self.weight,
             WandMode::Bm25 => {
@@ -390,9 +475,7 @@ impl<'a> Cursor<'a> {
                 let bound = round_up32((self.common * (norm + self.f4)) * margin, 1);
                 bound.min(round_up32(self.upper_bound * margin, 1))
             }
-        };
-        self.block_max = value;
-        value
+        }
     }
 }
 
@@ -409,11 +492,12 @@ pub(crate) struct BlockMaxWandIterator<'a> {
     mode: WandMode,
     ranker: Bm25Ranker,
     cursors: Vec<Cursor<'a>>,
-    /// The live cursors ordered by document id. The reference keeps a child
-    /// array it re-sorts after every reposition; a doc-ordered min-heap gives
-    /// FindPivotOptimized the same prefix while only the cursors that actually
-    /// move are touched (O(log n) per move instead of O(n log n) per round).
-    heap: BinaryHeap<Reverse<(u64, usize)>>,
+    /// The live cursors kept sorted by `(doc_id, cursor_ord)` packed into a
+    /// single `u64` (`(doc << 16) | ord`). Keeping an L1-resident sorted array
+    /// lets `FindPivotOptimized` scan sequentially and re-merge only the moved
+    /// prefix after each round, with 8-byte comparisons instead of 16-byte tuples.
+    order: Vec<u64>,
+    order_scratch: Vec<u64>,
     /// Sum of upper_bound over the cursors in the heap, i.e. the whole query's
     /// upper bound minus everything already retired.
     ///
@@ -518,6 +602,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                     cur: None,
                     done: false,
                     block_index: u64::MAX,
+                    block_max_index: u64::MAX,
                     block_max: 0.0,
                     block_last_doc: u64::MAX,
                     block_stats_cache: (u64::MAX, 0.0, 0),
@@ -525,14 +610,16 @@ impl<'a> BlockMaxWandIterator<'a> {
                 cursors.last_mut().unwrap().refresh();
             }
         }
-        let mut heap = BinaryHeap::with_capacity(cursors.len());
+        let mut order = Vec::with_capacity(cursors.len());
         let mut total_upper: f64 = 0.0;
         for cursor in &cursors {
             if let Some(doc) = cursor.cur {
-                heap.push(Reverse((doc, cursor.ord)));
+                order.push((doc << 16) | (cursor.ord as u64));
                 total_upper = round_up(total_upper + f64::from(cursor.upper_bound));
             }
         }
+        order.sort_unstable();
+        let order_scratch = Vec::with_capacity(order.len());
         Self {
             fields: field_count,
             dead,
@@ -542,7 +629,8 @@ impl<'a> BlockMaxWandIterator<'a> {
             mode,
             ranker,
             cursors,
-            heap,
+            order,
+            order_scratch,
             total_upper,
             prefix: Vec::new(),
             naive: false,
@@ -644,7 +732,7 @@ impl<'a> BlockMaxWandIterator<'a> {
                 self.jumps,
                 self.child_advances,
                 self.heap_ops,
-                self.cursors.len() - self.heap.len(),
+                self.cursors.len() - self.order.len(),
                 blocks,
                 postings,
                 self.cursors.len(),
@@ -733,19 +821,60 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
     }
 
-    /// Hands a cursor the last round popped back to the heap, resolving the
-    /// block cursor it was seek-ed to. A cursor that ran out is retired: its
-    /// whole upper bound leaves the search.
-    fn push_back(&mut self, i: usize) {
-        let cursor = &mut self.cursors[i];
-        cursor.ensure();
-        self.child_advances += 1;
-        match cursor.cur {
-            Some(doc) => {
+    /// Resolves the first `count` cursors in `self.order` (which were moved
+    /// during this round), retires any exhausted ones, and restores sorted order
+    /// by sorting the moved prefix and merging it with the already-sorted tail.
+    fn reposition_prefix(&mut self, count: usize) {
+        if count == 0 {
+            return;
+        }
+        let mut retired = false;
+        let mut write = 0usize;
+        for read in 0..count {
+            let i = (self.order[read] & 0xffff) as usize;
+            let cursor = &mut self.cursors[i];
+            cursor.ensure();
+            self.child_advances += 1;
+            if let Some(doc) = cursor.cur {
                 self.heap_ops += 1;
-                self.heap.push(Reverse((doc, cursor.ord)))
+                self.order[write] = (doc << 16) | (i as u64);
+                write += 1;
+            } else {
+                retired = true;
             }
-            None => self.recompute_upper_bound(),
+        }
+        if write < count {
+            self.order.copy_within(count.., write);
+            self.order.truncate(self.order.len() - (count - write));
+        }
+        if retired {
+            self.recompute_upper_bound();
+        }
+        if write == 0 {
+            return;
+        }
+        self.order[..write].sort_unstable();
+        if write < self.order.len() && self.order[write - 1] > self.order[write] {
+            self.order_scratch.clear();
+            let (left, right) = self.order.split_at(write);
+            let mut l = 0usize;
+            let mut r = 0usize;
+            while l < left.len() && r < right.len() {
+                if left[l] <= right[r] {
+                    self.order_scratch.push(left[l]);
+                    l += 1;
+                } else {
+                    self.order_scratch.push(right[r]);
+                    r += 1;
+                }
+            }
+            if l < left.len() {
+                self.order_scratch.extend_from_slice(&left[l..]);
+            }
+            if r < right.len() {
+                self.order_scratch.extend_from_slice(&right[r..]);
+            }
+            self.order.copy_from_slice(&self.order_scratch);
         }
     }
 
@@ -857,7 +986,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             // bar. Each of the `n` additions can raise the value by at most one
             // ulp (`f32::EPSILON`), so the bar is the exact sum widened by
             // `n * EPSILON`: an upper bound on any order of accumulation.
-            let live = self.heap.len() as f64;
+            let live = self.order.len() as f64;
             let bound = self.total_upper * (1.0 + live * f64::from(f32::EPSILON));
             if bound < f64::from(self.threshold) {
                 break;
@@ -875,11 +1004,16 @@ impl<'a> BlockMaxWandIterator<'a> {
             let mut sum: f64 = 0.0;
             let mut taken = 0usize;
             let mut pivot = None;
-            while let Some(Reverse((doc, i))) = self.heap.pop() {
+            let mut idx = 0usize;
+            while idx < self.order.len() {
+                let entry = self.order[idx];
+                let doc = entry >> 16;
+                let i = (entry & 0xffff) as usize;
                 self.heap_ops += 1;
                 sum += f64::from(self.cursors[i].upper_bound);
                 taken += 1;
                 self.prefix.push(i);
+                idx += 1;
                 let widened = sum * (1.0 + taken as f64 * f64::from(f32::EPSILON));
                 if widened >= f64::from(self.threshold) {
                     pivot = Some(doc);
@@ -889,13 +1023,11 @@ impl<'a> BlockMaxWandIterator<'a> {
             let Some(doc) = pivot else {
                 break;
             };
-            while let Some(&Reverse((tied, i))) = self.heap.peek() {
-                if tied != doc {
-                    break;
-                }
-                self.heap.pop();
+            while idx < self.order.len() && (self.order[idx] >> 16) == doc {
+                let i = (self.order[idx] & 0xffff) as usize;
                 self.heap_ops += 1;
                 self.prefix.push(i);
+                idx += 1;
             }
             // The pivot must land on a row the filter admits. Hopping the cursors
             // here is what makes the filter a seek instead of a post-score drop:
@@ -970,24 +1102,25 @@ impl<'a> BlockMaxWandIterator<'a> {
                 }
             }
             self.skip_blocks(doc);
-            for i in std::mem::take(&mut self.prefix) {
-                self.push_back(i);
-            }
+            let prefix_len = self.prefix.len();
+            self.prefix.clear();
+            self.reposition_prefix(prefix_len);
         }
         self.doc_id = None;
         false
     }
 
-    /// Moves the prefix cursors that sit before doc up to it and hands them back
-    /// to the heap.
+    /// Moves the prefix cursors that sit before doc up to it and restores order.
     fn advance_prefix(&mut self, doc: u64) {
-        for i in std::mem::take(&mut self.prefix) {
+        let prefix_len = self.prefix.len();
+        for &i in &self.prefix {
             let cursor = &mut self.cursors[i];
-            if cursor.cur.is_some_and(|cur| cur < doc) {
+            if !cursor.done && cursor.cur < Some(doc) {
                 cursor.seek(doc);
             }
-            self.push_back(i);
         }
+        self.prefix.clear();
+        self.reposition_prefix(prefix_len);
     }
 
     /// The first row at or after `doc` the filter admits; `doc` itself when the
@@ -1000,28 +1133,29 @@ impl<'a> BlockMaxWandIterator<'a> {
     }
 
     /// Moves every cursor that still sits before `next` up to it: the pivot
-    /// prefix (already out of the heap) and the heap entries below it. Rows in
-    /// between are ones the filter rejected, so no cursor needs to stop there.
+    /// prefix and any entries after it below `next`. Rows in between are ones
+    /// the filter rejected, so no cursor needs to stop there.
     fn skip_to(&mut self, next: u64) {
         self.jumps += 1;
-        self.advance_prefix(next);
-        let mut moved: Vec<usize> = Vec::new();
-        while let Some(&Reverse((doc, i))) = self.heap.peek() {
-            if doc >= next {
-                break;
-            }
-            self.heap.pop();
+        let mut end = self.prefix.len();
+        while end < self.order.len() && (self.order[end] >> 16) < next {
             self.heap_ops += 1;
-            moved.push(i);
+            end += 1;
         }
-        for i in moved {
-            self.cursors[i].seek(next);
-            self.push_back(i);
+        for k in 0..end {
+            let i = (self.order[k] & 0xffff) as usize;
+            let cursor = &mut self.cursors[i];
+            if !cursor.done && cursor.cur < Some(next) {
+                cursor.seek(next);
+            }
         }
+        self.prefix.clear();
+        self.reposition_prefix(end);
     }
 
     /// Resolves a cursor the round moved: its document, and the bound of the
     /// block it landed on (which also refreshes block_last_doc).
+    #[inline(always)]
     fn resolve(&mut self, i: usize) {
         self.cursors[i].ensure();
         self.child_advances += 1;
@@ -1049,10 +1183,11 @@ impl<'a> BlockMaxWandIterator<'a> {
         }
         loop {
             self.prefix.clear();
-            let Some(&Reverse((doc, _))) = self.heap.peek() else {
+            let Some(first) = self.order.first().copied() else {
                 self.doc_id = None;
                 return false;
             };
+            let doc = first >> 16;
             // Same pushdown as the pruned path: a document the filter rejects is
             // never scored, so the cursors hop to the next admitted row.
             if let Some(filter) = self.filter {
@@ -1065,13 +1200,12 @@ impl<'a> BlockMaxWandIterator<'a> {
                     continue;
                 }
             }
-            while let Some(&Reverse((tied, i))) = self.heap.peek() {
-                if tied != doc {
+            for &entry in &self.order {
+                if (entry >> 16) != doc {
                     break;
                 }
-                self.heap.pop();
                 self.heap_ops += 1;
-                self.prefix.push(i);
+                self.prefix.push((entry & 0xffff) as usize);
             }
             self.candidate_score = self.score_prefix();
             self.doc_id = Some(doc);
@@ -1086,24 +1220,33 @@ impl<'a> BlockMaxWandIterator<'a> {
     /// prefix so the round can hand the cursors back to the heap.
     fn skip_blocks(&mut self, from: u64) {
         let start = from + 1;
-        let up_to = self.heap.peek().map(|&Reverse((doc, _))| doc);
+        let up_to = self.order.get(self.prefix.len()).map(|&e| e >> 16);
 
-        // (1) Block-level reposition (NextShallow): a cursor whose current block
-        // already covers start stays where it is.
+        // (1) Reposition the block cursor only (the reference's phase 1):
+        // `BlockLastDocID() >= start` means the current block already covers the
+        // range; otherwise `NextShallow` hops the skip list without decoding.
         for k in 0..self.prefix.len() {
             let i = self.prefix[k];
             if self.cursors[i].cur.is_some_and(|cur| cur >= start) {
                 continue;
             }
-            if self.cursors[i].block_last() >= start {
+            if self.cursors[i]
+                .block_last_at_or_after()
+                .is_some_and(|last| last >= start)
+            {
                 continue;
             }
-            self.cursors[i].seek(start);
-            self.resolve(i);
+            if !self.cursors[i].seek_shallow(start) && !self.cursors[i].done {
+                self.cursors[i].seek(start);
+                self.resolve(i);
+            }
         }
 
-        // (2) Repeat "this block range cannot compete" and push the cursor whose
-        // block ends first forward by one block.
+        // (2) Repeat "the current block range cannot compete" and push every
+        // cursor whose block ends at `min_last` forward by one block. The bounds
+        // come from the skip list for a hopped cursor and from the decoded block
+        // for a cached one - the reference reads `BlockLastDocID()` /
+        // `BlockMaxBM25Score()` either way.
         let mut next_doc = start;
         loop {
             let mut sum_range: f64 = 0.0;
@@ -1112,22 +1255,28 @@ impl<'a> BlockMaxWandIterator<'a> {
             let mut earliest = None;
             for k in 0..self.prefix.len() {
                 let i = self.prefix[k];
-                if self.cursors[i].cur.is_none() {
-                    continue;
-                }
-                let last = self.cursors[i].block_last();
+                let last = match self.cursors[i].block_last_shallow() {
+                    Some(last) => last,
+                    None if self.cursors[i].cur.is_some() => self.cursors[i].block_last(),
+                    None => continue,
+                };
                 if last < next_doc {
-                    // Its block ends before the range: it contributes nothing.
                     continue;
                 }
-                sum_range += f64::from(self.cursors[i].block_max(self.mode));
+                let bound = match self.cursors[i].block_max_shallow_or(self.mode) {
+                    Some(bound) => bound,
+                    None => self.cursors[i].block_max(self.mode),
+                };
+                sum_range += f64::from(bound);
                 live_range += 1;
                 if last < min_last {
                     min_last = last;
                     earliest = Some(i);
                 }
             }
-            let Some(i) = earliest else { break };
+            if earliest.is_none() {
+                break;
+            }
             // '>' like the reference: a range that can only tie cannot produce a
             // document that beats the k-th (ties never win on a larger doc id).
             //
@@ -1141,19 +1290,43 @@ impl<'a> BlockMaxWandIterator<'a> {
             if widened > f64::from(self.threshold) {
                 break;
             }
-            let skip_to = match up_to {
-                Some(up_to) => (min_last + 1).min(up_to),
-                None => min_last + 1,
-            };
+            // The reference advances every child whose block ends at
+            // `min_block_last`, not just the one picked as `earliest`.
+            let clamp_to_up_to = up_to.is_some_and(|up_to| min_last >= up_to);
+            if clamp_to_up_to {
+                // The range runs to the heap top, so everything below it can be
+                // crossed.
+                next_doc = next_doc.max(up_to.expect("checked above"));
+                break;
+            }
+            let skip_to = min_last + 1;
             if skip_to <= next_doc {
                 break;
             }
-            self.cursors[i].seek(skip_to);
-            self.resolve(i);
+            let mut moved = false;
+            for k in 0..self.prefix.len() {
+                let j = self.prefix[k];
+                let ends_here = matches!(
+                    self.cursors[j].block_last_at_or_after(),
+                    Some(last) if last == min_last
+                );
+                if !ends_here {
+                    continue;
+                }
+                if !self.cursors[j].seek_shallow(skip_to) && !self.cursors[j].done {
+                    self.cursors[j].seek(skip_to);
+                    self.resolve(j);
+                }
+                moved = true;
+            }
+            if !moved {
+                break;
+            }
             next_doc = skip_to;
         }
 
-        // (3) Position every prefix cursor at or after next_doc.
+        // (3) Position every prefix cursor at or after next_doc - the only step
+        // that decodes a block nobody hopped past.
         for k in 0..self.prefix.len() {
             let i = self.prefix[k];
             if self.cursors[i].cur.is_some_and(|cur| cur >= next_doc) {

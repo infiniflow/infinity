@@ -1058,10 +1058,14 @@ pub(crate) fn vb_encode(values: &[u32], out: &mut Vec<u8>) {
     }
 }
 
-/// `VariableByte::decodeArray`: reads `count` values, returning how many bytes
-/// were consumed.
-pub(crate) fn vb_decode(buf: &[u8], count: usize) -> Result<(Vec<u32>, usize), FormatError> {
-    let mut out = Vec::with_capacity(count);
+/// `VariableByte::decodeArray`: reads `count` values into `out`, returning how
+/// many bytes were consumed.
+pub(crate) fn vb_decode_into(
+    buf: &[u8],
+    count: usize,
+    out: &mut Vec<u32>,
+) -> Result<usize, FormatError> {
+    out.reserve(count);
     let mut pos = 0usize;
     for _ in 0..count {
         let mut value = 0u64;
@@ -1080,7 +1084,7 @@ pub(crate) fn vb_decode(buf: &[u8], count: usize) -> Result<(Vec<u32>, usize), F
         }
         out.push(value as u32);
     }
-    Ok((out, pos))
+    Ok(pos)
 }
 
 /// Encodes a u32 posting field with the C++ `SIMDBinaryPacking + VariableByte`
@@ -1124,6 +1128,18 @@ pub fn encode_u32_block(values: &[u32]) -> Vec<u8> {
 /// were consumed (`IntEncoder::Decode` needs `expected` because the SIMD/`VB`
 /// split is not self-describing).
 pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize), FormatError> {
+    let mut out = Vec::with_capacity(expected);
+    let pos = decode_u32_block_into(buf, expected, &mut out)?;
+    Ok((out, pos))
+}
+
+/// Decodes a u32 posting field into a caller-supplied buffer, reusing its
+/// capacity.
+pub fn decode_u32_block_into(
+    buf: &[u8],
+    expected: usize,
+    out: &mut Vec<u32>,
+) -> Result<usize, FormatError> {
     if buf.len() < 4 {
         return Err(FormatError::Truncated {
             need: 4,
@@ -1132,7 +1148,8 @@ pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize)
     }
     let simd_len = u32::from_le_bytes(buf[0..4].try_into().unwrap()) as usize;
     let mut pos = 4usize;
-    let mut out = Vec::with_capacity(expected);
+    out.clear();
+    out.reserve(expected);
     let nblocks = simd_len / POSTING_MINI_BLOCK;
     let mut b = 0usize;
     while out.len() < simd_len {
@@ -1162,20 +1179,19 @@ pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize)
                     got: buf.len(),
                 });
             }
-            unpack_mini_block(&buf[pos..pos + nbytes], w, count, &mut out)?;
+            unpack_mini_block(&buf[pos..pos + nbytes], w, count, out)?;
             pos += nbytes;
         }
         b += group;
     }
     // The remaining values are variable-byte encoded.
     if expected > simd_len {
-        let (tail, used) = vb_decode(&buf[pos..], expected - simd_len)?;
-        out.extend_from_slice(&tail);
+        let used = vb_decode_into(&buf[pos..], expected - simd_len, out)?;
         // `VariableByte` zero-pads to a 32-bit boundary, and the C++ reader
         // consumes the padded span.
         pos = (pos + used).div_ceil(4) * 4;
     }
-    Ok((out, pos))
+    Ok(pos)
 }
 
 /// Decodes one `CompositeCodec<SIMDBinaryPacking, VariableByte>` payload whose
@@ -1185,6 +1201,14 @@ pub fn decode_u32_block(buf: &[u8], expected: usize) -> Result<(Vec<u32>, usize)
 /// terminate no value, so decoding stops at the payload end without producing
 /// spurious zeros (`variablebyte.h:202-284`).
 pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatError> {
+    let mut out = Vec::new();
+    decode_u32_block_all_into(payload, &mut out)?;
+    Ok(out)
+}
+
+/// Decodes one `CompositeCodec<SIMDBinaryPacking, VariableByte>` payload into a
+/// caller-supplied buffer, reusing its capacity.
+pub fn decode_u32_block_all_into(payload: &[u8], out: &mut Vec<u32>) -> Result<(), FormatError> {
     if payload.len() < 4 {
         return Err(FormatError::Truncated {
             need: 4,
@@ -1192,15 +1216,14 @@ pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatErr
         });
     }
     let simd_len = u32::from_le_bytes(payload[0..4].try_into().unwrap()) as usize;
-    let (mut out, used) = decode_u32_block(payload, simd_len)?;
-    let mut pos = used;
+    let mut pos = decode_u32_block_into(payload, simd_len, out)?;
     while pos < payload.len() {
         let mut value = 0u64;
         let mut shift = 0u32;
         loop {
             let Some(&byte) = payload.get(pos) else {
                 // Trailing `needPaddingTo32Bits` zero bytes: no value.
-                return Ok(out);
+                return Ok(());
             };
             pos += 1;
             value |= u64::from(byte & 0x7f) << shift;
@@ -1217,7 +1240,7 @@ pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatErr
             }
         }
     }
-    Ok(out)
+    Ok(())
 }
 
 /// Decodes one `IntEncoder<u32, SIMDBitPacking>`-framed field block: the
@@ -1228,6 +1251,14 @@ pub(crate) fn decode_u32_block_all(payload: &[u8]) -> Result<Vec<u32>, FormatErr
 /// Returns the values and the bytes consumed **including** the count byte, so a
 /// caller can walk a doc-list body field by field.
 pub fn decode_u32_field(buf: &[u8]) -> Result<(Vec<u32>, usize), FormatError> {
+    let mut out = Vec::new();
+    let end = decode_u32_field_into(buf, &mut out)?;
+    Ok((out, end))
+}
+
+/// Decodes one `IntEncoder<u32, SIMDBitPacking>`-framed field block into a
+/// caller-supplied buffer, reusing its capacity.
+pub fn decode_u32_field_into(buf: &[u8], out: &mut Vec<u32>) -> Result<usize, FormatError> {
     let Some(&words) = buf.first() else {
         return Err(FormatError::Truncated { need: 1, got: 0 });
     };
@@ -1238,7 +1269,8 @@ pub fn decode_u32_field(buf: &[u8]) -> Result<(Vec<u32>, usize), FormatError> {
             got: buf.len(),
         });
     }
-    Ok((decode_u32_block_all(&buf[1..end])?, end))
+    decode_u32_block_all_into(&buf[1..end], out)?;
+    Ok(end)
 }
 
 /// `NewPForDeltaCompressor::BLOCK_SIZE` (`new_pfordelta_compressor.h:51`).

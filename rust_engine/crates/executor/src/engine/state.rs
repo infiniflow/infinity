@@ -2067,6 +2067,7 @@ impl std::hash::Hasher for FxHasher {
 /// rather than a trait object because doc()/tf()/len() run once per visited
 /// document inside the block-max WAND loop, where the indirect call was a
 /// measurable share of the work.
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum Source<'a> {
     /// The unsealed segment's memory tail: (row, tf, positions) plus the
     /// document-length map.
@@ -2192,9 +2193,10 @@ impl<'a> Source<'a> {
                 lens.push(cur.doc_len_at(i));
             }
             cur.skip(n);
-            // The block is consumed; only `doc()` can say whether another one
-            // follows (`skip` does not cross blocks, `block()` is now empty).
-            let ended = cur.doc().is_none();
+            // Do not eagerly decode the next block via `cur.doc()`: if the
+            // caller hops past it with `skip_block_shallow`, decoding it here
+            // would be wasted work.
+            let ended = cur.is_exhausted();
             return (n, ended);
         }
         let mut n = 0;
@@ -2218,6 +2220,12 @@ impl<'a> Source<'a> {
         (n, self.doc().is_none())
     }
 
+    pub(crate) fn disable_positions(&mut self) {
+        if let Source::Segment(cur) = self {
+            cur.disable_positions();
+        }
+    }
+
     pub(crate) fn advance(&mut self, target: u64) {
         match self {
             Source::Mem { list, at, .. } => {
@@ -2231,6 +2239,32 @@ impl<'a> Source<'a> {
                 }
             }
             Source::Segment(cur) => cur.advance(target),
+        }
+    }
+
+    /// `NextShallow` for one source: move the block cursor to the block holding
+    /// `target` without decoding it. `Some(true)` moved, `Some(false)` could not
+    /// (needs the in-block walk), `None` exhausted.
+    pub(crate) fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
+        match self {
+            Source::Segment(cur) => cur.skip_block_shallow(target),
+            Source::Mem { .. } | Source::Owned { .. } => Some(false),
+        }
+    }
+
+    /// `BlockLastDocID()` from the skip list, without decoding the block.
+    pub(crate) fn block_last_shallow(&mut self) -> Option<u64> {
+        match self {
+            Source::Segment(cur) => cur.block_last_only(),
+            Source::Mem { .. } | Source::Owned { .. } => None,
+        }
+    }
+
+    /// `GetBlockMaxInfo()` from the skip list, without decoding the block.
+    pub(crate) fn block_max_shallow(&mut self) -> Option<(u32, u16)> {
+        match self {
+            Source::Segment(cur) => cur.block_max_only(),
+            Source::Mem { .. } | Source::Owned { .. } => None,
         }
     }
 
@@ -2266,7 +2300,7 @@ impl<'a> Source<'a> {
         match self {
             Source::Segment(cur) => {
                 cur.doc()?;
-                let last_row = cur.block().and_then(|(rows, _, _)| rows.last().copied())?;
+                let last_row = cur.block_rows().and_then(|rows| rows.last().copied())?;
                 let (max_tf, pct) = cur.block_max()?;
                 Some((last_row, max_tf, pct))
             }
@@ -2638,6 +2672,61 @@ impl<'a> MergeCursor<'a> {
         }
         self.settle();
     }
+
+    /// `NextShallow`: move to the block holding `target` through the skip list
+    /// alone. Only the shapes where "positioned but undecoded" is meaningful
+    /// take it - one sealed segment, or the concatenation of disjoint segments.
+    ///
+    /// `Some(true)` moved, `Some(false)` cannot hop (a memory tail, a spilled
+    /// run, or a target inside the current block), `None` exhausted.
+    pub(crate) fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
+        let moved = if self.single {
+            self.sources[0].skip_block_shallow(target)
+        } else if self.concat {
+            while self.next + 1 < self.sources.len()
+                && self.sources[self.next]
+                    .range()
+                    .is_some_and(|(_, hi)| hi < target)
+            {
+                self.next += 1;
+            }
+            self.sources[self.next].skip_block_shallow(target)
+        } else {
+            return Some(false);
+        };
+        if moved == Some(true) {
+            // The merge's cached document and its `(row, tf, len, source)` belong
+            // to the block the hop left. Keeping either would let the next
+            // `advance` report a stale row for a block nobody decoded.
+            self.cur = None;
+            self.cached = None;
+            self.dirty = true;
+        }
+        moved
+    }
+
+    /// `BlockLastDocID()` of the block this merge is positioned on, from the
+    /// skip list. `None` when the shape cannot answer or the source is done.
+    pub(crate) fn block_last_shallow(&mut self) -> Option<u64> {
+        if self.single {
+            return self.sources[0].block_last_shallow();
+        }
+        if self.concat {
+            return self.sources[self.next].block_last_shallow();
+        }
+        None
+    }
+
+    /// `GetBlockMaxInfo()` of the block this merge is positioned on.
+    pub(crate) fn block_max_shallow(&mut self) -> Option<(u32, u16)> {
+        if self.single {
+            return self.sources[0].block_max_shallow();
+        }
+        if self.concat {
+            return self.sources[self.next].block_max_shallow();
+        }
+        None
+    }
 }
 
 /// The interface BlockMaxWandIterator drives: a unit is a term or a phrase, and
@@ -2659,6 +2748,7 @@ impl<'a> WandStream<'a> {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn doc(&mut self) -> Option<u64> {
         match self {
             WandStream::Term(s) => s.doc(),
@@ -2687,6 +2777,7 @@ impl<'a> WandStream<'a> {
 
     /// NextShallow: reposition at document level without resolving the unit.
     /// A term has nothing to defer.
+    #[inline(always)]
     pub(crate) fn seek_block(&mut self, target: u64) {
         match self {
             WandStream::Term(s) => s.advance(target),
@@ -2694,7 +2785,34 @@ impl<'a> WandStream<'a> {
         }
     }
 
+    /// `NextShallow` as far as the skip list alone can take it. A phrase has no
+    /// skip list of its own (its children do), so it reports "cannot hop" and
+    /// the caller repositions at document level.
+    pub(crate) fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
+        match self {
+            WandStream::Term(s) => s.skip_block_shallow(target),
+            WandStream::Phrase(_) => Some(false),
+        }
+    }
+
+    /// `BlockLastDocID()` from the skip list, without decoding the block.
+    pub(crate) fn block_last_shallow(&mut self) -> Option<u64> {
+        match self {
+            WandStream::Term(s) => s.block_last_shallow(),
+            WandStream::Phrase(_) => None,
+        }
+    }
+
+    /// `GetBlockMaxInfo()` from the skip list, without decoding the block.
+    pub(crate) fn block_max_shallow(&mut self) -> Option<(u32, u16)> {
+        match self {
+            WandStream::Term(s) => s.block_max_shallow(),
+            WandStream::Phrase(_) => None,
+        }
+    }
+
     /// Identity of the block the cursor is on (a BlockMaxBM25Score cache key).
+    #[inline(always)]
     pub(crate) fn block_id(&mut self) -> u64 {
         match self {
             WandStream::Term(s) => s.block_id(),
@@ -2704,6 +2822,7 @@ impl<'a> WandStream<'a> {
 
     /// (last document of the block, largest tf, tf/doc-length ratio *
     /// `u16::MAX`), from the writer's stored block bounds.
+    #[inline(always)]
     pub(crate) fn block_stats(&mut self) -> (u64, f64, u16) {
         match self {
             WandStream::Term(s) => s.block_stats(),
@@ -2739,6 +2858,11 @@ pub(crate) struct TermStream<'a> {
     /// Keep each posting's token offsets (phrase children need them).
     pub(crate) capture: bool,
     pub(crate) pos: PosArena,
+    /// When true, `tfs` and `lens` are not copied into `TermStream`; instead
+    /// `tf()` / `len()` read lazily from `merge.sources[0]` (`Source::Segment`)
+    /// at `seg_base + self.at`.
+    pub(crate) lazy_segment: bool,
+    pub(crate) seg_base: usize,
 }
 
 /// The number of postings a block-max bound covers (MAX_DOC_PER_RECORD, the
@@ -2754,7 +2878,12 @@ impl<'a> TermStream<'a> {
         Self::with_positions(merge, false)
     }
 
-    pub(crate) fn with_positions(merge: MergeCursor<'a>, capture: bool) -> Self {
+    pub(crate) fn with_positions(mut merge: MergeCursor<'a>, capture: bool) -> Self {
+        if !capture {
+            for src in &mut merge.sources {
+                src.disable_positions();
+            }
+        }
         Self {
             merge,
             docs: Vec::new(),
@@ -2770,6 +2899,8 @@ impl<'a> TermStream<'a> {
             max_pct: 0.0,
             capture,
             pos: PosArena::default(),
+            lazy_segment: false,
+            seg_base: 0,
         }
     }
 
@@ -2848,16 +2979,22 @@ impl<'a> TermStream<'a> {
     /// mini-block, the skip list item's last doc id), so the cursor stops there
     /// and the bound it hands out is exactly the writer's - a seek inside a
     /// block therefore keeps the same bound, as in the reference.
+    #[inline(always)]
     pub(crate) fn load(&mut self) -> bool {
         if self.at < self.docs.len() {
             return true;
         }
+        self.load_slow()
+    }
+
+    fn load_slow(&mut self) -> bool {
         self.docs.clear();
         self.tfs.clear();
         self.lens.clear();
         self.pos.clear();
         self.at = 0;
         self.stats_ready = false;
+        self.lazy_segment = false;
         // The stored bound of the block the sources are on; `None` degrades to
         // one 128-posting window and a bound computed from the postings.
         self.stored = self.merge.block_stats();
@@ -2878,6 +3015,38 @@ impl<'a> TermStream<'a> {
                 self.tfs.push(tf);
                 self.lens.push(len);
                 self.merge.advance(doc + 1);
+            }
+        } else if self.merge.single {
+            if let Source::Segment(cur) = &mut self.merge.sources[0] {
+                if cur.doc().is_some() {
+                    let base = cur.pos();
+                    if let Some(rows) = cur.block_rows() {
+                        let n = rows
+                            .iter()
+                            .position(|row| *row > until)
+                            .unwrap_or(rows.len())
+                            .min(WAND_BLOCK);
+                        if n > 0 {
+                            self.docs.extend_from_slice(&rows[..n]);
+                            cur.skip(n);
+                            self.lazy_segment = true;
+                            self.seg_base = base;
+                        }
+                    }
+                }
+            } else {
+                let mut left = WAND_BLOCK - self.docs.len();
+                while left > 0
+                    && self.merge.extend_block(
+                        &mut self.docs,
+                        &mut self.tfs,
+                        &mut self.lens,
+                        left,
+                        until,
+                    )
+                {
+                    left = WAND_BLOCK.saturating_sub(self.docs.len());
+                }
             }
         } else {
             // Nothing is copied per posting here: a sealed chunk hands back its
@@ -2912,6 +3081,7 @@ impl<'a> TermStream<'a> {
     }
 
     /// The current document (None once exhausted).
+    #[inline(always)]
     pub(crate) fn doc(&mut self) -> Option<u64> {
         if !self.load() {
             return None;
@@ -2924,6 +3094,11 @@ impl<'a> TermStream<'a> {
         if !self.load() {
             return 0;
         }
+        if self.lazy_segment {
+            if let Source::Segment(cur) = &mut self.merge.sources[0] {
+                return cur.tf_at(self.seg_base + self.at);
+            }
+        }
         self.tfs.get(self.at).copied().unwrap_or(0)
     }
 
@@ -2932,6 +3107,11 @@ impl<'a> TermStream<'a> {
     pub(crate) fn len(&mut self) -> u32 {
         if !self.load() {
             return 1;
+        }
+        if self.lazy_segment {
+            if let Source::Segment(cur) = &mut self.merge.sources[0] {
+                return cur.doc_len_at_abs(self.seg_base + self.at);
+            }
         }
         self.lens.get(self.at).copied().unwrap_or(1)
     }
@@ -2988,7 +3168,65 @@ impl<'a> TermStream<'a> {
         }
     }
 
+    /// `NextShallow` at the skip-list level: move to the block holding `target`
+    /// and leave it undecoded.
+    ///
+    /// [`Self::advance`] decodes the block it lands in, so a cursor moved
+    /// hop-by-hop pays one decode per hop even when the WAND is about to cross
+    /// that block again. `TermDocIterator::NextShallow` moves the block cursor
+    /// through `SkipListReader::SkipTo` and reads `BlockLastDocID()` /
+    /// `BlockMaxBM25Score()` off the landed item, so a loop over an
+    /// uncompetitive range decodes nothing until it stops - on a 131-term enwiki
+    /// query this port decoded 15,561 blocks where the reference decodes 8,633.
+    ///
+    /// `Some(true)` moved, `Some(false)` cannot hop (a memory run, or a target
+    /// inside the current block - the caller then runs [`Self::advance`]),
+    /// `None` exhausted.
+    pub(crate) fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
+        let r = self.merge.skip_block_shallow(target)?;
+        match r {
+            true => {
+                // The hop left the decoded columns for a block nobody loaded.
+                // `last` is the landed block's end, so a later `advance` decides
+                // correctly between an in-block step and another hop.
+                self.docs.clear();
+                self.tfs.clear();
+                self.lens.clear();
+                self.pos.clear();
+                self.at = 0;
+                self.stored = None;
+                self.stats_ready = false;
+                self.lazy_segment = false;
+                match self.merge.block_last_shallow() {
+                    Some(last) => self.last = last,
+                    None => {
+                        // A hop that cannot name its block end would leave
+                        // `last` claiming the whole list (every later `advance`
+                        // would then step inside an empty `docs`). Fall back to
+                        // decoding here so the state is honest.
+                        self.load();
+                        self.last = self.docs.last().copied().unwrap_or(u64::MAX);
+                    }
+                }
+                Some(true)
+            }
+            false => Some(false),
+        }
+    }
+
+    /// `BlockLastDocID()` of the positioned block from the skip list, without
+    /// decoding.
+    pub(crate) fn block_last_shallow(&mut self) -> Option<u64> {
+        self.merge.block_last_shallow()
+    }
+
+    /// `GetBlockMaxInfo()` of the positioned block from the skip list.
+    pub(crate) fn block_max_shallow(&mut self) -> Option<(u32, u16)> {
+        self.merge.block_max_shallow()
+    }
+
     /// Identity of the loaded block: the cache key of BlockMaxBM25Score().
+    #[inline(always)]
     pub(crate) fn block_id(&mut self) -> u64 {
         self.load();
         self.block_id
@@ -3001,6 +3239,7 @@ impl<'a> TermStream<'a> {
     /// maximum - the same source `TermDocIterator::BlockMaxBM25Score` reads
     /// through `GetBlockMaxInfo`. Only a list without a skip item falls back to
     /// computing the bound from the decoded postings.
+    #[inline(always)]
     pub(crate) fn block_stats(&mut self) -> (u64, f64, u16) {
         if !self.load() {
             return (u64::MAX, 0.0, 0);
@@ -3015,12 +3254,27 @@ impl<'a> TermStream<'a> {
             let mut max_tf = 0u32;
             let mut best_tf = 0u64;
             let mut best_len = 1u64;
-            for (tf, len) in self.tfs.iter().zip(&self.lens) {
-                let len = u64::from((*len).max(1));
-                max_tf = max_tf.max(*tf);
-                if u64::from(*tf) * best_len > best_tf * len {
-                    best_tf = u64::from(*tf);
-                    best_len = len;
+            if self.lazy_segment {
+                if let Source::Segment(cur) = &mut self.merge.sources[0] {
+                    for i in 0..self.docs.len() {
+                        let abs_i = self.seg_base + i;
+                        let tf = cur.tf_at(abs_i);
+                        let len = u64::from(cur.doc_len_at_abs(abs_i).max(1));
+                        max_tf = max_tf.max(tf);
+                        if u64::from(tf) * best_len > best_tf * len {
+                            best_tf = u64::from(tf);
+                            best_len = len;
+                        }
+                    }
+                }
+            } else {
+                for (tf, len) in self.tfs.iter().zip(&self.lens) {
+                    let len = u64::from((*len).max(1));
+                    max_tf = max_tf.max(*tf);
+                    if u64::from(*tf) * best_len > best_tf * len {
+                        best_tf = u64::from(*tf);
+                        best_len = len;
+                    }
                 }
             }
             self.max_tf = f64::from(max_tf);
@@ -3194,6 +3448,7 @@ impl<'a> PhraseCursor<'a> {
     }
 
     /// The bound covers [cur, min over the terms' block ends].
+    #[inline(always)]
     pub(crate) fn block_stats(&mut self) -> (u64, f64, u16) {
         let mut last = u64::MAX;
         let mut max_tf = f64::INFINITY;
@@ -10895,5 +11150,202 @@ mod merge_extend_ut {
             (1000..1010).collect::<Vec<u64>>(),
             "the second chunk's postings must still be reachable"
         );
+    }
+
+    /// The block-max WAND over a **sealed** segment must return exactly what the
+    /// in-memory path returns, for a query long enough that a skip list has many
+    /// items.
+    ///
+    /// The unit tests in `blockmax_wand_iterator` materialise their lists in
+    /// memory, so they never exercise a segment's skip list - and the skip list
+    /// is where a block-level optimisation can silently drop documents: a range
+    /// is crossed on the strength of its block bounds alone, so a bound that
+    /// disagrees with the decoded block prunes a real hit without an error.
+    #[tokio::test]
+    async fn a_long_query_over_a_sealed_segment_matches_the_in_memory_scan() {
+        use crate::invertedindex::search::blockmax_wand_iterator::{
+            BlockMaxWandIterator, WandMode,
+        };
+
+        const DOCS: u64 = 20000;
+        const TERMS: usize = 131;
+        let dir = tempfile::tempdir().unwrap();
+        let index_dir = dir.path().to_str().unwrap().to_string();
+
+        let mut rng = 0x5eed_1234_abcd_0001u64;
+        let mut next = move || {
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            rng >> 33
+        };
+        let docs: Vec<(u64, u32)> = (0..DOCS)
+            .map(|row| (row, 20 + (next() % 80) as u32))
+            .collect();
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        for t in 0..TERMS {
+            let mut list = Vec::new();
+            // Wildly uneven densities: a real query mixes terms that hit a
+            // third of the table with terms that hit a handful of rows, and the
+            // rare ones are what decide where the pivot and the block skip land.
+            // A few very long lists (hundreds of blocks) next to very short
+            // ones: the long list is what makes the hop repeat, and a repeated
+            // hop is where a stale `left` or a wrongly cached block end shows.
+            let density = match t % 11 {
+                0 => 95,
+                1 => 88,
+                2 => 60,
+                3 => 25,
+                4 => 8,
+                5 => 2,
+                6 => 1,
+                7 => 0,
+                8 => 45,
+                9 => 70,
+                _ => 30,
+            };
+            for (row, len) in &docs {
+                if next() % 100 < density {
+                    let tf = 1 + (next() % u64::from(*len)) as u32;
+                    let pos: Vec<u32> = (0..tf).collect();
+                    list.push((*row, tf, pos));
+                }
+            }
+            postings.insert(format!("term{t}"), list);
+        }
+        // Two chunks over disjoint, ascending row ranges, so every term's
+        // sources concatenate (`MergeCursor::concat`) instead of a single
+        // pass-through - the shape a table reaches after one seal and a second
+        // import, and the one `skip_block_shallow` reaches through `next`.
+        let (lo, mid) = docs.split_at((DOCS / 2) as usize);
+        let mut lo_postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        let mut hi_postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        for t in 0..TERMS {
+            let name = format!("term{t}");
+            let (low, high): (Vec<_>, Vec<_>) = postings[&name]
+                .iter()
+                .cloned()
+                .partition(|(row, _, _)| *row < DOCS / 2);
+            lo_postings.insert(name.clone(), low);
+            hi_postings.insert(name, high);
+        }
+        for (base, part_docs, part_postings) in
+            [(0u64, lo, lo_postings), (DOCS / 2, mid, hi_postings)]
+        {
+            let dir_seg = storage::invertedindex::format::segment_chunk_dir(&index_dir, base >> 32);
+            storage::invertedindex::disk_segment_reader::write_segment_index(
+                &dir_seg,
+                &format!("ft_{base:016x}"),
+                base,
+                part_docs,
+                &part_postings,
+                storage::invertedindex::format::OPTION_FLAG_ALL,
+            )
+            .await
+            .unwrap();
+        }
+
+        let mut index = TextIndex::new(index_dir.clone(), TextTokenizer::default());
+        index.load_sealed();
+        assert_eq!(index.reader.segments.len(), 2, "both chunks are loaded");
+
+        // A memory tail above the sealed chunks: the shape a live table always
+        // has, and the one where the merge is neither a pass-through nor a
+        // concatenation. Every term appears in every tail row, so each query
+        // reaches the k-way path.
+        const TAIL: u64 = 300;
+        let tokenizer = TextTokenizer::default();
+        for row in DOCS..DOCS + TAIL {
+            let mut text = String::new();
+            for t in 0..TERMS {
+                text.push_str(&format!("term{t} "));
+            }
+            assert!(index.mem.insert(row, &text, &tokenizer, usize::MAX));
+        }
+
+        for t in 0..TERMS {
+            let (sources, _) = index.term_sources(&format!("term{t}"));
+            let sealed_df: usize = sources.iter().map(|s| s.df()).sum();
+            let written = postings[&format!("term{t}")].len() + TAIL as usize;
+            assert_eq!(
+                sealed_df, written,
+                "term{t}: the index holds {sealed_df} postings, the writer was given {written}"
+            );
+        }
+        let mut all_docs: Vec<(u64, u32)> = docs.clone();
+        all_docs.extend((DOCS..DOCS + TAIL).map(|row| (row, 131)));
+        let total_len: u64 = all_docs.iter().map(|(_, l)| u64::from(*l)).sum();
+        let dead = common::RowBitmap::new();
+        for k in [1usize, 3, 10, 25, 50, 100] {
+            let sealed_units: Vec<crate::WandUnit<'_>> = (0..TERMS)
+                .map(|t| {
+                    let (sources, from) = index.term_sources(&format!("term{t}"));
+                    assert!(!sources.is_empty(), "term{t} has a sealed source");
+                    let merge = MergeCursor::new(sources, from, None);
+                    crate::WandUnit {
+                        stream: crate::WandStream::Term(crate::TermStream::new(merge)),
+                        weight: 1.0,
+                        idf: 1.0,
+                        delta: None,
+                    }
+                })
+                .collect();
+            let sealed = BlockMaxWandIterator::new(
+                vec![crate::WandField {
+                    n_docs: (DOCS + TAIL) as usize,
+                    total_len,
+                    units: sealed_units,
+                }],
+                k,
+                &dead,
+                0.0,
+                1,
+                WandMode::Bm25,
+            )
+            .run();
+
+            let flats: Vec<Vec<(u64, u32)>> = (0..TERMS)
+                .map(|t| {
+                    let mut list: Vec<(u64, u32)> = postings[&format!("term{t}")]
+                        .iter()
+                        .map(|(row, tf, _)| (*row, *tf))
+                        .collect();
+                    // The tail hits every term once per row.
+                    list.extend((DOCS..DOCS + TAIL).map(|row| (row, 1)));
+                    list
+                })
+                .collect();
+            let mem_units: Vec<crate::WandUnit<'_>> = flats
+                .iter()
+                .map(|list| crate::WandUnit {
+                    stream: crate::WandStream::Term(crate::TermStream::from_slice(list, &all_docs)),
+                    weight: 1.0,
+                    idf: 1.0,
+                    delta: None,
+                })
+                .collect();
+            let in_memory = BlockMaxWandIterator::new(
+                vec![crate::WandField {
+                    n_docs: (DOCS + TAIL) as usize,
+                    total_len,
+                    units: mem_units,
+                }],
+                k,
+                &dead,
+                0.0,
+                1,
+                WandMode::Bm25,
+            )
+            .run();
+
+            let ids = |r: &[(u64, f64)]| r.iter().map(|(d, _)| *d).collect::<Vec<u64>>();
+            eprintln!("k={k} sealed={:?}", sealed);
+            eprintln!("k={k} memory={:?}", in_memory);
+            assert_eq!(
+                ids(&sealed),
+                ids(&in_memory),
+                "k={k}: the sealed segment's block skip dropped or added a document"
+            );
+        }
     }
 }
