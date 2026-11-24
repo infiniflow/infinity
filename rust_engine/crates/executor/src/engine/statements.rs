@@ -644,21 +644,26 @@ impl Engine {
         // The blocks next, then the WAL's rows on top: what the files carry is
         // already applied, so the replay starts above the newest timestamp they
         // hold (the reference's checkpoint record gives it the same floor).
-        let hydrated = engine.recover_blocks()?;
+        // Per table: a block's `create` says which appends *that table's* files
+        // already hold. One global floor was too high - the fastest table's
+        // checkpoint raised it above another table's rows that were still only
+        // in the append buffer, and the replay then skipped their tail
+        // (`ix_08: 238 rows after restart, expected 325`).
+        let floors = engine.recover_block_floors()?;
         mark("recover_blocks");
         // Two floors, because the two halves of a commit reach the disk in
         // sequence: the KV batch is written first, the block in `CommitBottom`
         // after. A record above `applied` (the newest checkpoint frame) still
-        // has KV work to do; a record above `hydrated` still has to reach a
-        // block.
+        // has KV work to do; a record above its table's floor still has to reach
+        // a block.
         if wal_enabled {
             let mut replayed_appends = Vec::new();
             let mut replayed_deletes = Vec::new();
             engine
                 .txn
-                .recover_into(
+                .recover_into_floors(
                     applied,
-                    hydrated,
+                    &floors,
                     &mut replayed_appends,
                     &mut replayed_deletes,
                 )

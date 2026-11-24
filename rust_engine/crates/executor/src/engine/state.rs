@@ -6063,6 +6063,17 @@ pub(crate) fn scalar_only(types: &[String]) -> bool {
 /// and only the cache's reference goes away.
 pub(crate) struct BlockMapCache {
     entries: std::collections::HashMap<storage::format::BlockId, CachedBlock>,
+    /// One counter per block that has ever been rewritten, bumped **after** the
+    /// new files land.
+    ///
+    /// A reader maps a block outside this lock (the open is I/O), so it can be
+    /// holding a directory that a writer replaces underneath it. Comparing the
+    /// generation it started from with the one found when it inserts is what
+    /// stops that mapping - a version file and column bodies from two different
+    /// writes - from being cached and served forever. Without it a rewrite
+    /// could be invisible to the live process until the next restart, while the
+    /// files on disk were already correct.
+    generations: std::collections::HashMap<storage::format::BlockId, u64>,
     /// Insertion order, the clock hand's track: eviction walks it from the
     /// front, giving an entry that was used since its last visit a second
     /// chance (CLOCK). A full sort by timestamp on every eviction would be
@@ -6090,9 +6101,30 @@ impl BlockMapCache {
     pub(crate) fn new() -> Self {
         Self {
             entries: std::collections::HashMap::new(),
+            generations: std::collections::HashMap::new(),
             order: std::collections::VecDeque::new(),
             bytes: 0,
         }
+    }
+
+    /// The generation `id` is at: a reader that mapped the block under this
+    /// value may cache it, one that mapped it under an older value must not.
+    pub(crate) fn generation(&self, id: &storage::format::BlockId) -> u64 {
+        self.generations.get(id).copied().unwrap_or(0)
+    }
+
+    /// Marks `id` as rewritten: bumps its generation and drops the mapping the
+    /// cache holds, so the next read maps the files the write just landed.
+    ///
+    /// Called **after** the files are written: a reader that opened the
+    /// directory while the write was in flight discovers the bump when it tries
+    /// to insert and re-opens instead of caching a half-written block.
+    pub(crate) fn bump_generation(&mut self, id: storage::format::BlockId) -> u64 {
+        let next = self.generations.entry(id).or_insert(0);
+        *next += 1;
+        let next = *next;
+        self.remove(&id);
+        next
     }
 
     /// The mapping for `id`, marked as used since the clock hand last passed.
@@ -6219,6 +6251,9 @@ impl BlockMapCache {
         for id in stale {
             self.remove(&id);
         }
+        // A table that is being dropped (or rebuilt under new block ids) has no
+        // generation worth remembering.
+        self.generations.retain(|id, _| id.table_id != table_id);
         // Keep the hand's track from filling with ids that no longer resolve.
         self.order.retain(|id| self.entries.contains_key(id));
     }
@@ -8649,15 +8684,24 @@ impl RowFulltextProvider<'_> {
 
     /// C++ `ColumnIndexReader::Lookup(term, false)`: the row ids whose documents
     /// contain `term`, with stale copies of re-indexed rows removed.
-    pub(crate) fn index_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
-        let (index, tokenizer) = self.index?;
-        self.row_ids?;
-        let guard = index.try_read().ok()?;
+    pub(crate) fn index_postings(&self, term: &str) -> TermPostings {
+        let Some((index, tokenizer)) = self.index else {
+            return TermPostings::Unusable;
+        };
+        if self.row_ids.is_none() {
+            return TermPostings::Unusable;
+        }
+        // A miss here is a writer indexing this column right now. It is not the
+        // same thing as "this column cannot answer", and the caller has to tell
+        // the two apart (see [`TermPostings`]).
+        let Ok(guard) = index.try_read() else {
+            return TermPostings::Busy;
+        };
         if &guard.tokenizer != tokenizer {
-            return None;
+            return TermPostings::Unusable;
         }
         let merged = guard.merge(&[term.to_string()]);
-        Some(
+        TermPostings::Hits(
             merged
                 .postings
                 .get(term)
@@ -8666,19 +8710,61 @@ impl RowFulltextProvider<'_> {
         )
     }
 
-    /// [`Self::index_postings`] over every form the analyzer emitted, or `None`
-    /// when this column has no inverted index to answer the filter.
-    fn analyzed_postings(&self, term: &str) -> Option<std::collections::HashSet<usize>> {
-        let mut out: Option<std::collections::HashSet<usize>> = None;
+    /// [`Self::index_postings`] over every form the analyzer emitted.
+    fn analyzed_postings(&self, term: &str) -> TermPostings {
+        let mut out: std::collections::HashSet<usize> = Default::default();
         for analyzed in self.query_terms(term) {
-            // `index_postings` returns `None` when the index's tokenizer is not
-            // the one the filter asked for; that is a property of the column, so
-            // one probe is enough.
-            let hits = self.index_postings(&analyzed)?;
-            out.get_or_insert_with(Default::default).extend(hits);
+            match self.index_postings(&analyzed) {
+                TermPostings::Hits(hits) => out.extend(hits),
+                // A property of the column (`Unusable`) or of this moment
+                // (`Busy`): one probe is enough, the answer does not change.
+                other => return other,
+            }
         }
-        out
+        TermPostings::Hits(out)
     }
+
+    /// Whether `row` matches `term`, decided from the row's own text.
+    ///
+    /// The fallback for an index a writer is holding (a `try_read` miss, i.e. an
+    /// `INSERT` is indexing the same column). Answering "every row" there made
+    /// `filter_text` match the whole table while a write was in flight - a filter
+    /// that admits everything is not a filter - and there is no residual
+    /// predicate to correct it afterwards. The text and the column's analyzer are
+    /// both in hand, so the term is matched the way the index would have.
+    fn local_hit(&self, row: &[Value], terms: &[String], needle: &str) -> bool {
+        let text = match row.get(self.column) {
+            Some(Value::Str(s)) => s.as_str(),
+            Some(other) => return other.to_slt_string().to_lowercase().contains(needle),
+            None => return false,
+        };
+        if self.substring {
+            return text.to_lowercase().contains(needle);
+        }
+        let Some((_, tokenizer)) = self.index else {
+            // No analyzer to apply: the row text is all there is, and a
+            // substring test is the only answer that cannot hide a hit.
+            return text.to_lowercase().contains(needle);
+        };
+        let lowered = text.to_lowercase();
+        crate::tokenize_index_positions(&lowered, tokenizer)
+            .into_iter()
+            .any(|(term, _)| terms.iter().any(|wanted| wanted == &term))
+    }
+}
+
+/// What the inverted index can say about one term.
+pub(crate) enum TermPostings {
+    /// The rows whose documents contain it.
+    Hits(std::collections::HashSet<usize>),
+    /// This column carries no index that answers the filter - no index, no row
+    /// ids to map postings onto, or an index built with another analyzer. That
+    /// is a property of the plan, not of this moment, so the rows stay and the
+    /// residual predicate decides.
+    Unusable,
+    /// The right index exists but a writer holds its lock: the rows still have
+    /// to be filtered, from their own text.
+    Busy,
 }
 
 impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
@@ -8687,22 +8773,28 @@ impl planner::index_scan::FulltextIndex for RowFulltextProvider<'_> {
         // The term index answers from the postings; a sparse-gram index
         // (seeded by `RegexIndexRewrite`, or named with `col@index`) is a
         // literal-run test over the text.
+        let terms = self.query_terms(&needle);
         let postings = self.analyzed_postings(&needle);
         let mut out = Vec::new();
         for (i, row) in self.rows.iter().enumerate() {
-            let hit = if let (Some(postings), Some(ids)) = (&postings, self.row_ids) {
-                ids.get(i).is_some_and(|id| postings.contains(id))
-            } else if self.substring {
-                let text = match row.get(self.column) {
-                    Some(Value::Str(s)) => s.clone(),
-                    Some(other) => other.to_slt_string(),
-                    None => continue,
-                };
-                text.to_lowercase().contains(&needle)
-            } else {
+            let hit = match (&postings, self.row_ids) {
+                (TermPostings::Hits(postings), Some(ids)) => {
+                    ids.get(i).is_some_and(|id| postings.contains(id))
+                }
+                // The index is the right one but a writer holds it: the row's
+                // own text decides. `true` here (the previous fallback) made the
+                // filter admit any row it was handed, which is how
+                // `filter_text` came to match a whole table while an `INSERT`
+                // was running.
+                (TermPostings::Busy, _) => self.local_hit(row, &terms, &needle),
+                // A sparse-gram index matches a literal run, which the text can
+                // be tested for directly.
+                (TermPostings::Unusable, _) if self.substring => {
+                    self.local_hit(row, &terms, &needle)
+                }
                 // No usable index for this filter: keep the row and let the
                 // residual predicate decide rather than dropping it.
-                true
+                _ => true,
             };
             if hit {
                 out.push(i as u32);

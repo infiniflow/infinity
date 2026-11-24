@@ -1298,6 +1298,42 @@ impl TxnManager {
         appends: &mut Vec<ReplayedAppend>,
         deletes: &mut Vec<ReplayedDelete>,
     ) -> Result<usize> {
+        // One floor for every table: the shape a caller with no per-table
+        // information has (a test). An engine reopen uses
+        // [`Self::recover_into_floors`], which knows each table's own floor.
+        self.recover_into_floors(
+            checkpoint_ts,
+            &[(String::new(), block_floor)].into_iter().collect(),
+            appends,
+            deletes,
+        )
+        .await
+    }
+
+    /// [`Self::recover_into`] with a floor **per table**.
+    ///
+    /// A block's `create` timestamp says what that table's files already hold;
+    /// it says nothing about any other table. Folding them into one number
+    /// takes the maximum, i.e. the fastest table's progress, and every slower
+    /// table's tail above it was silently skipped on the next open.
+    ///
+    /// A table missing from `block_floors` replays from zero: nothing proved its
+    /// rows are in a block, and re-adding a row that is already there is a
+    /// duplicate the next checkpoint merges by slot, while skipping one is a
+    /// lost row.
+    pub async fn recover_into_floors(
+        &self,
+        checkpoint_ts: TxnTimeStamp,
+        block_floors: &std::collections::HashMap<String, TxnTimeStamp>,
+        appends: &mut Vec<ReplayedAppend>,
+        deletes: &mut Vec<ReplayedDelete>,
+    ) -> Result<usize> {
+        let table_floor = |table: &str| -> TxnTimeStamp {
+            block_floors
+                .get(table)
+                .copied()
+                .unwrap_or_else(|| block_floors.get("").copied().unwrap_or(0))
+        };
         let mut applied = 0;
         // A sealed segment's name carries the timestamp it was sealed at, and
         // every record inside it is at or below that, so a segment both floors
@@ -1317,7 +1353,9 @@ impl TxnManager {
         // that held them was sealed with a ts the frame covers, and their blocks
         // were never written (`test_insert_checkpoint`: one 8192-row batch lost
         // on the restart after each checkpoint).
-        let floor = checkpoint_ts.min(block_floor);
+        // The *lowest* table floor, so a segment is only skipped when every
+        // table's files really do cover its records.
+        let floor = checkpoint_ts.min(block_floors.values().copied().min().unwrap_or(0));
         let covered: std::collections::HashSet<std::path::PathBuf> =
             sealed_segments(&self.wal_path)?
                 .into_iter()
@@ -1333,9 +1371,12 @@ impl TxnManager {
                 let Some(entry) = iter.next() else {
                     break; // torn / corrupt tail
                 };
+                // Per record: the row commands name their table, so the block
+                // floor is looked up there. The entry-level skip below only
+                // takes the cheap way out when *no* table can still need it.
                 let for_kv = entry.commit_ts > checkpoint_ts;
-                let for_blocks = entry.commit_ts > block_floor;
-                if !for_kv && !for_blocks {
+                let for_any_blocks = entry.commit_ts > floor;
+                if !for_kv && !for_any_blocks {
                     continue;
                 }
                 let mut writes = Vec::new();
@@ -1350,7 +1391,7 @@ impl TxnManager {
                             ..
                         } => {
                             // Rows live in the block, never in a `row:` key.
-                            if for_blocks {
+                            if entry.commit_ts > table_floor(&join_table(db_name, table_name)) {
                                 appends.push(ReplayedAppend {
                                     table: join_table(db_name, table_name),
                                     table_id: table_id.parse().unwrap_or(u64::MAX),
@@ -1368,7 +1409,7 @@ impl TxnManager {
                         } => {
                             // The tombstone is the block's `version`; the KV
                             // keeps no `del:` key.
-                            if for_blocks {
+                            if entry.commit_ts > table_floor(&join_table(db_name, table_name)) {
                                 deletes.push(ReplayedDelete {
                                     table: join_table(db_name, table_name),
                                     table_id: table_id.parse().unwrap_or(u64::MAX),

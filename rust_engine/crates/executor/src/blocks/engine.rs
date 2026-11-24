@@ -854,12 +854,12 @@ impl Engine {
         let totals = self.append_totals(&table);
         let append_ts = self.append_ts(&table);
         let mut counts = self.segment_row_counts(&table);
-        // The rows this write covers, table-wide. The append journal is
-        // table-wide too (`append_ts_of` maps a row id through `counts`), so
-        // the two are comparable: a `create` in a block's `version` may only
-        // name a ts whose append lies entirely inside this total. See
-        // [`Self::block_version_batches`].
-        let covered_rows: u64 = counts.iter().map(|(_, rows)| *rows).sum();
+        // A `create` in a block's `version` may only name a ts whose append the
+        // block **holds in full**; that extent is per block, from the rows it
+        // actually encodes (see [`Self::block_version_batches`]). The window
+        // this write aimed at is deliberately not used: it is wider by exactly
+        // the commits that landed mid-checkpoint, and naming their ts is what
+        // made a restart skip their rows.
         // The reference decides per block, by ts: a block is flushed when
         // `record_ts < min(bound_ts, block_max_ts)` where `record_ts` is
         // the ts at which the block was last written and `block_max_ts` the
@@ -994,34 +994,12 @@ impl Engine {
             let seals_now = sealed && !already_recorded;
             let seg_partial =
                 partial && !seals_now && !(sealed && touched.contains(&(segment_id, last_block)));
-            for (k, _) in self
-                .storage
-                .catalog
-                .store()
-                .scan_prefix(format!("blk|{}|{}|{}|", db_id, meta.id, segment_id).as_bytes())?
-            {
-                // The prefix also covers the block's `fast_rough_filter` tag.
-                // It is not a block record (its key has no block id in the
-                // record's position, and `nth(5)` reads the record's tail), so
-                // the sweep below used to delete the filter of every block this
-                // write touched - the reference keeps them until the segment is
-                // re-sealed.
-                if k.ends_with(b"|fast_rough_filter") {
-                    continue;
-                }
-                if seg_partial {
-                    let block_id = String::from_utf8_lossy(&k)
-                        .split('|')
-                        .nth(5)
-                        .and_then(|s| s.parse::<u16>().ok());
-                    if block_id.is_some_and(|b| {
-                        (b as usize) < block_count && !touched.contains(&(segment_id, b))
-                    }) {
-                        continue;
-                    }
-                }
-                self.storage.catalog.store().delete(&k)?;
-            }
+            // The segment's block records are **not** swept here. Deleting them
+            // before the rewrite republishes them leaves a window in which the
+            // table has a segment and no blocks, and a concurrent query reads
+            // that as `no blocks for table` - a committed table answering an
+            // error. `Catalog::publish_segments` puts the new records first and
+            // removes what this write did not produce afterwards.
             let mut seg_filters = crate::fast_rough_filter::Filters::new(&encode_meta.types);
             // Drain the segment block by block so each block's values are freed
             // once it is encoded: holding the whole table's decoded rows while
@@ -1096,7 +1074,7 @@ impl Engine {
                         &append_ts,
                         slot_base,
                         rows,
-                        covered_rows,
+                        (slot_base + rows) as u64,
                     );
                     let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
                     for k in 0..rows {
@@ -1232,7 +1210,13 @@ impl Engine {
                     &append_ts,
                     slot_base,
                     chunk.len(),
-                    covered_rows,
+                    // The rows this block **holds**, not the window the write
+                    // aimed at. A commit that lands while the checkpoint walks
+                    // widens the window but leaves its rows in the append
+                    // buffer; naming its ts here would tell a restart's WAL
+                    // replay that rows it never wrote are already on disk, and
+                    // the tail was lost on the next open (1648 of 1800).
+                    (slot_base + chunk.len()) as u64,
                 );
                 let mut version = BlockVersionFile::new(&batches, DEFAULT_BLOCK_CAPACITY);
                 // The slot of a deleted row is its in-segment offset inside the
@@ -1304,6 +1288,13 @@ impl Engine {
                     path: root.join(&block_dir),
                     source: e,
                 })?;
+                // The files are the newest copy now: publish that to the mapping
+                // cache. Dropping the mapping is not enough - a reader that
+                // opened the directory while this write was in flight would
+                // insert the block it saw, and every later read would keep
+                // serving that mixture of two writes until the process
+                // restarted. The generation bump makes that insert re-open.
+                self.block_written(id);
                 // The reference opens an outline file for every variable-length
                 // column (`ColumnMeta::FilePaths` lists `col_{id}_out` for a
                 // kVarBuffer type) and aborts the whole read when it is missing,
@@ -3335,11 +3326,32 @@ impl Engine {
     /// gets the same floor from its checkpoint record; with the row KV gone
     /// (plan C) the files are the only place it can come from.
     pub fn recover_blocks(&self) -> Result<u64> {
-        let mut newest = 0u64;
+        Ok(self
+            .recover_block_floors()?
+            .values()
+            .copied()
+            .max()
+            .unwrap_or(0))
+    }
+
+    /// The same rebuild, reported **per table**: the newest ts a table's block
+    /// files already hold.
+    ///
+    /// A restart replays the WAL above this floor, and the floor has to be the
+    /// table's own. One number for the whole engine is whatever the *fastest*
+    /// table reached: a checkpoint that finished on table A raised it above
+    /// rows table B still had only in its append buffer, and the replay skipped
+    /// them - a tail of B lost at every reopen that raced a checkpoint
+    /// (`ix_08: 238 rows after restart, expected 325`).
+    pub fn recover_block_floors(&self) -> Result<std::collections::HashMap<String, u64>> {
+        let mut floors = std::collections::HashMap::new();
         for meta in self.storage.catalog.list_tables()? {
-            newest = newest.max(self.restore_blocks(&meta.name)?);
+            let floor = self.restore_blocks(&meta.name)?;
+            // The replay names a table the way the WAL does (`default_db.t`), so
+            // the key has to be that form even when the catalog lists a bare one.
+            floors.insert(self.qualified_table(&meta.name), floor);
         }
-        Ok(newest)
+        Ok(floors)
     }
 
     /// Rebuilds a table's rows **and the append/delete journals** from its block
@@ -4389,7 +4401,7 @@ impl Engine {
             .buffer_budget
             .load(std::sync::atomic::Ordering::Relaxed)
             .max(1);
-        {
+        let mut generation = {
             let mut maps = self.context.block_maps.lock().unwrap();
             if let Some(block) = maps.get(&id) {
                 self.context
@@ -4398,30 +4410,54 @@ impl Engine {
                 maps.trim_to(budget);
                 return Ok(block);
             }
-        }
+            maps.generation(&id)
+        };
         self.context
             .block_map_misses
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let block = match self.block_index_for(table) {
-            Some(index) => {
-                let index = index.lock().unwrap();
-                match index.get_block(&id) {
-                    Ok((_, block)) => block,
-                    Err(_) => Arc::new(MappedBlock::open(root, id)?),
+        // A write replaces a block's files in place, so an open that overlaps
+        // one can read a `version` from before the write and column bodies from
+        // after it. `generation` is the counter the writer bumps once its files
+        // have landed: if it moved while this mapping was being made, the
+        // mapping describes no single write and is opened again instead of
+        // cached. Three attempts to let a busy block settle, then the mapping is
+        // returned uncached rather than looping behind the writer.
+        for _ in 0..3 {
+            let block = match self.block_index_for(table) {
+                Some(index) => {
+                    let index = index.lock().unwrap();
+                    match index.get_block(&id) {
+                        Ok((_, block)) => block,
+                        Err(_) => Arc::new(MappedBlock::open(root, id)?),
+                    }
                 }
+                None => Arc::new(MappedBlock::open(root, id)?),
+            };
+            // Another reader may have mapped the block while this one did the
+            // I/O: keep the first mapping, so a block has exactly one in the
+            // process. The insert also enforces the buffer budget - a block
+            // beyond it evicts the least recently used mappings rather than
+            // staying mapped forever.
+            let mut maps = self.context.block_maps.lock().unwrap();
+            let current = maps.generation(&id);
+            if current == generation {
+                return Ok(maps.insert(id, block, budget));
             }
-            None => Arc::new(MappedBlock::open(root, id)?),
-        };
-        // Another reader may have mapped the block while this one did the I/O:
-        // keep the first mapping, so a block has exactly one in the process.
-        // The insert also enforces the buffer budget - a block beyond it evicts
-        // the least recently used mappings rather than staying mapped forever.
-        Ok(self
-            .context
-            .block_maps
-            .lock()
-            .unwrap()
-            .insert(id, block, budget))
+            generation = current;
+        }
+        MappedBlock::open(root, id).map(Arc::new)
+    }
+
+    /// Marks a block as rewritten: its files have just been replaced, so the
+    /// mappings describing the old ones must not be served again.
+    ///
+    /// Call **after** the write lands. Bumping the generation first is what
+    /// makes the invalidation safe against a reader that opened the directory
+    /// mid-write: [`Self::block_map`] compares the generation it started from
+    /// with the one it finds when inserting, and re-opens on a mismatch.
+    pub(crate) fn block_written(&self, id: BlockId) {
+        let mut maps = self.context.block_maps.lock().unwrap();
+        maps.bump_generation(id);
     }
 
     /// Drops the mappings of every block of `table_id`: the block files under
@@ -6209,6 +6245,18 @@ impl Engine {
             }
             candidates.push((at, id));
         }
+        // A rewrite replaces a block's files; a mapping that failed once can
+        // succeed on a fresh generation. Giving up here answers `no blocks for
+        // table` for a table that has them.
+        let map = |id: BlockId| -> Option<Arc<crate::blocks::MappedBlock>> {
+            match self.block_map(&table, &root, id) {
+                Ok(block) => Some(block),
+                Err(_) => {
+                    self.block_written(id);
+                    self.block_map(&table, &root, id).ok()
+                }
+            }
+        };
         let decode = |id: BlockId, keep: RowFilter<'_>| {
             self.decode_block_visible(
                 &table,
@@ -6248,7 +6296,7 @@ impl Engine {
                 // ends the scan at the same place the sequential one does.
                 let mapped: Vec<(usize, BlockId, Option<Arc<MappedBlock>>)> = candidates
                     .iter()
-                    .map(|(at, id)| (*at, *id, self.block_map(&table, &root, *id).ok()))
+                    .map(|(at, id)| (*at, *id, map(*id)))
                     .collect();
                 // The body needs its inputs owned (a task outlives this frame):
                 // the schema, the types and the row filter are cloned once for
