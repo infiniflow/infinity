@@ -8470,7 +8470,6 @@ impl Engine {
         let terms: Vec<String> = units
             .iter()
             .flat_map(|(_, u, _, _)| u.iter().cloned())
-            .filter(|t| t != "or" && t != "and")
             .collect();
         if terms.is_empty() {
             return Ok((Vec::new(), hidden.to_vec()));

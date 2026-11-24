@@ -2703,7 +2703,7 @@ impl<'a> MergeCursor<'a> {
         } else {
             return Some(false);
         };
-        if moved == Some(true) {
+        if moved.is_some() {
             // The merge's cached document and its `(row, tf, len, source)` belong
             // to the block the hop left. Keeping either would let the next
             // `advance` report a stale row for a block nobody decoded.

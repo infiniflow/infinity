@@ -1296,7 +1296,10 @@ impl<'a> TermDocCursor<'a> {
     /// did not move leaves the cursor exactly where it was, so the caller's
     /// fallback seek starts from a consistent state.
     pub fn skip_block_shallow(&mut self, target: u64) -> Option<bool> {
-        let skiplist = self.skiplist.as_mut()?;
+        // A list shorter than one block has no skip items; the caller must decode.
+        let Some(skiplist) = self.skiplist.as_mut() else {
+            return Some(false);
+        };
         let query = self.reader.ordinal_at_or_after(target)?;
         // The skip list only moves forward; a target inside the current block
         // needs the in-block walk of `advance`.

@@ -722,6 +722,21 @@ impl Engine {
         rows: Vec<Vec<Literal>>,
         t_read: std::time::Duration,
     ) -> Result<QueryResult> {
+        if rows.len() > Self::SEGMENT_CAPACITY {
+            let mut total = 0usize;
+            let mut rest = rows;
+            while !rest.is_empty() {
+                let take = rest.len().min(Self::SEGMENT_CAPACITY);
+                let tail = rest.split_off(take);
+                if let QueryResult::Inserted { count } =
+                    Box::pin(self.import_literal_rows(table, rest, t_read)).await?
+                {
+                    total += count;
+                }
+                rest = tail;
+            }
+            return Ok(QueryResult::Inserted { count: total });
+        }
         let profile = std::env::var_os("INFINITY_PROFILE_IMPORT").is_some();
         let t1 = std::time::Instant::now();
         // `ApplySegmentIDs`: a segment of the statement's own, with no append

@@ -1237,7 +1237,7 @@ impl<'a> BlockMaxWandIterator<'a> {
             if widened_at_doc > thresh_f64 {
                 if self.order[..self.prefix_len]
                     .iter()
-                    .all(|&e| self.cursors[(e & 0xffff) as usize].cur == Some(doc))
+                    .all(|&e| self.cursors[(e & 0xffff_ffff) as usize].cur == Some(doc))
                 {
                     let score = self.score_prefix();
                     if score > thresh_f64 {
