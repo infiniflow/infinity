@@ -780,7 +780,7 @@ impl Engine {
         // directly by the RPC and the REST handler, so a direct insert has to be
         // refused at the same ceiling - before the row range is allocated and
         // before the WAL frame is written.
-        self.admit_write()?;
+        self.admit_write().await?;
         let meta = self
             .storage
             .catalog
@@ -2344,7 +2344,7 @@ impl Engine {
     ) {
         self.update_text_indexes_batch_inner(table, rows, schema, prepared)
             .await;
-        self.enforce_memindex_quota(Some(table));
+        self.enforce_unsealed_memory_quota(Some(table));
     }
 
     /// The batch's work, without the quota check.
@@ -3155,16 +3155,8 @@ impl Engine {
     /// the two can never disagree about what "over" means. `0` turns the whole
     /// mechanism off.
     pub fn set_unsealed_memory_quota(&self, bytes: u64) {
-        self.set_memindex_quota(bytes)
-    }
-
-    /// The old name for [`Self::set_unsealed_memory_quota`].
-    ///
-    /// Kept because the field it writes (`Context::memindex_quota`) is still the
-    /// engine's one byte ledger; callers that predate the rename keep working.
-    pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
-            .memindex_quota
+            .unsealed_memory_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
@@ -3284,7 +3276,7 @@ impl Engine {
     pub(crate) fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
             .context
-            .memindex_quota
+            .unsealed_memory_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
         if quota == 0 || count == 0 {
             return;

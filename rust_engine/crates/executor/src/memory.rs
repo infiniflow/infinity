@@ -16,7 +16,7 @@
 //!
 //! Four budgets already existed and none of them is the process's:
 //! `buffer_budget` (the block mappings and the decoded index chunks),
-//! `memindex_quota` (the index tails), `spann_page_budget` /
+//! `unsealed_memory_quota` (the index tails), `spann_page_budget` /
 //! `spann_dirty_budget` (one delta write). The only place that compared a number
 //! with the process was the cleanup task - and it ran only when a transaction
 //! had committed since the last pass, so a read-only server that grew its page
@@ -543,7 +543,10 @@ impl super::Engine {
     /// most to redo - the SPANN handles' own page bookkeeping and the caches
     /// that are pure copies (results, plans, the whole-column vector cache an
     /// exact scan builds when it has no index).
-    pub(crate) fn reclaim_memory(&self, want: u64, forced: bool) -> u64 {
+    /// Synchronous part of [`Self::reclaim_memory`]: allocator arenas, resident
+    /// mapped pages, SPANN bookkeeping, pure-copy caches, and unmapping idle
+    /// block mappings. Used directly from synchronous CPU loops.
+    pub(crate) fn reclaim_memory_sync(&self, want: u64, forced: bool) -> u64 {
         storage::trim_allocator();
         let mut released = storage::mapped::release_mapped_pages(want as usize) as u64;
         if forced {
@@ -563,6 +566,25 @@ impl super::Engine {
             let over = self.memory_usage().saturating_sub(self.memory_low());
             let remaining = want.saturating_sub(released).max(over);
             released += self.shrink_block_maps(remaining as usize) as u64;
+        }
+        released
+    }
+
+    pub(crate) async fn reclaim_memory(&self, want: u64, forced: bool) -> u64 {
+        let mut released = self.reclaim_memory_sync(want, forced);
+        let (_, cgroup) = cgroup_snapshot();
+        let pressure = self.measure_pressure(cgroup.as_ref());
+        if (forced || pressure != Pressure::Ok) && self.budget_bytes() > 0 {
+            let dumped = self
+                .reclaim_unsealed_under_pressure(self.memory_low())
+                .await;
+            if dumped > 0 {
+                storage::trim_allocator();
+                let over = self.memory_usage().saturating_sub(self.memory_low());
+                if over > 0 {
+                    released += self.shrink_block_maps(over as usize) as u64;
+                }
+            }
         }
         released
     }
@@ -609,13 +631,13 @@ impl super::Engine {
         matches!(error, ::common::Error::Invalid(message) if message.starts_with(ADMISSION_REFUSED))
     }
 
-    pub(crate) fn admit_write(&self) -> ::common::Result<()> {
+    pub(crate) async fn admit_write(&self) -> ::common::Result<()> {
         if !self.memory_pressure().blocks_writes() {
             return Ok(());
         }
-        // One reclaim pass now, so a burst that just needs its page cache
-        // dropped does not turn into a user-visible error.
-        let _ = self.memory_tick();
+        // One reclaim pass now, so a burst that just needs its page cache or
+        // unsealed tables dropped does not turn into a user-visible error.
+        let _ = self.memory_tick().await;
         if !self.memory_pressure().blocks_writes() {
             return Ok(());
         }
@@ -632,7 +654,7 @@ impl super::Engine {
     /// One pass of the governor, run on the periodic tick - deliberately **not**
     /// behind `needs_cleanup`: a read-only server can grow its page cache without
     /// a single transaction. Returns the bytes it released.
-    pub(crate) fn memory_tick(&self) -> u64 {
+    pub(crate) async fn memory_tick(&self) -> u64 {
         // One snapshot: the pass measures and stamps against the same limit.
         let (generation, cgroup) = cgroup_snapshot();
         let ceiling = self.ceiling_from(cgroup.as_ref());
@@ -647,7 +669,7 @@ impl super::Engine {
         // Down to the low watermark, not by one page: a pass that stops at `high`
         // reruns on the next tick and thrashes the working set.
         let want = usage.saturating_sub(low);
-        let released = self.reclaim_memory(want, usage >= critical);
+        let released = self.reclaim_memory(want, usage >= critical).await;
         // Measure again rather than assuming the pass worked: when nothing can
         // be released (a ceiling below the working set) the level is still
         // critical, and the next write must see that.
@@ -698,7 +720,7 @@ mod tests {
         // which is exactly the state that must not take the process down.
         e.set_memory_limit(1);
         assert!(e.memory_pressure().blocks_writes());
-        let _ = e.memory_tick();
+        let _ = e.memory_tick().await;
         assert_eq!(
             e.context.memory_reclaim_passes.load(Ordering::Relaxed),
             1,
@@ -735,7 +757,7 @@ mod tests {
 
         // A terabyte the page advice cannot produce on its own: the pass has to
         // go on to the block map.
-        let released = e.reclaim_memory(1 << 40, false);
+        let released = e.reclaim_memory(1 << 40, false).await;
         assert!(released > 0);
         assert!(
             e.buffer_objects().is_empty(),
@@ -769,7 +791,7 @@ mod tests {
         // One byte: every measurement is critical, which is the state that must
         // reclaim rather than wait for a write.
         e.set_memory_limit(1);
-        e.memory_tick();
+        e.memory_tick().await;
         assert!(
             e.buffer_objects().is_empty(),
             "the tick unmapped the block instead of leaving it resident"
@@ -881,7 +903,7 @@ mod tests {
 
         // One pass over the ceiling: pages advised away, mappings dropped.
         e.set_memory_limit(1);
-        let released = e.memory_tick();
+        let released = e.memory_tick().await;
         println!(
             "reclaim:         released {} MB, mapped {} MB left",
             released / (1024 * 1024),
@@ -952,7 +974,7 @@ mod tests {
             // The tick runs once a second; queries here are a few ms, so every
             // eighth query stands in for "one query fell in the tick's window".
             if i % 8 == 0 {
-                e.memory_tick();
+                e.memory_tick().await;
             }
             let t0 = std::time::Instant::now();
             e.execute(&q).await.unwrap();

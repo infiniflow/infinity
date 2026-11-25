@@ -516,7 +516,8 @@ impl Engine {
                 block_map_hits: std::sync::atomic::AtomicU64::new(0),
                 block_map_misses: std::sync::atomic::AtomicU64::new(0),
                 config: Mutex::new(HashMap::new()),
-                memindex_quota: std::sync::atomic::AtomicU64::new(0),
+                unsealed_memory_quota: std::sync::atomic::AtomicU64::new(0),
+                unsealed_reclaim_lock: tokio::sync::Mutex::new(()),
                 memindex_total: std::sync::atomic::AtomicUsize::new(0),
                 memindex_capacity: std::sync::atomic::AtomicUsize::new(64 * 1024),
                 flush_dumps_mem_index: std::sync::atomic::AtomicBool::new(false),
@@ -808,10 +809,10 @@ impl Engine {
     ///
     /// `table` names the table whose charge changed (the per-row call); `None`
     /// asks for a full recompute first (an explicit check).
-    pub(crate) fn enforce_memindex_quota(&self, table: Option<&str>) {
+    pub(crate) fn enforce_unsealed_memory_quota(&self, table: Option<&str>) {
         let quota = self
             .context
-            .memindex_quota
+            .unsealed_memory_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
         if quota == 0 {
             return;
@@ -843,12 +844,12 @@ impl Engine {
 
     /// The quota check for a table whose rows just grew.
     ///
-    /// [`Self::enforce_memindex_quota`] is driven by the **index** write path,
+    /// [`Self::enforce_unsealed_memory_quota`] is driven by the **index** write path,
     /// so a table with no index never reached it - and that is exactly the table
     /// whose append buffer grows unbounded. This runs at the end of a commit
     /// instead and raises the same flag.
     pub(crate) fn enforce_quota_after_append(&self, table: &str) {
-        self.enforce_memindex_quota(Some(table));
+        self.enforce_unsealed_memory_quota(Some(table));
     }
 
     /// Whether an `IMPORT` is currently staging rows into `table`.

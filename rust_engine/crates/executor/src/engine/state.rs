@@ -6610,9 +6610,12 @@ pub(crate) struct Context {
     pub(crate) block_map_misses: std::sync::atomic::AtomicU64,
     /// session/global configuration set via `SET CONFIG …`
     pub(crate) config: Mutex<HashMap<String, String>>,
-    /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
-    /// trigger (the reference only dumps when a quota is configured).
-    pub(crate) memindex_quota: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_memory_quota`, in bytes. `0` disables the periodic
+    /// quota trigger.
+    pub(crate) unsealed_memory_quota: std::sync::atomic::AtomicU64,
+    /// Serialises `reclaim_unsealed` rounds (both periodic and RSS-pressure
+    /// triggered) so concurrent writers do not dump the same tables twice.
+    pub(crate) unsealed_reclaim_lock: tokio::sync::Mutex<()>,
     /// Process RSS ceiling (`0` = unset). The cleanup pass reads it and, when
     /// the process is over it, gives the mapped pages back instead of waiting
     /// for an index to go idle - the difference between a slow query and an OOM

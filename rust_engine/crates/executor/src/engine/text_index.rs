@@ -1944,7 +1944,7 @@ impl TextIndex {
     /// The primary bound is the reference's row count
     /// (`new_txn_index_impl.cpp:1381`, `memory_indexer->GetRowCount() >=
     /// mem_index_capacity`), with a 1 GiB safety byte ceiling so huge documents
-    /// cannot grow unboundedly when `memindex_quota` is 0 (disabled).
+    /// cannot grow unboundedly when `unsealed_memory_quota` is 0 (disabled).
     pub(crate) fn should_seal(&self, capacity: usize) -> bool {
         const TEXT_SEGMENT_SAFETY_BYTES: usize = 1024 * 1024 * 1024;
         if self.inflight.is_some() {

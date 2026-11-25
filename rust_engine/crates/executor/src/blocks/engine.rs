@@ -9236,7 +9236,7 @@ impl Engine {
                 // drops the page cache a scan filled in, which is the memory a
                 // bulk build would otherwise sit on top of.
                 if self.memory_pressure().blocks_writes() {
-                    self.reclaim_memory(0, true);
+                    self.reclaim_memory_sync(0, true);
                 }
             }
             for token in doc {

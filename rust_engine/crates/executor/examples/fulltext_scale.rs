@@ -166,7 +166,7 @@ async fn run() {
     let e = Engine::open_async(&dir, Default::default()).await.unwrap();
     // A bounded tail: the memory index must spill instead of growing with the
     // corpus, which is the shape a 10M import has.
-    e.set_memindex_quota(512 << 20);
+    e.set_unsealed_memory_quota(512 << 20);
     e.execute("CREATE TABLE t (id INT, title VARCHAR, body VARCHAR);")
         .await
         .unwrap();

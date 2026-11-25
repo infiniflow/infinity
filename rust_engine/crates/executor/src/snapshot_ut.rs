@@ -416,7 +416,7 @@ async fn a_restore_does_not_bring_back_rows_written_after_the_snapshot() {
     let e = Engine::open_async(dir.path(), opts()).await.unwrap();
     // The reference config this mirrors runs with a 1 KB mem index quota, so the
     // post-snapshot rows are dumped into the block before the restore starts.
-    e.set_memindex_quota(1024);
+    e.set_unsealed_memory_quota(1024);
     e.execute("CREATE TABLE t (a INT, b VARCHAR);")
         .await
         .unwrap();

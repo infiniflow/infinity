@@ -104,7 +104,7 @@ pub(crate) async fn trigger_loop(
             // single transaction, and that process is the one an OOM killer
             // finds. Every lever here is `madvise`/`malloc_trim` - no I/O, no
             // lock on a hot path - so it is safe to run on the tick itself.
-            engine.memory_tick();
+            engine.memory_tick().await;
             if !optimize_interval.is_zero() && last_optimize.elapsed() >= optimize_interval {
                 last_optimize = std::time::Instant::now();
                 engine.submit_optimize_indexes();

@@ -31,7 +31,7 @@ async fn run() {
     let e = Engine::open_async(dir.path(), Default::default())
         .await
         .unwrap();
-    e.set_memindex_quota(1 << 30);
+    e.set_unsealed_memory_quota(1 << 30);
     let rows: usize = std::env::args()
         .nth(1)
         .and_then(|v| v.parse().ok())

@@ -578,7 +578,7 @@ impl Engine {
                 // Backpressure, the same admission the direct insert primitives
                 // apply (`Engine::admit_write`): a statement is refused at the
                 // critical watermark, after one reclaim pass.
-                self.admit_write()?;
+                self.admit_write().await?;
             }
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
