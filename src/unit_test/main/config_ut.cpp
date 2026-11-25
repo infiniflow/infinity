@@ -258,3 +258,48 @@ TEST_F(ConfigTest, TestValidValues) {
     // persistence
     EXPECT_EQ(config.PersistenceDir(), "/var/infinity/persistence");
 }
+
+TEST_F(ConfigTest, TestDefaultConfWithRustUnsealedOptions) {
+    using namespace infinity;
+    std::shared_ptr<std::string> path = std::make_shared<std::string>("conf/infinity_conf.toml");
+    Config config;
+    auto status = config.Init(path, nullptr);
+    ASSERT_TRUE(status.ok()) << status.message();
+    EXPECT_EQ(config.MemIndexMemoryQuota(), 1024l * 1024l * 1024l);
+}
+
+TEST_F(ConfigTest, TestUnsealedMemoryQuotaZeroAndDuplicate) {
+    using namespace infinity;
+    std::ifstream base_in("conf/infinity_conf.toml");
+    ASSERT_TRUE(base_in.is_open());
+    std::string base_content((std::istreambuf_iterator<char>(base_in)), std::istreambuf_iterator<char>());
+
+    const std::string zero_path = "/tmp/test_unsealed_zero.toml";
+    {
+        std::string zero_content = base_content;
+        auto pos = zero_content.find("unsealed_memory_quota    = \"1GB\"");
+        ASSERT_NE(pos, std::string::npos);
+        zero_content.replace(pos, std::string("unsealed_memory_quota    = \"1GB\"").size(), "unsealed_memory_quota = 0");
+        std::ofstream out(zero_path);
+        out << zero_content;
+    }
+    Config zero_cfg;
+    auto zero_status = zero_cfg.Init(std::make_shared<std::string>(zero_path), nullptr);
+    ASSERT_TRUE(zero_status.ok()) << zero_status.message();
+    EXPECT_EQ(zero_cfg.MemIndexMemoryQuota(), 0);
+    std::remove(zero_path.c_str());
+
+    const std::string dup_path = "/tmp/test_unsealed_dup.toml";
+    {
+        std::string dup_content = base_content;
+        auto pos = dup_content.find("unsealed_memory_quota    = \"1GB\"");
+        ASSERT_NE(pos, std::string::npos);
+        dup_content.insert(pos, "memindex_memory_quota = \"4GB\"\n");
+        std::ofstream out(dup_path);
+        out << dup_content;
+    }
+    Config dup_cfg;
+    auto dup_status = dup_cfg.Init(std::make_shared<std::string>(dup_path), nullptr);
+    EXPECT_EQ(dup_status.code(), ErrorCode::kInvalidConfig);
+    std::remove(dup_path.c_str());
+}

@@ -87,10 +87,12 @@ bool PhraseDocIterator::Next(const RowID doc_id) {
         }
         if (target_doc_id == pos_iters_[0]->DocID()) {
             bool found = GetPhraseMatchData();
-            if (found && (threshold_ <= 0.0f || BM25Score() > threshold_)) {
+            if (found) {
                 doc_id_ = target_doc_id;
-                UpdateBlockRangeDocID();
-                return true;
+                if (threshold_ <= 0.0f || BM25Score() > threshold_) {
+                    UpdateBlockRangeDocID();
+                    return true;
+                }
             }
             ++target_doc_id;
         }

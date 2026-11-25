@@ -319,6 +319,71 @@ TEST_P(QueryMatchTest, bmw_heap_differential) {
     EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
 }
 
+TEST_P(QueryMatchTest, test_phrase_top_k_threshold_updates_doc_id) {
+    datas_.clear();
+    datas_.push_back({"0", "d0", "one of"});
+    datas_.push_back({"1", "d1", "one of a b c d e f g h i j k l m n o p q r s t u v w x y z"});
+    datas_.push_back({"2", "d2", "one of x y z"});
+    datas_.push_back({"3", "d3", "one of one of"});
+
+    std::string db_name = "default_db";
+    std::string table_name = "phrase_topk_tbl";
+    std::string index_name = "phrase_topk_idx";
+
+    CreateDBAndTable(db_name, table_name);
+    InsertData(db_name, table_name);
+    CreateIndex(db_name, table_name, index_name, "standard");
+
+    Storage *storage = InfinityContext::instance().storage();
+    NewTxnManager *txn_mgr = storage->new_txn_manager();
+    auto *txn = txn_mgr->BeginTxn(std::make_unique<std::string>("phrase topk"), TransactionType::kRead);
+    auto [table_info, status] = txn->GetTableInfo(db_name, table_name);
+    ASSERT_TRUE(status.ok());
+
+    std::shared_ptr<IndexReader> index_reader;
+    status = txn->GetFullTextIndexReader(db_name, table_name, index_reader);
+    ASSERT_TRUE(status.ok());
+
+    auto run_top_k = [&](EarlyTermAlgo algo, bool use_threshold, u32 topn) {
+        QueryBuilder query_builder(table_info);
+        query_builder.Init(index_reader);
+        SearchDriver driver(query_builder.GetColumn2Analyzer(), "text");
+        FullTextQueryContext context(FulltextSimilarity::kBM25, BM25Params{}, MinimumShouldMatchOption{}, RankFeaturesOption{}, topn);
+        context.early_term_algo_ = algo;
+        context.query_tree_ = driver.ParseSingleWithFields("text", "\"one of\"");
+        std::unique_ptr<DocIterator> doc_iterator = query_builder.CreateSearch(context);
+        EXPECT_NE(doc_iterator, nullptr);
+        std::vector<float> scores(topn, 0.0f);
+        std::vector<RowID> row_ids(topn);
+        FullTextScoreResultHeap result_heap(topn, scores.data(), row_ids.data());
+        while (doc_iterator->Next()) {
+            if (result_heap.AddResult(doc_iterator->Score(), doc_iterator->DocID()) && use_threshold) {
+                doc_iterator->UpdateScoreThreshold(result_heap.GetScoreThreshold());
+            }
+        }
+        std::vector<std::pair<RowID, float>> top;
+        for (size_t i = 0; i < result_heap.GetResultSize(); ++i) {
+            top.emplace_back(row_ids[i], scores[i]);
+        }
+        std::sort(top.begin(), top.end(), [](const auto &lhs, const auto &rhs) {
+            if (lhs.second != rhs.second) {
+                return lhs.second > rhs.second;
+            }
+            return lhs.first < rhs.first;
+        });
+        return top;
+    };
+
+    auto naive_top1 = run_top_k(EarlyTermAlgo::kNaive, false, 1);
+    auto wand_top1 = run_top_k(EarlyTermAlgo::kBMW, true, 1);
+    ASSERT_EQ(naive_top1.size(), 1u);
+    ASSERT_EQ(wand_top1.size(), 1u);
+    EXPECT_EQ(wand_top1[0].first, naive_top1[0].first);
+    EXPECT_FLOAT_EQ(wand_top1[0].second, naive_top1[0].second);
+
+    EXPECT_TRUE(txn_mgr->CommitTxn(txn).ok());
+}
+
 void QueryMatchTest::CreateDBAndTable(const std::string &db_name, const std::string &table_name) {
     std::vector<std::shared_ptr<ColumnDef>> column_defs;
     {
