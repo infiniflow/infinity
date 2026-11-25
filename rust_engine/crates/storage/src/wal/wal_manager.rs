@@ -213,7 +213,22 @@ impl WalManager {
             }
             #[cfg(not(target_os = "linux"))]
             {
-                file.sync_all()?;
+                fn sync_tree_recursive(path: &Path) -> std::io::Result<()> {
+                    for entry in std::fs::read_dir(path)? {
+                        let entry = entry?;
+                        let entry_path = entry.path();
+                        let file_type = entry.file_type()?;
+                        if file_type.is_dir() {
+                            sync_tree_recursive(&entry_path)?;
+                        } else if file_type.is_file() {
+                            std::fs::File::open(&entry_path)?.sync_all()?;
+                        }
+                    }
+                    std::fs::File::open(path)?.sync_all()?;
+                    Ok(())
+                }
+                drop(file);
+                sync_tree_recursive(&dir)?;
             }
             Ok(())
         })

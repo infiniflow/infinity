@@ -1490,6 +1490,10 @@ impl Engine {
         }
         mirror?;
         mark("catalog_rewrite");
+        // Make block/chunk files and their directory entries on the data
+        // filesystem durable before `txn.flush()` raises `synced` (even when
+        // `data/` and `wal/` live on separate filesystems).
+        storage::wal::WalManager::sync_dir_fs(&self.dir.join("data")).await?;
         // The checkpoint's one store flush, at the end as in
         // `NewTxn::Checkpoint` (`kv_store()->Flush()`, `new_txn_impl.cpp:1814`).
         // It covers everything the mirror published - `catalog|seg|…`,
@@ -1528,10 +1532,6 @@ impl Engine {
         // commit that landed while the mirror ran, and the replay would then
         // redo it (measured: a replayed `DROP COLUMN` of an already dropped
         // column aborted the open).
-        // Ensure all block/chunk files and their directory entries on the data
-        // filesystem are durable before the checkpoint frame is appended to the
-        // WAL (even when `data/` and `wal/` live on separate filesystems).
-        storage::wal::WalManager::sync_dir_fs(&self.dir.join("data")).await?;
         self.txn.append_checkpoint_flushed().await?;
         self.txn.rotate_wal_if_large().await?;
         self.txn.sync_wal().await?;

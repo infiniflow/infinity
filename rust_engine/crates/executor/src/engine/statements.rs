@@ -2673,14 +2673,12 @@ impl Engine {
         // interleave two statements' layout rewrites, and only one capture slot
         // exists. Hold `ddl_lock` across `commit_at` for operations that
         // allocate shared catalog counters (`CreateTable`, `CreateDatabase`,
-        // etc.) so concurrent captures cannot read the same counter before the
-        // first commits. Only `CreateIndex`, `DropIndex`, and `DropTable`
-        // release the lock before `commit_at` so concurrent batches can coalesce
-        // in `sync_wal_grouped`.
-        let release_before_commit = matches!(
-            op,
-            TxnOp::CreateIndex { .. } | TxnOp::DropIndex { .. } | TxnOp::DropTable { .. }
-        );
+        // `CreateIndex`, etc.) or mutate shared table index sets (`DropIndex`)
+        // so concurrent captures cannot read stale counters or race on
+        // `CreateIndex`/`DropIndex` conflicts before the first commits. Only
+        // `DropTable` releases the lock before `commit_at` so concurrent drops
+        // can coalesce in `sync_wal_grouped`.
+        let release_before_commit = matches!(op, TxnOp::DropTable { .. });
         let mut ddl_guard = Some(self.ddl_lock.lock().await);
         let (out, mut batch) = self.storage.catalog.capture(f)?;
         if release_before_commit {
