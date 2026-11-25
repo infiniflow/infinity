@@ -143,10 +143,13 @@ impl Engine {
         F: FnMut() -> bool,
     {
         let now_ts = self.current_ts();
-        let cap = self
-            .context
-            .unsealed_max_tables_per_round
-            .load(Ordering::Relaxed);
+        let cap = if ignore_backoff {
+            0
+        } else {
+            self.context
+                .unsealed_max_tables_per_round
+                .load(Ordering::Relaxed)
+        };
 
         if stop() {
             return 0;

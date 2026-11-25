@@ -566,6 +566,17 @@ impl super::Engine {
             let over = self.memory_usage().saturating_sub(self.memory_low());
             let remaining = want.saturating_sub(released).max(over);
             released += self.shrink_block_maps(remaining as usize) as u64;
+            if forced || pressure != Pressure::Ok {
+                let over = self.memory_usage().saturating_sub(self.memory_low());
+                let remaining = want.saturating_sub(released).max(over);
+                if remaining > 0 {
+                    let evicted = self.evict_table_caches(remaining as usize, forced) as u64;
+                    if evicted > 0 {
+                        released += evicted;
+                        storage::trim_allocator();
+                    }
+                }
+            }
         }
         released
     }
@@ -575,6 +586,7 @@ impl super::Engine {
         let (_, cgroup) = cgroup_snapshot();
         let pressure = self.measure_pressure(cgroup.as_ref());
         if (forced || pressure != Pressure::Ok) && self.budget_bytes() > 0 {
+            let before = self.memory_usage();
             let dumped = self
                 .reclaim_unsealed_under_pressure(self.memory_low())
                 .await;
@@ -583,10 +595,85 @@ impl super::Engine {
                 let over = self.memory_usage().saturating_sub(self.memory_low());
                 if over > 0 {
                     released += self.shrink_block_maps(over as usize) as u64;
+                    let over = self.memory_usage().saturating_sub(self.memory_low());
+                    if over > 0 {
+                        let evicted = self.evict_table_caches(over as usize, forced) as u64;
+                        if evicted > 0 {
+                            released += evicted;
+                            storage::trim_allocator();
+                        }
+                    }
                 }
+                let after = self.memory_usage();
+                released = released.saturating_add(before.saturating_sub(after));
             }
         }
         released
+    }
+
+    /// Evicts reloadable table-level caches (`row_cache`, decoded HNSW chunk
+    /// graphs in `vector`, and when `forced`, decoded `ivf` segments) up to
+    /// `want` bytes. Dropped `Arc`s are collected and freed outside `self.tables`
+    /// so concurrent readers/writers are not stalled during deallocation.
+    fn evict_table_caches(&self, want: usize, forced: bool) -> usize {
+        if want == 0 {
+            return 0;
+        }
+        let mut freed = 0usize;
+        let mut dropped_rows = Vec::new();
+        let mut dropped_vectors = Vec::new();
+        let mut dropped_ivf = Vec::new();
+        {
+            let mut tables = self.tables.lock().unwrap();
+            for entry in tables.values_mut() {
+                if freed >= want {
+                    break;
+                }
+                if let Some(cache) = entry.row_cache.take() {
+                    freed = freed.saturating_add(cache.bytes);
+                    dropped_rows.push(cache);
+                }
+            }
+            for entry in tables.values_mut() {
+                if freed >= want {
+                    break;
+                }
+                let mut empty_ids = Vec::new();
+                for (&id, list) in &mut entry.vector {
+                    while freed < want {
+                        let Some(chunk) = list.pop() else {
+                            break;
+                        };
+                        freed = freed.saturating_add(chunk.bytes);
+                        dropped_vectors.push(chunk);
+                    }
+                    if list.is_empty() {
+                        empty_ids.push(id);
+                    }
+                    if freed >= want {
+                        break;
+                    }
+                }
+                for id in empty_ids {
+                    entry.vector.remove(&id);
+                }
+            }
+            if forced && freed < want {
+                for entry in tables.values_mut() {
+                    if !entry.ivf.is_empty() {
+                        dropped_ivf.push(std::mem::take(&mut entry.ivf));
+                    }
+                }
+            }
+        }
+        let had_ivf = !dropped_ivf.is_empty();
+        drop(dropped_rows);
+        drop(dropped_vectors);
+        drop(dropped_ivf);
+        if freed == 0 && had_ivf {
+            return 1;
+        }
+        freed
     }
 
     /// The low watermark: the level a pass reclaims down to. `0` when no
@@ -635,11 +722,31 @@ impl super::Engine {
         if !self.memory_pressure().blocks_writes() {
             return Ok(());
         }
-        // One reclaim pass now, so a burst that just needs its page cache or
-        // unsealed tables dropped does not turn into a user-visible error.
-        let _ = self.memory_tick().await;
-        if !self.memory_pressure().blocks_writes() {
-            return Ok(());
+        // Reclaim now; if memory is actively draining (released > 0 or RSS is
+        // falling across a transient dump/compact spike), retry briefly before
+        // turning a burst into a user-visible error.
+        for attempt in 0..5 {
+            let before = self.memory_usage();
+            let released = self.memory_tick().await;
+            let (generation, cgroup) = cgroup_snapshot();
+            let after_usage = self.usage_against(cgroup.as_ref());
+            let after = self.measure_pressure(cgroup.as_ref());
+            self.context
+                .memory_pressure_level
+                .store(after as u8, Ordering::Relaxed);
+            self.context
+                .memory_checked_at
+                .store(elapsed_millis(), Ordering::Relaxed);
+            self.context
+                .memory_ceiling_generation
+                .store(generation, Ordering::Relaxed);
+            if !after.blocks_writes() {
+                return Ok(());
+            }
+            if attempt == 4 || (released == 0 && after_usage >= before) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         let ceiling = self.memory_ceiling();
         Err(::common::Error::Invalid(format!(
@@ -664,6 +771,15 @@ impl super::Engine {
         let usage = self.usage_against(cgroup.as_ref());
         let (low, high, critical) = watermarks(ceiling.bytes, cgroup_high());
         if usage < high {
+            self.context
+                .memory_pressure_level
+                .store(Pressure::Ok as u8, Ordering::Relaxed);
+            self.context
+                .memory_checked_at
+                .store(elapsed_millis(), Ordering::Relaxed);
+            self.context
+                .memory_ceiling_generation
+                .store(generation, Ordering::Relaxed);
             return 0;
         }
         // Down to the low watermark, not by one page: a pass that stops at `high`

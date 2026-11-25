@@ -414,7 +414,7 @@ impl Engine {
             let uncovered = self.uncovered_rows(q, &covered);
             return answered(candidates, uncovered);
         }
-        let ivf = {
+        let mut ivf = {
             let tables = self.tables.lock().unwrap();
             tables.get(&tkey).and_then(|e| {
                 (e.ivf.contains_key(&index_id) || e.ivf_mem.contains_key(&index_id)).then(|| {
@@ -425,6 +425,39 @@ impl Engine {
                 })
             })
         };
+        if ivf.as_ref().is_none_or(|(segs, _)| segs.is_empty()) {
+            let has_loaded_hnsw = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.vector.get(&index_id))
+                    .is_some_and(|v| !v.is_empty())
+            };
+            if !has_loaded_hnsw {
+                if let Ok(indexes) = self.storage.catalog.indexes_of_table(q.table) {
+                    if let Some(im) = indexes.into_iter().find(|im| im.id == index_id) {
+                        if im.index_type.eq_ignore_ascii_case("IVF")
+                            || im.index_type.eq_ignore_ascii_case("HNSW")
+                        {
+                            self.reload_vector_index_for(&im);
+                            if im.index_type.eq_ignore_ascii_case("IVF") {
+                                let tables = self.tables.lock().unwrap();
+                                ivf = tables.get(&tkey).and_then(|e| {
+                                    (e.ivf.contains_key(&index_id)
+                                        || e.ivf_mem.contains_key(&index_id))
+                                    .then(|| {
+                                        (
+                                            e.ivf.get(&index_id).cloned().unwrap_or_default(),
+                                            e.ivf_mem.get(&index_id).cloned().unwrap_or_default(),
+                                        )
+                                    })
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if let Some((segments, mem)) = ivf {
             if segments.is_empty() && mem.is_empty() {
                 return None;

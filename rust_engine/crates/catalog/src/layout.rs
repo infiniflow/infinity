@@ -1325,8 +1325,17 @@ impl Catalog {
             imported += 1;
         }
         // Index records, resolved against the tables just imported.
+        let table_by_id: std::collections::HashMap<(String, String), String> = tables
+            .iter()
+            .map(|t| {
+                (
+                    (t.db_id.to_string(), t.table_id.to_string()),
+                    format!("{}.{}", t.db_name, t.table_name),
+                )
+            })
+            .collect();
         for def in read_indexes(store)? {
-            let Some(meta) = index_meta_of(&def, &tables) else {
+            let Some(meta) = index_meta_of_with_map(&def, &table_by_id, &tables) else {
                 continue;
             };
             // Keep the reference's id: it names the index's directory
@@ -3199,6 +3208,30 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
                 .map(|t| format!("{}.{}", t.db_name, t.table_name))
         }),
     }?;
+    Some(index_meta_with_table(def, table))
+}
+
+/// Like [`index_meta_of`], but resolves `(db_id, table_id)` via a pre-built
+/// `O(1)` lookup map so enumerating all indexes in a catalog with many tables
+/// stays `O(indexes + tables)` instead of `O(indexes * tables)`.
+pub fn index_meta_of_with_map(
+    def: &IndexDefValue,
+    table_by_id: &std::collections::HashMap<(String, String), String>,
+    tables: &[TableLayout],
+) -> Option<IndexMeta> {
+    let table = match &def.owner {
+        Some((db_id, table_id)) => table_by_id.get(&(db_id.clone(), table_id.clone())).cloned(),
+        None => def.base.column_names.first().and_then(|c| {
+            tables
+                .iter()
+                .find(|t| t.columns.iter().any(|col| &col.column_name == c))
+                .map(|t| format!("{}.{}", t.db_name, t.table_name))
+        }),
+    }?;
+    Some(index_meta_with_table(def, table))
+}
+
+fn index_meta_with_table(def: &IndexDefValue, table: String) -> IndexMeta {
     let column = def.base.column_names.first().cloned().unwrap_or_default();
     // Carry the options the engine tracks on `IndexMeta`.
     let opt = |k: &str| {
@@ -3374,7 +3407,7 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
             .collect();
         options.sort_by(|a, b| a.0.cmp(&b.0));
     }
-    Some(IndexMeta {
+    IndexMeta {
         name: def.base.index_name.clone(),
         table,
         column,
@@ -3389,7 +3422,7 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
         // The id the reference's record carries; `Catalog::indexes` fills
         // in a fallback for a record that has none.
         id: def.index_id.unwrap_or(0),
-    })
+    }
 }
 
 /// Rebuilds `TableMeta`s from a C++-layout catalog (for comparison with the

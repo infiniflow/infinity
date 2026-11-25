@@ -1642,17 +1642,16 @@ impl Engine {
         // column this table entry has not seen): the catalog record decides.
         self.storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .unwrap_or_default()
             .iter()
             .any(|im| {
-                (im.table == table || im.table == self.qualified_table(table))
-                    && (im.index_type.eq_ignore_ascii_case("FULLTEXT")
-                        || im.index_type.eq_ignore_ascii_case("HNSW")
-                        || im.index_type.eq_ignore_ascii_case("IVF")
-                        || im.index_type.eq_ignore_ascii_case("BMP")
-                        || im.index_type.eq_ignore_ascii_case("SPARSE")
-                        || im.index_type.eq_ignore_ascii_case("EMVB"))
+                im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                    || im.index_type.eq_ignore_ascii_case("HNSW")
+                    || im.index_type.eq_ignore_ascii_case("IVF")
+                    || im.index_type.eq_ignore_ascii_case("BMP")
+                    || im.index_type.eq_ignore_ascii_case("SPARSE")
+                    || im.index_type.eq_ignore_ascii_case("EMVB")
             })
     }
 
@@ -1786,17 +1785,14 @@ impl Engine {
         // reference's `MemIndex` map is keyed by index id, so two indexes on
         // one column never share one.
         if topup {
-            let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
                 return Vec::new();
             };
             let Ok(types) = self.column_types(table) else {
                 return Vec::new();
             };
-            let short = table.split('.').next_back().unwrap_or(table);
             for im in indexes {
-                if !(im.table == table || im.table == short)
-                    || !im.index_type.eq_ignore_ascii_case("HNSW")
-                {
+                if !im.index_type.eq_ignore_ascii_case("HNSW") {
                     continue;
                 }
                 let Some(ci) = schema.iter().position(|c| c == &im.column) else {
@@ -3287,20 +3283,11 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
             return;
         };
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
-                continue;
-            }
-            // The index metadata may hold either a qualified or a short table
-            // name, so match fully when both are qualified and by short name
-            // when either side is unqualified.
-            let same_table = im.table == table
-                || (im.table.rsplit('.').next() == table.rsplit('.').next()
-                    && (!im.table.contains('.') || !table.contains('.')));
-            if !same_table {
                 continue;
             }
             let Some(col) = schema.iter().position(|c| c == &im.column) else {

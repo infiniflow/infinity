@@ -25,7 +25,7 @@ pub mod meta_cache;
 pub mod value_format;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use common::{Error, Result};
 use storage::{MetaStore, RocksMetaStore};
@@ -382,7 +382,7 @@ pub struct Catalog {
     /// When a DDL captures its batch ([`Self::capture`]), newly created records
     /// are stamped with [`DDL_TS_SENTINEL`] and the caller substitutes the
     /// transaction's commit timestamp with [`Self::restamp`].
-    capture: Mutex<Option<Capture>>,
+    capture: RwLock<Option<Capture>>,
     /// Decoded table records, keyed by qualified name.
     ///
     /// Resolving a name reads the catalog store and decodes the record, which
@@ -527,7 +527,7 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             catalog_only: false,
-            capture: Mutex::new(None),
+            capture: RwLock::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
@@ -544,7 +544,7 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             catalog_only: true,
-            capture: Mutex::new(None),
+            capture: RwLock::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
@@ -656,7 +656,7 @@ impl Catalog {
     /// Runs `f` against the store as the DDL in flight sees it: either the
     /// store itself, or the store with the captured writes applied.
     fn with_view<T>(&self, f: impl FnOnce(&dyn MetaStore) -> Result<T>) -> Result<T> {
-        let guard = self.capture.lock().unwrap();
+        let guard = self.capture.read().unwrap();
         match guard.as_ref() {
             Some(capture) => f(&Overlay {
                 inner: self.store.as_ref(),
@@ -682,9 +682,20 @@ impl Catalog {
     fn indexes(&self) -> Result<Vec<IndexMeta>> {
         self.with_view(|store| {
             let tables = crate::layout::read_layout(store)?;
+            let table_by_id: HashMap<(String, String), String> = tables
+                .iter()
+                .map(|t| {
+                    (
+                        (t.db_id.to_string(), t.table_id.to_string()),
+                        format!("{}.{}", t.db_name, t.table_name),
+                    )
+                })
+                .collect();
             let mut out = Vec::new();
             for def in crate::layout::read_indexes(store)? {
-                if let Some(meta) = crate::layout::index_meta_of(&def, &tables) {
+                if let Some(meta) =
+                    crate::layout::index_meta_of_with_map(&def, &table_by_id, &tables)
+                {
                     out.push(meta);
                 }
             }
@@ -797,7 +808,7 @@ impl Catalog {
     }
 
     fn indexes_cached(&self, key: &str, qualified: &str) -> Result<Vec<IndexMeta>> {
-        if self.capture.lock().unwrap().is_some()
+        if self.capture.read().unwrap().is_some()
             || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
         {
             return self.indexes_of_table_uncached(qualified);
@@ -933,7 +944,7 @@ impl Catalog {
         // has already written, not from the store: dropping a database rewrites
         // the layout once per table it holds, and each rewrite must see the
         // previous one.
-        let mut slot = self.capture.lock().unwrap();
+        let mut slot = self.capture.write().unwrap();
         let (sweep, layout) = match slot.as_ref() {
             Some(capture) => {
                 let view = Overlay {
@@ -976,7 +987,7 @@ impl Catalog {
     /// error and is reported rather than silently nesting.
     pub fn capture<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<(T, Vec<BatchItem>)> {
         {
-            let mut slot = self.capture.lock().unwrap();
+            let mut slot = self.capture.write().unwrap();
             if slot.is_some() {
                 return Err(Error::Catalog("nested catalog capture".into()));
             }
@@ -997,7 +1008,7 @@ impl Catalog {
         // store to decide the statement was a no-op) on each of them.
         let wrote_nothing = self
             .capture
-            .lock()
+            .read()
             .unwrap()
             .as_ref()
             .is_some_and(|capture| capture.batch.is_empty());
@@ -1010,7 +1021,7 @@ impl Catalog {
                 .and_then(|dbs| Ok((dbs, self.list_tables()?, self.list_indexes()?)))
                 .and_then(|(dbs, tables, indexes)| self.rewrite_catalog(&dbs, &tables, &indexes));
         }
-        let capture = self.capture.lock().unwrap().take().unwrap_or_default();
+        let capture = self.capture.write().unwrap().take().unwrap_or_default();
         Ok((out?, last_op_per_key(capture.batch)))
     }
 
@@ -1805,7 +1816,7 @@ impl Catalog {
         // transaction's own uncommitted DDL, so a cached record would answer
         // from before that DDL. Captures are DDL-only and short, so they simply
         // bypass the cache.
-        if self.capture.lock().unwrap().is_some()
+        if self.capture.read().unwrap().is_some()
             || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
         {
             return self.get_table_by_name_uncached(name);
@@ -2095,7 +2106,7 @@ impl Catalog {
     /// `next_database_id` before its layout rewrite) must see its own write,
     /// not the value the store had when the statement started.
     pub(crate) fn stage(&self, items: &[BatchItem]) -> Result<()> {
-        let mut slot = self.capture.lock().unwrap();
+        let mut slot = self.capture.write().unwrap();
         match slot.as_mut() {
             Some(capture) => {
                 for (key, value) in items {
