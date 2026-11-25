@@ -42,7 +42,7 @@ pub(crate) type LockedLinks = Vec<Vec<RwLock<Vec<usize>>>>;
 /// can stand in for it. Stores that derive a query from a code (LVQ, RaBitQ)
 /// keep the owned form, because their query is not the stored bytes.
 enum QueryRef<'a> {
-    Owned(crate::vector::HnswQuery),
+    Owned(crate::vector::HnswQuery<'a>),
     /// The query is the vertex's own stored row, already resolved.
     ///
     /// Holding the slice rather than the node id is the difference between one
@@ -415,6 +415,7 @@ impl<'a> Builder<'a> {
             visited,
             candidate,
             result,
+            ..
         } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
         // The vertex being built must never enter its own result set. The

@@ -54,90 +54,90 @@ fn prev_is_value(out: &[Token]) -> bool {
 }
 
 pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
-    let chars: Vec<char> = sql.chars().collect();
+    let bytes = sql.as_bytes();
+    let len = bytes.len();
     let mut i = 0;
     let mut out = Vec::new();
-    while i < chars.len() {
-        let c = chars[i];
-        match c {
-            c if c.is_whitespace() => {
+    while i < len {
+        let b = bytes[i];
+        match b {
+            b if b.is_ascii_whitespace() => {
                 i += 1;
             }
-            ',' => {
+            b',' => {
                 out.push(Token::Comma);
                 i += 1;
             }
-            '(' => {
+            b'(' => {
                 out.push(Token::LParen);
                 i += 1;
             }
-            ')' => {
+            b')' => {
                 out.push(Token::RParen);
                 i += 1;
             }
-            '[' => {
+            b'[' => {
                 out.push(Token::LBracket);
                 i += 1;
             }
-            ']' => {
+            b']' => {
                 out.push(Token::RBracket);
                 i += 1;
             }
-            '{' => {
+            b'{' => {
                 out.push(Token::LBrace);
                 i += 1;
             }
-            '}' => {
+            b'}' => {
                 out.push(Token::RBrace);
                 i += 1;
             }
-            '"' => {
+            b'"' => {
                 i += 1;
-                let mut s = String::new();
-                while i < chars.len() && chars[i] != '"' {
-                    s.push(chars[i]);
+                let start = i;
+                while i < len && bytes[i] != b'"' {
                     i += 1;
                 }
-                if i >= chars.len() {
+                if i >= len {
                     return Err(Error::Invalid("unterminated quoted identifier".into()));
                 }
+                out.push(Token::Str(sql[start..i].to_owned()));
                 i += 1;
-                out.push(Token::Str(s));
             }
-            ':' => {
+            b':' => {
                 out.push(Token::Colon);
                 i += 1;
             }
-            '*' => {
+            b'*' => {
                 out.push(Token::Star);
                 i += 1;
             }
-            ';' => {
+            b';' => {
                 out.push(Token::Semicolon);
                 i += 1;
             }
             // `==` is accepted as an alias for `=`
-            '=' => {
-                if i + 1 < chars.len() && chars[i + 1] == '=' {
+            b'=' => {
+                if i + 1 < len && bytes[i + 1] == b'=' {
                     i += 2;
                 } else {
                     i += 1;
                 }
                 out.push(Token::Op("=".into()));
             }
-            '.' => {
+            b'.' => {
                 out.push(Token::Op(".".into()));
                 i += 1;
             }
-            '!' if i + 1 < chars.len() && chars[i + 1] == '=' => {
+            b'!' if i + 1 < len && bytes[i + 1] == b'=' => {
                 out.push(Token::Op("!=".into()));
                 i += 2;
             }
-            '<' => {
-                if i + 1 < chars.len() && chars[i + 1] == '=' {
+            b'<' => {
+                if i + 1 < len && bytes[i + 1] == b'=' {
                     out.push(Token::Op("<=".into()));
                     i += 2;
-                } else if i + 1 < chars.len() && chars[i + 1] == '>' {
+                } else if i + 1 < len && bytes[i + 1] == b'>' {
                     out.push(Token::Op("<>".into()));
                     i += 2;
                 } else {
@@ -145,8 +145,8 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                     i += 1;
                 }
             }
-            '>' => {
-                if i + 1 < chars.len() && chars[i + 1] == '=' {
+            b'>' => {
+                if i + 1 < len && bytes[i + 1] == b'=' {
                     out.push(Token::Op(">=".into()));
                     i += 2;
                 } else {
@@ -154,61 +154,72 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                     i += 1;
                 }
             }
-            '\'' => {
+            b'\'' => {
                 i += 1;
-                let mut s = String::new();
+                let start = i;
+                let mut escaped: Option<String> = None;
+                let mut seg_start = i;
                 loop {
-                    if i >= chars.len() {
+                    if i >= len {
                         return Err(Error::Invalid("unterminated string literal".into()));
                     }
-                    if chars[i] == '\'' {
+                    if bytes[i] == b'\'' {
                         // `''` inside a literal is an escaped quote.
-                        if i + 1 < chars.len() && chars[i + 1] == '\'' {
-                            s.push('\'');
+                        if i + 1 < len && bytes[i + 1] == b'\'' {
+                            let buf = escaped.get_or_insert_with(String::new);
+                            buf.push_str(&sql[seg_start..i]);
+                            buf.push('\'');
                             i += 2;
+                            seg_start = i;
                             continue;
                         }
+                        let s = match escaped {
+                            Some(mut buf) => {
+                                buf.push_str(&sql[seg_start..i]);
+                                buf
+                            }
+                            None => sql[start..i].to_owned(),
+                        };
                         i += 1; // closing quote
+                        out.push(Token::Str(s));
                         break;
                     }
-                    s.push(chars[i]);
                     i += 1;
                 }
-                out.push(Token::Str(s));
             }
-            c if c.is_ascii_digit()
-                || (c == '-'
-                    && i + 1 < chars.len()
-                    && chars[i + 1].is_ascii_digit()
+            b if b.is_ascii_digit()
+                || (b == b'-'
+                    && i + 1 < len
+                    && bytes[i + 1].is_ascii_digit()
                     && !prev_is_value(&out)) =>
             {
                 let start = i;
-                if c == '-' {
+                if b == b'-' {
                     i += 1;
                 }
                 let mut is_float = false;
-                while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                    if chars[i] == '.' {
+                while i < len && (bytes[i].is_ascii_digit() || bytes[i] == b'.') {
+                    if bytes[i] == b'.' {
                         is_float = true;
                     }
                     i += 1;
                 }
                 // An exponent belongs to the literal: `1e-5`, `2.5E+3`. Without
                 // this the array reader saw `1`, `e`, `-`, `5`.
-                if i < chars.len() && (chars[i] == 'e' || chars[i] == 'E') {
+                if i < len && (bytes[i] == b'e' || bytes[i] == b'E') {
                     let mut j = i + 1;
-                    if j < chars.len() && (chars[j] == '+' || chars[j] == '-') {
+                    if j < len && (bytes[j] == b'+' || bytes[j] == b'-') {
                         j += 1;
                     }
-                    if j < chars.len() && chars[j].is_ascii_digit() {
-                        while j < chars.len() && chars[j].is_ascii_digit() {
+                    if j < len && bytes[j].is_ascii_digit() {
+                        while j < len && bytes[j].is_ascii_digit() {
                             j += 1;
                         }
                         i = j;
                         is_float = true;
                     }
                 }
-                let text: String = chars[start..i].iter().collect();
+                let text = &sql[start..i];
                 if is_float {
                     out.push(Token::Float(
                         text.parse()
@@ -221,18 +232,65 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
                     ));
                 }
             }
-            c if c.is_alphabetic() || c == '_' => {
+            b if b.is_ascii_alphabetic() || b == b'_' => {
                 let start = i;
-                while i < chars.len() && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                    i += 1;
+                i += 1;
+                while i < len {
+                    if bytes[i] < 0x80 {
+                        if bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' {
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    } else {
+                        let c = sql[i..].chars().next().unwrap();
+                        if c.is_alphanumeric() || c == '_' {
+                            i += c.len_utf8();
+                        } else {
+                            break;
+                        }
+                    }
                 }
-                out.push(Token::Ident(chars[start..i].iter().collect()));
+                out.push(Token::Ident(sql[start..i].to_owned()));
             }
-            '+' | '-' | '/' | '%' => {
-                out.push(Token::Op(c.to_string()));
+            b'+' | b'-' | b'/' | b'%' => {
+                out.push(Token::Op(sql[i..i + 1].to_owned()));
                 i += 1;
             }
-            other => return Err(Error::Invalid(format!("unexpected character '{other}'"))),
+            b if b >= 0x80 => {
+                let c = sql[i..].chars().next().unwrap();
+                if c.is_whitespace() {
+                    i += c.len_utf8();
+                } else if c.is_alphabetic() {
+                    let start = i;
+                    i += c.len_utf8();
+                    while i < len {
+                        if bytes[i] < 0x80 {
+                            if bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' {
+                                i += 1;
+                            } else {
+                                break;
+                            }
+                        } else {
+                            let c2 = sql[i..].chars().next().unwrap();
+                            if c2.is_alphanumeric() || c2 == '_' {
+                                i += c2.len_utf8();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    out.push(Token::Ident(sql[start..i].to_owned()));
+                } else {
+                    return Err(Error::Invalid(format!("unexpected character '{c}'")));
+                }
+            }
+            other => {
+                return Err(Error::Invalid(format!(
+                    "unexpected character '{}'",
+                    other as char
+                )))
+            }
         }
     }
     out.push(Token::Eof);

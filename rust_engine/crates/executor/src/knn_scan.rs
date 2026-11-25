@@ -140,6 +140,9 @@ pub(crate) struct KnnProbe {
     /// every row - and they may still be in the append buffer, so the caller
     /// reads them by id (block *and* buffer), not through a block pass.
     pub uncovered: Vec<usize>,
+    /// Pre-scored `(row_id, sim, dist)` hits when an `encode=plain` HNSW
+    /// already computed exact `f32` distances and no rows are uncovered.
+    pub scored: Option<Vec<(usize, f64, f64)>>,
 }
 
 impl KnnProbe {
@@ -161,12 +164,21 @@ impl KnnProbe {
 /// the one failure a caller cannot notice or repair, so the empty answer is
 /// handed back as "the index cannot help" and the rows are scored directly.
 fn answered(candidates: HashSet<usize>, uncovered: Vec<usize>) -> Option<KnnProbe> {
-    if candidates.is_empty() && uncovered.is_empty() {
+    answered_scored(candidates, uncovered, None)
+}
+
+fn answered_scored(
+    candidates: HashSet<usize>,
+    uncovered: Vec<usize>,
+    scored: Option<Vec<(usize, f64, f64)>>,
+) -> Option<KnnProbe> {
+    if candidates.is_empty() && uncovered.is_empty() && scored.as_ref().is_none_or(Vec::is_empty) {
         return None;
     }
     Some(KnnProbe {
         candidates,
         uncovered,
+        scored,
     })
 }
 
@@ -505,7 +517,17 @@ impl Engine {
         // `KnnSearchOption.ef_`: the candidate list size for the bottom
         // layer (`WITH (ef = ...)`).
         let search_option = index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
-        let k = self.candidate_budget(q);
+        // `encode=plain` HNSW already computes exact `f32` distances inside the
+        // graph, so it does not need a `topn * 4` rerank pool (which would
+        // also silently inflate `ef.max(k)` above the user's `WITH (ef = ...)`).
+        let mut all_plain = segments
+            .iter()
+            .all(|seg| seg.index.index().encoding() == index::vector::HnswEncoding::Plain);
+        let k = if all_plain {
+            q.topn.max(1)
+        } else {
+            self.candidate_budget(q)
+        };
         let mut merge = index::merge_knn::MergeKnn::new(1, k, index::merge_knn::Compare::Max, None);
         merge.begin();
         for seg in &segments {
@@ -541,6 +563,7 @@ impl Engine {
                 if mem.dims != q.query.len() {
                     return None;
                 }
+                all_plain &= mem.index().encoding() == index::vector::HnswEncoding::Plain;
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
@@ -560,13 +583,30 @@ impl Engine {
             }
         }
         merge.end();
+        let plain_scored = |hits: &[(f32, u64)]| -> Vec<(usize, f64, f64)> {
+            hits.iter()
+                .map(|&(d, row)| {
+                    let df = f64::from(d);
+                    let (sim, dist) = match q.metric {
+                        "ip" => (-df, df),
+                        "cosine" => {
+                            let c = -df;
+                            (c, 1.0 - c)
+                        }
+                        _ => (1.0 / (1.0 + df), df),
+                    };
+                    (row as usize, sim, dist)
+                })
+                .collect()
+        };
         let candidates: std::collections::HashSet<usize> = merge
-            .ids_by_idx(0)
-            .into_iter()
-            .map(|r| r as usize)
+            .hits_by_idx(0)
+            .iter()
+            .map(|&(_, r)| r as usize)
             .collect();
         if all_covered(q, labelled) {
-            return answered(candidates, Vec::new());
+            let scored = all_plain.then(|| plain_scored(merge.hits_by_idx(0)));
+            return answered_scored(candidates, Vec::new(), scored);
         }
         // The counts disagree, so which rows are missing has to be answered with
         // the labels themselves: a delete leaves its row in the graph (the

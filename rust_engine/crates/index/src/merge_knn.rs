@@ -209,6 +209,11 @@ impl MergeKnn {
         self.results[query_id].iter().map(|(_, r)| *r).collect()
     }
 
+    /// `(dist, row_id)` pairs for `query_id`, best-first after `end()`.
+    pub fn hits_by_idx(&self, query_id: usize) -> &[(f32, RowID)] {
+        &self.results[query_id]
+    }
+
     /// C++: `GetUniqueIDs` — the candidate set across every query, ordered
     /// like the reference's `std::set<RowID>`.
     pub fn unique_ids(&self) -> Vec<RowID> {

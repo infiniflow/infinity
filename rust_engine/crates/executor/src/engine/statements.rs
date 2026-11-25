@@ -11215,24 +11215,35 @@ impl Engine {
         // An `async` block: the probe awaits its spann fan-out. Everything it
         // touches before the first `await` is synchronous, so the readers'
         // locks are released before the future can be parked (§7.6).
-        let vector_candidates: Option<std::collections::HashSet<usize>> = (async {
+        enum VectorProbe {
+            None,
+            Scored(Vec<(usize, f64, f64)>),
+            Candidates(std::collections::HashSet<usize>),
+        }
+        let vector_probe = (async {
             if is_sparse || is_tensor {
-                return None;
+                return VectorProbe::None;
             }
-            let col_name = match_columns(&m.column).first()?.clone();
-            let col_type = types.get(col_idx)?.to_ascii_uppercase();
+            let col_name = match match_columns(&m.column).first() {
+                Some(name) => name.clone(),
+                None => return VectorProbe::None,
+            };
+            let col_type = match types.get(col_idx) {
+                Some(t) => t.to_ascii_uppercase(),
+                None => return VectorProbe::None,
+            };
             if col_type.starts_with("MULTIVECTOR") || is_bit_type(&col_type) {
-                return None; // a single-vector index
+                return VectorProbe::None; // a single-vector index
             }
             let qv = &query_f32;
             if qv.is_empty() {
-                return None;
+                return VectorProbe::None;
             }
             // A filtered query whose predicate the columnar evaluator does not
             // cover has no mask to push down; the index would then return rows
             // the filter rejects and the top-k could come out short.
             if has_filter && allowed.is_none() {
-                return None;
+                return VectorProbe::None;
             }
             // The index this scan reads: the one the statement named, else the
             // column's first HNSW/IVF/SPANN index.
@@ -11377,23 +11388,41 @@ impl Engine {
             // `candidates ∪ uncovered`: the rows the index can win plus the rows
             // it does not cover (`§9.7`). Both are scored exactly, so a partly
             // covered table costs the uncovered rows instead of every row.
-            self.knn_candidates(&knn_scan::KnnCandidateScan {
-                table,
-                index_id,
-                query: qv,
-                rows: &rows,
-                live_rows: None,
-                live_count,
-                topn,
-                metric: &metric,
-                options: &knn_opts,
-                allowed: allowed.as_ref(),
-                beam,
-            })
-            .await
-            .map(|probe| probe.rows())
+            let probe = self
+                .knn_candidates(&knn_scan::KnnCandidateScan {
+                    table,
+                    index_id,
+                    query: qv,
+                    rows: &rows,
+                    live_rows: None,
+                    live_count,
+                    topn,
+                    metric: &metric,
+                    options: &knn_opts,
+                    allowed: allowed.as_ref(),
+                    beam,
+                })
+                .await;
+            match probe {
+                Some(probe)
+                    if !has_filter
+                        && probe.scored.is_some()
+                        && crate::blocks::embedding_shape(&col_type).is_some_and(
+                            |(dim, element_type)| dim == query_f32.len() && element_type == 6,
+                        ) =>
+                {
+                    VectorProbe::Scored(probe.scored.unwrap_or_default())
+                }
+                Some(probe) => VectorProbe::Candidates(probe.rows()),
+                None => VectorProbe::None,
+            }
         })
         .await;
+        let (pre_scored, vector_candidates) = match vector_probe {
+            VectorProbe::None => (None, None),
+            VectorProbe::Scored(scored) => (Some(scored), None),
+            VectorProbe::Candidates(cands) => (None, Some(cands)),
+        };
         // An index answered: its candidates carry the vectors to score, so the
         // column is never read whole. Without one the exact scan wants the
         // parsed column, and building the cache is what makes a repeated exact
@@ -11430,16 +11459,20 @@ impl Engine {
             // Sparse and tensor scans still take the whole column: their scores
             // are built from it before ranking (the BMP index and MaxSim read
             // `rows`).
-            rows = match &vector_candidates {
-                // The fast path: an unfiltered dense embedding whose declared
-                // shape matches the query. The row is decoded as `f32` out of its
-                // block (`BlockCursor::vectors`) instead of being rendered into
-                // the text form and parsed back - on 1536d that round trip was
-                // ~240 us of rendering plus ~27 us of parsing per candidate,
-                // which made the pool the entire query
-                // (`spann_query_profile_1536d`).
-                Some(cands)
-                    if !cands.is_empty()
+            rows = if let Some(pre) = pre_scored {
+                streamed = Some(pre);
+                Vec::new()
+            } else {
+                match &vector_candidates {
+                    // The fast path: an unfiltered dense embedding whose declared
+                    // shape matches the query. The row is decoded as `f32` out of its
+                    // block (`BlockCursor::vectors`) instead of being rendered into
+                    // the text form and parsed back - on 1536d that round trip was
+                    // ~240 us of rendering plus ~27 us of parsing per candidate,
+                    // which made the pool the entire query
+                    // (`spann_query_profile_1536d`).
+                    Some(cands)
+                        if !cands.is_empty()
                         && !has_filter
                         && !is_sparse
                         && !is_tensor
@@ -11450,173 +11483,30 @@ impl Engine {
                             .is_some_and(|(dim, element_type)| {
                                 dim == query_f32.len() && element_type == 6
                             }) =>
-                {
-                    let (dim, element_type) =
-                        crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
-                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
-                    ids.sort_unstable();
-                    let mut merged: Vec<(usize, f64, f64)> = Vec::with_capacity(ids.len());
-                    let mut cursor = self.block_cursor(table)?;
-                    for chunk in ids.chunks(RERANK_BATCH) {
-                        for (seq, stored) in cursor.vectors(col_idx, dim, element_type, chunk)? {
-                            let (sim, dist) = crate::vector_score_f32(&query_f32, &stored, &metric);
-                            merged.push((seq, sim, dist));
-                        }
-                    }
-                    streamed = Some(merged);
-                    Vec::new()
-                }
-                Some(cands) if !cands.is_empty() && !is_sparse && !is_tensor => {
-                    let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
-                    ids.sort_unstable();
-                    let none: HashMap<usize, f64> = HashMap::new();
-                    let mut merged: Vec<(usize, f64, f64)> = Vec::new();
-                    for chunk in ids.chunks(RERANK_BATCH) {
-                        let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
-                        if !has_filter {
-                            for (_, row) in got.iter_mut() {
-                                let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
-                                *row = vec![Value::Null; col_idx + 1];
-                                row[col_idx] = value;
+                    {
+                        let (dim, element_type) =
+                            crate::blocks::embedding_shape(&column_decl).expect("guard checked it");
+                        let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                        ids.sort_unstable();
+                        let mut merged: Vec<(usize, f64, f64)> = Vec::with_capacity(ids.len());
+                        let mut cursor = self.block_cursor(table)?;
+                        for chunk in ids.chunks(RERANK_BATCH) {
+                            for (seq, stored) in
+                                cursor.vectors(col_idx, dim, element_type, chunk)?
+                            {
+                                let (sim, dist) =
+                                    crate::vector_score_f32(&query_f32, &stored, &metric);
+                                merged.push((seq, sim, dist));
                             }
                         }
-                        let batch = knn_scan::PhysicalKnnScan {
-                            column_index: col_idx,
-                            column_type: &column_decl,
-                            is_sparse,
-                            is_tensor,
-                            is_bit_sparse: bit_sparse,
-                            query_items: &query_items,
-                            query_elem_type: query_elem_arg.as_deref(),
-                            topn,
-                            metric: &metric,
-                            threshold,
-                            rows: &got,
-                            vector_candidates: None,
-                        };
-                        merged.extend(
-                            batch
-                                .finish(batch.execute(&keep, &none, &none).await?)
-                                .scored,
-                        );
-                    }
-                    streamed = Some(merged);
-                    Vec::new()
-                }
-                // A predicate reads other columns, so a filtered query needs the
-                // whole row; an unfiltered one is scored from the vector column
-                // alone and gets its output rows from the block pass below.
-                //
-                // A point read here, not a block pass: the uncovered rows are
-                // the ones written after the index was built, and those live in
-                // the append buffer as often as in a block - a block-only read
-                // silently dropped them (`§12.6`).
-                Some(cands) if !cands.is_empty() => {
-                    let ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
-                    let mut got = self.fetch_some_rows_with_ids(table, &ids)?;
-                    if !has_filter {
-                        for (_, row) in got.iter_mut() {
-                            let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
-                            *row = vec![Value::Null; col_idx + 1];
-                            row[col_idx] = value;
-                        }
-                    }
-                    got
-                }
-                Some(_) => Vec::new(),
-                None if !is_sparse && !is_tensor => {
-                    // The in-place `f32` decode the indexed path uses, when the
-                    // query and the column's declared element agree on it; a
-                    // filtered query needs the whole row, so it takes the row
-                    // batches below.
-                    //
-                    // The element has to be `f32` (code 6): `for_each_block_f32`
-                    // walks the block's bytes as `f32` and returns immediately
-                    // for anything else, so a `TINYINT`/`UINT8`/`DOUBLE` column
-                    // would take the dense branch and produce no rows at all -
-                    // `test_knn_hnsw_u8` read that as an empty result.
-                    let dense = if has_filter {
-                        None
-                    } else {
-                        crate::blocks::embedding_shape(&column_decl).filter(
-                            |(dim, element_type)| *dim == query_f32.len() && *element_type == 6,
-                        )
-                    };
-                    // The row-id list is only for the fallback that decodes
-                    // rows; the dense path walks the blocks themselves. Building
-                    // it costs a `HashSet` of every row, which the profile put at
-                    // ~45% of a SIFT 1M scan.
-                    let ids: Vec<u64> = if dense.is_some() {
+                        streamed = Some(merged);
                         Vec::new()
-                    } else {
-                        let mut ids: Vec<u64> = self
-                            .live_row_ids(table)
-                            .into_iter()
-                            .map(|seq| seq as u64)
-                            .collect();
+                    }
+                    Some(cands) if !cands.is_empty() && !is_sparse && !is_tensor => {
+                        let mut ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
                         ids.sort_unstable();
-                        ids
-                    };
-                    let mut cursor = match dense {
-                        Some(_) => Some(self.block_cursor(table)?),
-                        None => None,
-                    };
-                    // Reads only the ranking parameters, so one is enough for the
-                    // per-batch truncation.
-                    let truncate = knn_scan::PhysicalKnnScan {
-                        column_index: col_idx,
-                        column_type: &column_decl,
-                        is_sparse,
-                        is_tensor,
-                        is_bit_sparse: bit_sparse,
-                        query_items: &query_items,
-                        query_elem_type: query_elem_arg.as_deref(),
-                        topn,
-                        metric: &metric,
-                        threshold,
-                        rows: &[],
-                        vector_candidates: None,
-                    };
-                    let none: HashMap<usize, f64> = HashMap::new();
-                    let mut merged: Vec<(usize, f64, f64)> = Vec::new();
-                    if let (Some((dim, element_type)), Some(cursor)) = (dense, cursor.as_mut()) {
-                        // The dense full scan reads the mapped `f32` bytes and
-                        // scores straight out of them - no `Vec<f32>` per row
-                        // (that copy was 64% of this query on SIFT 1M), no
-                        // per-batch set, no sort.
-                        // The reference keeps a top-k heap and reduces it as it
-                        // scans; this reduces per block instead of collecting
-                        // every row, so the working set is `topn` per block
-                        // rather than 1M `(id, sim, dist)` triples.
-                        // One running top-n for the whole scan: each row is
-                        // compared against the set's current cutoff, so the
-                        // 122 per-block `select_nth_unstable_by` calls (16% of
-                        // this query) are gone.
-                        let mut top = truncate.topn_collector();
-                        cursor.for_each_block_f32(
-                            col_idx,
-                            dim,
-                            element_type,
-                            // The whole block at once: one call per block, and
-                            // the row slices come straight out of the mapping.
-                            &mut |base, floats, slots| {
-                                for slot in slots.iter().copied() {
-                                    let at = slot * dim;
-                                    let Some(row) = floats.get(at..at + dim) else {
-                                        continue;
-                                    };
-                                    let (sim, dist) =
-                                        crate::vector_score_f32(&query_f32, row, &metric);
-                                    top.push((base + slot, sim, dist));
-                                }
-                                true
-                            },
-                        )?;
-                        merged.extend(top.into_rows());
-                    } else {
-                        // Sparse, tensor or filtered: the row path, one batch at
-                        // a time, because the score is built from other columns
-                        // too.
+                        let none: HashMap<usize, f64> = HashMap::new();
+                        let mut merged: Vec<(usize, f64, f64)> = Vec::new();
                         for chunk in ids.chunks(RERANK_BATCH) {
                             let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
                             if !has_filter {
@@ -11640,23 +11530,172 @@ impl Engine {
                                 rows: &got,
                                 vector_candidates: None,
                             };
-                            let scored = batch.execute(&keep, &none, &none).await?.scored;
-                            // The union of per-batch top-n is a superset of the
-                            // global top-n for a monotone ranking key.
                             merged.extend(
-                                truncate
-                                    .finish(knn_scan::KnnScanOperatorState {
-                                        scored,
-                                        use_sim: truncate.is_knn_min_heap(),
-                                    })
+                                batch
+                                    .finish(batch.execute(&keep, &none, &none).await?)
                                     .scored,
                             );
                         }
+                        streamed = Some(merged);
+                        Vec::new()
                     }
-                    streamed = Some(merged);
-                    Vec::new()
+                    // A predicate reads other columns, so a filtered query needs the
+                    // whole row; an unfiltered one is scored from the vector column
+                    // alone and gets its output rows from the block pass below.
+                    //
+                    // A point read here, not a block pass: the uncovered rows are
+                    // the ones written after the index was built, and those live in
+                    // the append buffer as often as in a block - a block-only read
+                    // silently dropped them (`§12.6`).
+                    Some(cands) if !cands.is_empty() => {
+                        let ids: Vec<u64> = cands.iter().map(|seq| *seq as u64).collect();
+                        let mut got = self.fetch_some_rows_with_ids(table, &ids)?;
+                        if !has_filter {
+                            for (_, row) in got.iter_mut() {
+                                let value = row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                *row = vec![Value::Null; col_idx + 1];
+                                row[col_idx] = value;
+                            }
+                        }
+                        got
+                    }
+                    Some(_) => Vec::new(),
+                    None if !is_sparse && !is_tensor => {
+                        // The in-place `f32` decode the indexed path uses, when the
+                        // query and the column's declared element agree on it; a
+                        // filtered query needs the whole row, so it takes the row
+                        // batches below.
+                        //
+                        // The element has to be `f32` (code 6): `for_each_block_f32`
+                        // walks the block's bytes as `f32` and returns immediately
+                        // for anything else, so a `TINYINT`/`UINT8`/`DOUBLE` column
+                        // would take the dense branch and produce no rows at all -
+                        // `test_knn_hnsw_u8` read that as an empty result.
+                        let dense = if has_filter {
+                            None
+                        } else {
+                            crate::blocks::embedding_shape(&column_decl).filter(
+                                |(dim, element_type)| *dim == query_f32.len() && *element_type == 6,
+                            )
+                        };
+                        // The row-id list is only for the fallback that decodes
+                        // rows; the dense path walks the blocks themselves. Building
+                        // it costs a `HashSet` of every row, which the profile put at
+                        // ~45% of a SIFT 1M scan.
+                        let ids: Vec<u64> = if dense.is_some() {
+                            Vec::new()
+                        } else {
+                            let mut ids: Vec<u64> = self
+                                .live_row_ids(table)
+                                .into_iter()
+                                .map(|seq| seq as u64)
+                                .collect();
+                            ids.sort_unstable();
+                            ids
+                        };
+                        let mut cursor = match dense {
+                            Some(_) => Some(self.block_cursor(table)?),
+                            None => None,
+                        };
+                        // Reads only the ranking parameters, so one is enough for the
+                        // per-batch truncation.
+                        let truncate = knn_scan::PhysicalKnnScan {
+                            column_index: col_idx,
+                            column_type: &column_decl,
+                            is_sparse,
+                            is_tensor,
+                            is_bit_sparse: bit_sparse,
+                            query_items: &query_items,
+                            query_elem_type: query_elem_arg.as_deref(),
+                            topn,
+                            metric: &metric,
+                            threshold,
+                            rows: &[],
+                            vector_candidates: None,
+                        };
+                        let none: HashMap<usize, f64> = HashMap::new();
+                        let mut merged: Vec<(usize, f64, f64)> = Vec::new();
+                        if let (Some((dim, element_type)), Some(cursor)) = (dense, cursor.as_mut())
+                        {
+                            // The dense full scan reads the mapped `f32` bytes and
+                            // scores straight out of them - no `Vec<f32>` per row
+                            // (that copy was 64% of this query on SIFT 1M), no
+                            // per-batch set, no sort.
+                            // The reference keeps a top-k heap and reduces it as it
+                            // scans; this reduces per block instead of collecting
+                            // every row, so the working set is `topn` per block
+                            // rather than 1M `(id, sim, dist)` triples.
+                            // One running top-n for the whole scan: each row is
+                            // compared against the set's current cutoff, so the
+                            // 122 per-block `select_nth_unstable_by` calls (16% of
+                            // this query) are gone.
+                            let mut top = truncate.topn_collector();
+                            cursor.for_each_block_f32(
+                                col_idx,
+                                dim,
+                                element_type,
+                                // The whole block at once: one call per block, and
+                                // the row slices come straight out of the mapping.
+                                &mut |base, floats, slots| {
+                                    for slot in slots.iter().copied() {
+                                        let at = slot * dim;
+                                        let Some(row) = floats.get(at..at + dim) else {
+                                            continue;
+                                        };
+                                        let (sim, dist) =
+                                            crate::vector_score_f32(&query_f32, row, &metric);
+                                        top.push((base + slot, sim, dist));
+                                    }
+                                    true
+                                },
+                            )?;
+                            merged.extend(top.into_rows());
+                        } else {
+                            // Sparse, tensor or filtered: the row path, one batch at
+                            // a time, because the score is built from other columns
+                            // too.
+                            for chunk in ids.chunks(RERANK_BATCH) {
+                                let mut got = self.fetch_some_rows_with_ids(table, chunk)?;
+                                if !has_filter {
+                                    for (_, row) in got.iter_mut() {
+                                        let value =
+                                            row.get(col_idx).cloned().unwrap_or(Value::Null);
+                                        *row = vec![Value::Null; col_idx + 1];
+                                        row[col_idx] = value;
+                                    }
+                                }
+                                let batch = knn_scan::PhysicalKnnScan {
+                                    column_index: col_idx,
+                                    column_type: &column_decl,
+                                    is_sparse,
+                                    is_tensor,
+                                    is_bit_sparse: bit_sparse,
+                                    query_items: &query_items,
+                                    query_elem_type: query_elem_arg.as_deref(),
+                                    topn,
+                                    metric: &metric,
+                                    threshold,
+                                    rows: &got,
+                                    vector_candidates: None,
+                                };
+                                let scored = batch.execute(&keep, &none, &none).await?.scored;
+                                // The union of per-batch top-n is a superset of the
+                                // global top-n for a monotone ranking key.
+                                merged.extend(
+                                    truncate
+                                        .finish(knn_scan::KnnScanOperatorState {
+                                            scored,
+                                            use_sim: truncate.is_knn_min_heap(),
+                                        })
+                                        .scored,
+                                );
+                            }
+                        }
+                        streamed = Some(merged);
+                        Vec::new()
+                    }
+                    None => self.fetch_rows_with_ids(table).await?,
                 }
-                None => self.fetch_rows_with_ids(table).await?,
             };
         }
         // One BMP index per query over the scanned rows: sparse vectors use the

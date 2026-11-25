@@ -174,13 +174,13 @@ impl HnswEncoding {
 }
 
 /// A query prepared in the store's representation.
-pub(crate) enum HnswQuery {
-    Plain(Vec<f32>),
+pub(crate) enum HnswQuery<'a> {
+    Plain(&'a [f32]),
     Lvq(crate::lvq::LvqQuery),
     Rabitq(crate::rabitq::RabitqQuery),
     /// A sparse `(dimension, weight)` list, sorted by dimension (the
     /// reference's `SparseVecRef`).
-    Sparse(Vec<(u32, f32)>),
+    Sparse(&'a [(u32, f32)]),
 }
 
 /// Inner product of two sparse vectors.
@@ -263,6 +263,8 @@ pub(crate) struct SearchScratch {
     pub(crate) candidate: std::collections::BinaryHeap<std::cmp::Reverse<Cand>>,
     /// The result set, largest distance first.
     pub(crate) result: std::collections::BinaryHeap<Cand>,
+    /// Reusable buffer of unvisited neighbors for lookahead prefetching.
+    pub(crate) to_visit: Vec<usize>,
 }
 
 impl SearchScratch {
@@ -271,6 +273,7 @@ impl SearchScratch {
             visited: Visited::new(),
             candidate: std::collections::BinaryHeap::new(),
             result: std::collections::BinaryHeap::new(),
+            to_visit: Vec::new(),
         }
     }
 
@@ -279,6 +282,7 @@ impl SearchScratch {
         self.visited.begin(nodes, first);
         self.candidate.clear();
         self.result.clear();
+        self.to_visit.clear();
     }
 }
 
@@ -467,11 +471,9 @@ impl Store {
     }
 
     /// The query for the vector stored at `node` (the reference's `GetVecToQuery`).
-    pub(crate) fn make_query_at(&self, node: usize) -> HnswQuery {
+    pub(crate) fn make_query_at(&self, node: usize) -> HnswQuery<'_> {
         match self {
-            Store::Plain { data, .. } => {
-                HnswQuery::Plain(data.get(node).unwrap_or_default().to_vec())
-            }
+            Store::Plain { data, .. } => HnswQuery::Plain(data.get(node).unwrap_or_default()),
             Store::Lvq(store) => HnswQuery::Lvq(
                 store
                     .query_at(node)
@@ -487,23 +489,23 @@ impl Store {
         }
     }
 
-    fn make_query(&self, v: &[f32]) -> HnswQuery {
+    fn make_query<'a>(&self, v: &'a [f32]) -> HnswQuery<'a> {
         match self {
-            Store::Plain { .. } => HnswQuery::Plain(v.to_vec()),
+            Store::Plain { .. } => HnswQuery::Plain(v),
             Store::Lvq(store) => HnswQuery::Lvq(store.make_query(v)),
             Store::Rabitq(store) => HnswQuery::Rabitq(store.make_query(v)),
             Store::SparseIp { .. } => panic!("dense query into a sparse store"),
         }
     }
 
-    fn make_query_sparse(&self, v: &[(u32, f32)]) -> HnswQuery {
+    fn make_query_sparse<'a>(&self, v: &'a [(u32, f32)]) -> HnswQuery<'a> {
         match self {
-            Store::SparseIp { .. } => HnswQuery::Sparse(v.to_vec()),
+            Store::SparseIp { .. } => HnswQuery::Sparse(v),
             _ => panic!("sparse query into a dense store"),
         }
     }
 
-    pub(crate) fn distance_query(&self, query: &HnswQuery, index: usize) -> f32 {
+    pub(crate) fn distance_query(&self, query: &HnswQuery<'_>, index: usize) -> f32 {
         match (self, query) {
             (Store::Plain { metric, data }, HnswQuery::Plain(q)) => data
                 .get(index)
@@ -582,6 +584,15 @@ impl Store {
         }
     }
 
+    #[inline(always)]
+    fn prefetch_node(&self, node: usize) {
+        if let Store::Plain { data, .. } = self {
+            if let Some(row) = data.get(node) {
+                let _ = std::hint::black_box(row.first().copied());
+            }
+        }
+    }
+
     fn encoding(&self) -> HnswEncoding {
         match self {
             Store::Plain { .. } | Store::SparseIp { .. } => HnswEncoding::Plain,
@@ -617,6 +628,37 @@ impl Store {
     }
 }
 
+/// Flat CSR-like adjacency list for one layer of an immutable/loaded graph.
+struct FlatLayer {
+    offsets: Vec<usize>,
+    neighbors: Vec<usize>,
+}
+
+impl FlatLayer {
+    fn from_nested(layer: &[Vec<usize>]) -> Self {
+        let total: usize = layer.iter().map(Vec::len).sum();
+        let mut offsets = Vec::with_capacity(layer.len() + 1);
+        let mut neighbors = Vec::with_capacity(total);
+        offsets.push(0);
+        for nbs in layer {
+            neighbors.extend_from_slice(nbs);
+            offsets.push(neighbors.len());
+        }
+        Self { offsets, neighbors }
+    }
+
+    #[inline]
+    fn get(&self, node: usize) -> Option<&[usize]> {
+        let start = *self.offsets.get(node)?;
+        let end = *self.offsets.get(node + 1)?;
+        self.neighbors.get(start..end)
+    }
+
+    fn len(&self) -> usize {
+        self.offsets.len().saturating_sub(1)
+    }
+}
+
 /// Approximate kNN via a multi-layer navigable graph.
 pub struct HnswIndex {
     dims: usize,
@@ -628,7 +670,7 @@ pub struct HnswIndex {
     /// Per-row LSG scaling factors, when the index was built with `build_type=lsg`.
     lsg: Option<crate::lsg::LsgIndex>,
     levels: Vec<usize>,
-    /// `links[layer][node]` = neighbor node ids.
+    /// `links[layer][node]` = neighbor node ids for mutable/building graphs.
     ///
     /// Stored **already locked**, which is the shape a parallel build needs
     /// (`LockedLinks`). Keeping the unlocked form meant `add_batch` wrapped
@@ -637,6 +679,9 @@ pub struct HnswIndex {
     /// per call once a caller feeds the rows a block at a time (123 calls on
     /// SIFT 1M).
     links: Vec<Vec<std::sync::RwLock<Vec<usize>>>>,
+    /// Lock-free flat adjacency lists for loaded/sealed graphs (`from_store_parts`).
+    /// When non-empty, `links` is empty and searches read without taking any lock.
+    flat_links: Vec<FlatLayer>,
     entry: Option<usize>,
     max_level: usize,
     rng: Rng,
@@ -702,6 +747,7 @@ impl HnswIndex {
             lsg: None,
             levels: Vec::new(),
             links: Vec::new(),
+            flat_links: Vec::new(),
             entry: None,
             max_level: 0,
             rng: Rng::new(0x9E37_79B9_7F4A_7C15),
@@ -832,6 +878,12 @@ impl HnswIndex {
         node: usize,
         f: impl FnOnce(&[usize]) -> R,
     ) -> R {
+        if !self.flat_links.is_empty() {
+            return match self.flat_links.get(layer).and_then(|l| l.get(node)) {
+                Some(list) => f(list),
+                None => f(&[]),
+            };
+        }
         match self.links.get(layer).and_then(|l| l.get(node)) {
             Some(cell) => {
                 let list = cell.read().unwrap_or_else(|e| e.into_inner());
@@ -863,28 +915,41 @@ impl HnswIndex {
                 return Err(Error::Invalid(format!("entry {entry} outside 0..{n}")));
             }
         }
+        let check_node = |layer: usize, node: usize, neighbors: &[usize]| -> Result<()> {
+            let mut seen = HashSet::with_capacity(neighbors.len());
+            for &neighbor in neighbors {
+                if neighbor >= n {
+                    return Err(Error::Invalid(format!(
+                        "layer {layer} node {node} links to {neighbor} outside 0..{n}"
+                    )));
+                }
+                if neighbor == node {
+                    return Err(Error::Invalid(format!(
+                        "layer {layer} node {node} links to itself"
+                    )));
+                }
+                if !seen.insert(neighbor) {
+                    return Err(Error::Invalid(format!(
+                        "layer {layer} node {node} links to {neighbor} twice"
+                    )));
+                }
+            }
+            Ok(())
+        };
+        if !self.flat_links.is_empty() {
+            for (layer, flat) in self.flat_links.iter().enumerate() {
+                for node in 0..flat.len() {
+                    if let Some(neighbors) = flat.get(node) {
+                        check_node(layer, node, neighbors)?;
+                    }
+                }
+            }
+            return Ok(());
+        }
         for (layer, nodes) in self.links.iter().enumerate() {
             for (node, cell) in nodes.iter().enumerate() {
                 let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
-                let neighbors = &*neighbors;
-                let mut seen = HashSet::with_capacity(neighbors.len());
-                for &neighbor in neighbors {
-                    if neighbor >= n {
-                        return Err(Error::Invalid(format!(
-                            "layer {layer} node {node} links to {neighbor} outside 0..{n}"
-                        )));
-                    }
-                    if neighbor == node {
-                        return Err(Error::Invalid(format!(
-                            "layer {layer} node {node} links to itself"
-                        )));
-                    }
-                    if !seen.insert(neighbor) {
-                        return Err(Error::Invalid(format!(
-                            "layer {layer} node {node} links to {neighbor} twice"
-                        )));
-                    }
-                }
+                check_node(layer, node, &neighbors)?;
             }
         }
         Ok(())
@@ -932,14 +997,28 @@ impl HnswIndex {
             put_u64(&mut out, self.level_of(node) as u64);
         }
         put_u64(&mut out, self.entry.map_or(u64::MAX, |entry| entry as u64));
-        put_u64(&mut out, self.links.len() as u64);
-        for layer in &self.links {
-            put_u64(&mut out, layer.len() as u64);
-            for cell in layer {
-                let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
-                put_u64(&mut out, neighbors.len() as u64);
-                for &neighbor in neighbors.iter() {
-                    out.extend_from_slice(&(neighbor as u32).to_le_bytes());
+        if !self.flat_links.is_empty() {
+            put_u64(&mut out, self.flat_links.len() as u64);
+            for layer in &self.flat_links {
+                put_u64(&mut out, layer.len() as u64);
+                for node in 0..layer.len() {
+                    let neighbors = layer.get(node).unwrap_or(&[]);
+                    put_u64(&mut out, neighbors.len() as u64);
+                    for &neighbor in neighbors {
+                        out.extend_from_slice(&(neighbor as u32).to_le_bytes());
+                    }
+                }
+            }
+        } else {
+            put_u64(&mut out, self.links.len() as u64);
+            for layer in &self.links {
+                put_u64(&mut out, layer.len() as u64);
+                for cell in layer {
+                    let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
+                    put_u64(&mut out, neighbors.len() as u64);
+                    for &neighbor in neighbors.iter() {
+                        out.extend_from_slice(&(neighbor as u32).to_le_bytes());
+                    }
                 }
             }
         }
@@ -1028,7 +1107,7 @@ impl HnswIndex {
         }
     }
 
-    fn distance_query(&self, query: &HnswQuery, self_id: Option<usize>, index: usize) -> f32 {
+    fn distance_query(&self, query: &HnswQuery<'_>, self_id: Option<usize>, index: usize) -> f32 {
         let d = self.store.distance_query(query, index);
         self.adjust(d, self_id, index)
     }
@@ -1076,24 +1155,24 @@ impl HnswIndex {
         store: Store,
         lsg: Option<crate::lsg::LsgIndex>,
         levels: Vec<usize>,
-        links: Vec<Vec<Vec<usize>>>,
+        mut links: Vec<Vec<Vec<usize>>>,
         entry: Option<usize>,
         max_level: usize,
     ) -> Self {
-        let mut links: Vec<Vec<std::sync::RwLock<Vec<usize>>>> = links
-            .into_iter()
-            .map(|layer| layer.into_iter().map(std::sync::RwLock::new).collect())
-            .collect();
         for (node, level) in levels.iter().enumerate() {
             for layer in 0..=*level {
                 while links.len() <= layer {
                     links.push(Vec::new());
                 }
                 while links[layer].len() <= node {
-                    links[layer].push(std::sync::RwLock::new(Vec::new()));
+                    links[layer].push(Vec::new());
                 }
             }
         }
+        let flat_links = links
+            .iter()
+            .map(|layer| FlatLayer::from_nested(layer))
+            .collect();
         Self {
             dims,
             m,
@@ -1103,11 +1182,27 @@ impl HnswIndex {
             store,
             lsg,
             levels,
-            links,
+            links: Vec::new(),
+            flat_links,
             entry,
             max_level,
             rng: Rng::new(0x9E37_79B9_7F4A_7C15),
         }
+    }
+
+    fn ensure_locked_links(&mut self) {
+        if self.flat_links.is_empty() {
+            return;
+        }
+        self.links = self
+            .flat_links
+            .drain(..)
+            .map(|flat| {
+                (0..flat.len())
+                    .map(|node| std::sync::RwLock::new(flat.get(node).unwrap_or(&[]).to_vec()))
+                    .collect()
+            })
+            .collect();
     }
 
     /// C++ `KnnHnsw::CompressToLVQ`: re-encode the stored vectors with an LVQ
@@ -1214,19 +1309,33 @@ impl HnswIndex {
         let vectors = self.store_record_size() * self.len();
         let labels = self.len() * std::mem::size_of::<u64>();
         let levels = self.levels.len() * std::mem::size_of::<usize>();
-        let graph: usize = self
-            .links
-            .iter()
-            .map(|layer| {
-                layer
-                    .iter()
-                    .map(|cell| {
-                        let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
-                        std::mem::size_of::<u32>() + neighbors.len() * std::mem::size_of::<u32>()
-                    })
-                    .sum::<usize>()
-            })
-            .sum();
+        let graph: usize = if !self.flat_links.is_empty() {
+            self.flat_links
+                .iter()
+                .map(|layer| {
+                    (0..layer.len())
+                        .map(|node| {
+                            let nbs = layer.get(node).unwrap_or(&[]);
+                            std::mem::size_of::<u32>() + nbs.len() * std::mem::size_of::<u32>()
+                        })
+                        .sum::<usize>()
+                })
+                .sum()
+        } else {
+            self.links
+                .iter()
+                .map(|layer| {
+                    layer
+                        .iter()
+                        .map(|cell| {
+                            let neighbors = cell.read().unwrap_or_else(|e| e.into_inner());
+                            std::mem::size_of::<u32>()
+                                + neighbors.len() * std::mem::size_of::<u32>()
+                        })
+                        .sum::<usize>()
+                })
+                .sum()
+        };
         header + store_meta + vectors + labels + levels + graph
     }
 
@@ -1400,6 +1509,7 @@ impl HnswIndex {
         if vectors.is_empty() {
             return 0;
         }
+        self.ensure_locked_links();
         if threads <= 1 {
             for v in vectors {
                 self.add(v.as_ref());
@@ -1591,7 +1701,8 @@ impl HnswIndex {
         self.insert_node(query, |store| store.push_sparse(v))
     }
 
-    fn insert_node(&mut self, query: HnswQuery, push: impl FnOnce(&mut Store)) -> usize {
+    fn insert_node(&mut self, query: HnswQuery<'_>, push: impl FnOnce(&mut Store)) -> usize {
+        self.ensure_locked_links();
         let node = self.store.len();
         push(&mut self.store);
         let q_layer = self.random_level();
@@ -1650,13 +1761,34 @@ impl HnswIndex {
 
     fn search_layer_nearest(
         &self,
-        q: &HnswQuery,
+        q: &HnswQuery<'_>,
         start: usize,
         layer: usize,
         self_id: Option<usize>,
     ) -> usize {
         let mut cur = start;
         let mut cur_d = self.distance_query(q, self_id, cur);
+        if !self.flat_links.is_empty() {
+            let Some(flat_layer) = self.flat_links.get(layer) else {
+                return cur;
+            };
+            loop {
+                let mut changed = false;
+                if let Some(list) = flat_layer.get(cur) {
+                    for &nb in list.iter().rev() {
+                        let d = self.distance_query(q, self_id, nb);
+                        if d < cur_d {
+                            cur = nb;
+                            cur_d = d;
+                            changed = true;
+                        }
+                    }
+                }
+                if !changed {
+                    return cur;
+                }
+            }
+        }
         loop {
             let mut changed = false;
             if let Some(cell) = self.links.get(layer).and_then(|l| l.get(cur)) {
@@ -1678,7 +1810,7 @@ impl HnswIndex {
 
     fn search_layer(
         &self,
-        q: &HnswQuery,
+        q: &HnswQuery<'_>,
         ep: usize,
         ef: usize,
         layer: usize,
@@ -1698,7 +1830,7 @@ impl HnswIndex {
     /// 47% of the build's samples in `perf`, against 8% in `distance_query`.
     fn search_layer_filtered(
         &self,
-        q: &HnswQuery,
+        q: &HnswQuery<'_>,
         ep: usize,
         ef: usize,
         layer: usize,
@@ -1734,7 +1866,7 @@ impl HnswIndex {
     #[allow(clippy::too_many_arguments)]
     fn search_layer_loop(
         &self,
-        q: &HnswQuery,
+        q: &HnswQuery<'_>,
         ef: usize,
         layer: usize,
         self_id: Option<usize>,
@@ -1744,6 +1876,9 @@ impl HnswIndex {
         ep: usize,
         scratch: &mut SearchScratch,
     ) -> Vec<(f32, usize)> {
+        // Lookahead prefetch depth for neighbor vectors (`parallel_build.rs`
+        // measured ~60% LLC misses without prefetching).
+        const PREFETCH_STEP: usize = 3;
         // The heaps live in the scratch: one per call would be two allocations
         // and two frees per layer per vertex over a whole build. They are
         // destructured out so the visited stamp and the heaps can be borrowed
@@ -1752,12 +1887,14 @@ impl HnswIndex {
             visited,
             candidate,
             result,
+            to_visit,
         } = scratch;
         candidate.push(Reverse(Cand(ep_d, ep)));
         if allowed(ep) {
             result.push(Cand(ep_d, ep));
         }
 
+        let flat_layer = self.flat_links.get(layer);
         while let Some(Reverse(Cand(cd, c))) = candidate.pop() {
             // `result` is a max-heap under `CompareMax`, so its root is the
             // worst kept entry: `result_handler.GetDistance0(0)`.
@@ -1765,13 +1902,33 @@ impl HnswIndex {
             if result.len() >= ef && cd > worst {
                 break;
             }
-            let Some(cell) = self.links.get(layer).and_then(|l| l.get(c)) else {
-                continue;
-            };
-            let list = cell.read().unwrap_or_else(|e| e.into_inner());
-            for &nb in list.iter() {
-                if nb >= nodes || !visited.visit(nb) {
+            to_visit.clear();
+            if let Some(flat) = flat_layer {
+                let Some(list) = flat.get(c) else {
                     continue;
+                };
+                for &nb in list {
+                    if nb < nodes && visited.visit(nb) {
+                        to_visit.push(nb);
+                    }
+                }
+            } else {
+                let Some(cell) = self.links.get(layer).and_then(|l| l.get(c)) else {
+                    continue;
+                };
+                let list = cell.read().unwrap_or_else(|e| e.into_inner());
+                for &nb in list.iter() {
+                    if nb < nodes && visited.visit(nb) {
+                        to_visit.push(nb);
+                    }
+                }
+            }
+            for &nb in to_visit.iter().take(PREFETCH_STEP) {
+                self.store.prefetch_node(nb);
+            }
+            for (idx, &nb) in to_visit.iter().enumerate() {
+                if let Some(&ahead) = to_visit.get(idx + PREFETCH_STEP) {
+                    self.store.prefetch_node(ahead);
                 }
                 let d = self.distance_query(q, self_id, nb);
                 let worst = result.peek().map(|x| x.0).unwrap_or(f32::INFINITY);
@@ -1781,9 +1938,10 @@ impl HnswIndex {
                         // `HeapResultHandler::AddResult`: replace the root when
                         // the new entry is better under `CompareMax`, else drop.
                         if result.len() == ef {
-                            if result.peek().is_some_and(|top| Cand(d, nb) < *top) {
-                                result.pop();
-                                result.push(Cand(d, nb));
+                            if let Some(mut top) = result.peek_mut() {
+                                if Cand(d, nb) < *top {
+                                    *top = Cand(d, nb);
+                                }
                             }
                         } else {
                             result.push(Cand(d, nb));
@@ -1801,17 +1959,23 @@ impl HnswIndex {
     pub fn mem_usage(&self) -> usize {
         let data = self.store.mem_bytes();
         let levels = self.levels.capacity() * std::mem::size_of::<usize>();
-        let links: usize = self
-            .links
-            .iter()
-            .map(|layer| {
-                layer.capacity() * std::mem::size_of::<std::sync::RwLock<Vec<usize>>>()
-                    + layer
-                        .iter()
-                        .map(|l| l.read().unwrap_or_else(|e| e.into_inner()).capacity() * 8)
-                        .sum::<usize>()
-            })
-            .sum();
+        let links: usize = if !self.flat_links.is_empty() {
+            self.flat_links
+                .iter()
+                .map(|layer| (layer.offsets.capacity() + layer.neighbors.capacity()) * 8)
+                .sum()
+        } else {
+            self.links
+                .iter()
+                .map(|layer| {
+                    layer.capacity() * std::mem::size_of::<std::sync::RwLock<Vec<usize>>>()
+                        + layer
+                            .iter()
+                            .map(|l| l.read().unwrap_or_else(|e| e.into_inner()).capacity() * 8)
+                            .sum::<usize>()
+                })
+                .sum()
+        };
         data + levels + links
     }
 
@@ -1845,16 +2009,16 @@ impl HnswIndex {
     /// The sparse counterpart of [`HnswIndex::search_with_ef`]
     /// (C++ `KnnHnsw<SparseIPVecStoreType>::KnnSearchSorted`).
     pub fn search_sparse(&self, q: &[(u32, f32)], k: usize, ef: usize) -> Vec<(usize, f32)> {
-        self.search_query(HnswQuery::Sparse(q.to_vec()), k, ef)
+        self.search_query(HnswQuery::Sparse(q), k, ef)
     }
 
-    fn search_query(&self, query: HnswQuery, k: usize, ef: usize) -> Vec<(usize, f32)> {
+    fn search_query(&self, query: HnswQuery<'_>, k: usize, ef: usize) -> Vec<(usize, f32)> {
         let mut res = self.search_query_candidates(query, ef.max(k));
         res.truncate(k);
         res
     }
 
-    fn search_query_candidates(&self, query: HnswQuery, ef: usize) -> Vec<(usize, f32)> {
+    fn search_query_candidates(&self, query: HnswQuery<'_>, ef: usize) -> Vec<(usize, f32)> {
         let Some(entry) = self.entry else {
             return vec![];
         };
@@ -1864,8 +2028,7 @@ impl HnswIndex {
             cur = self.search_layer_nearest(&query, cur, l as usize, None);
             l -= 1;
         }
-        let mut res = self.search_layer(&query, cur, ef.max(1), 0, None);
-        res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        let res = self.search_layer(&query, cur, ef.max(1), 0, None);
         res.into_iter().map(|(d, i)| (i, d)).collect()
     }
 
@@ -1890,7 +2053,6 @@ impl HnswIndex {
         }
         let ef = ef.max(k);
         let mut res = self.search_layer_filtered(&query, cur, ef, 0, None, Some(allow));
-        res.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
         res.truncate(k);
         res.into_iter().map(|(d, i)| (i, d)).collect()
     }

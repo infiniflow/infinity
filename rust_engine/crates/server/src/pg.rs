@@ -461,8 +461,9 @@ async fn read_message_async(
 /// synchronous tests (which drive it over a `Cursor`) still cover the bytes;
 /// this function only decides *where* the statement runs (plan §6.5).
 async fn handle_connection_async(stream: tokio::net::TcpStream, engine: Arc<Engine>) -> Result<()> {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let (mut reader, mut writer) = stream.into_split();
+    use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader};
+    let (reader, mut writer) = stream.into_split();
+    let mut reader = BufReader::with_capacity(16 * 1024, reader);
 
     // Startup: `len | protocol | key\0value\0…\0`. `SSLRequest` is answered with
     // a single `N` (no SSL) and the loop waits for the real startup message.

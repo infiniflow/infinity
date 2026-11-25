@@ -33,23 +33,11 @@
 //! reorders *results*: the comparison order is the same, only the rounding of
 //! equal-to-a-few-ulps sums moves.
 
-use std::simd::f32x8;
 use std::simd::num::SimdFloat;
+use std::simd::{f32x16, f32x8};
 
 /// Lanes of the accumulator: `f32x8` is one AVX register, or two SSE ones.
 const LANES: usize = 8;
-
-/// The lanes of `a` that form a whole vector, and the scalar remainder.
-///
-/// `f32x8::from_slice(&a[i..])` reads correctly but leaves a panicking bounds
-/// check on every iteration, and LLVM cannot fold that into a single vector
-/// load: the hot loop came out as `vaddss`/`vmulss` (scalar) with only the odd
-/// `vaddps`. `as_chunks` makes the length a type-level fact (`&[[f32; LANES]]`),
-/// so the load becomes one `vmovups`.
-#[inline(always)]
-fn split_lanes(a: &[f32]) -> (&[[f32; LANES]], &[f32]) {
-    a.as_chunks::<LANES>()
-}
 
 /// One `f32x8` loaded from a fixed-size lane group.
 #[inline(always)]
@@ -58,20 +46,29 @@ fn lane8(chunk: &[f32; LANES]) -> f32x8 {
 }
 
 /// Squared L2 distance, the reference's `F32L2` family.
+///
+/// Uses `f32x16` (16 floats/iter: one AVX-512 `zmm` on Zen 4+, or two AVX2
+/// `ymm` accumulators on `x86-64-v3`) with an `f32x8` + scalar tail.
 #[inline]
 pub fn l2_sq(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len().min(b.len());
     let (a, b) = (&a[..n], &b[..n]);
-    let (av, at) = split_lanes(a);
-    let (bv, bt) = split_lanes(b);
-    let mut acc = f32x8::splat(0.0);
-    for (x, y) in av.iter().zip(bv) {
-        let diff = lane8(x) - lane8(y);
+    let (av16, at16) = a.as_chunks::<16>();
+    let (bv16, bt16) = b.as_chunks::<16>();
+    let mut acc16 = f32x16::splat(0.0);
+    for (x, y) in av16.iter().zip(bv16) {
+        let diff = f32x16::from_array(*x) - f32x16::from_array(*y);
         // `sum + diff * diff`, not `mul_add`: the reference commented the FMA
         // out in `F32L2AVX512` and this keeps the same rounding.
-        acc += diff * diff;
+        acc16 += diff * diff;
     }
-    let mut sum = acc.reduce_sum();
+    let mut sum = acc16.reduce_sum();
+    let (av8, at) = at16.as_chunks::<8>();
+    let (bv8, bt) = bt16.as_chunks::<8>();
+    if let (Some(x), Some(y)) = (av8.first(), bv8.first()) {
+        let diff = lane8(x) - lane8(y);
+        sum += (diff * diff).reduce_sum();
+    }
     for (x, y) in at.iter().zip(bt) {
         let diff = x - y;
         sum += diff * diff;
@@ -116,13 +113,18 @@ pub fn l2_sq_bytes(a: &[f32], b: &[u8]) -> f32 {
 pub fn ip(a: &[f32], b: &[f32]) -> f32 {
     let n = a.len().min(b.len());
     let (a, b) = (&a[..n], &b[..n]);
-    let (av, at) = split_lanes(a);
-    let (bv, bt) = split_lanes(b);
-    let mut acc = f32x8::splat(0.0);
-    for (x, y) in av.iter().zip(bv) {
-        acc += lane8(x) * lane8(y);
+    let (av16, at16) = a.as_chunks::<16>();
+    let (bv16, bt16) = b.as_chunks::<16>();
+    let mut acc16 = f32x16::splat(0.0);
+    for (x, y) in av16.iter().zip(bv16) {
+        acc16 += f32x16::from_array(*x) * f32x16::from_array(*y);
     }
-    let mut sum = acc.reduce_sum();
+    let mut sum = acc16.reduce_sum();
+    let (av8, at) = at16.as_chunks::<8>();
+    let (bv8, bt) = bt16.as_chunks::<8>();
+    if let (Some(x), Some(y)) = (av8.first(), bv8.first()) {
+        sum += (lane8(x) * lane8(y)).reduce_sum();
+    }
     for (x, y) in at.iter().zip(bt) {
         sum += x * y;
     }
@@ -173,17 +175,27 @@ pub fn ip_x4(rows: [&[f32]; 4], b: &[f32]) -> [f32; 4] {
 pub fn cos_parts(a: &[f32], b: &[f32]) -> (f32, f32, f32) {
     let n = a.len().min(b.len());
     let (a, b) = (&a[..n], &b[..n]);
-    let (av, at) = split_lanes(a);
-    let (bv, bt) = split_lanes(b);
-    let (mut dot, mut na, mut nb) = (f32x8::splat(0.0), f32x8::splat(0.0), f32x8::splat(0.0));
-    for (xc, yc) in av.iter().zip(bv) {
+    let (av16, at16) = a.as_chunks::<16>();
+    let (bv16, bt16) = b.as_chunks::<16>();
+    let (mut dot16, mut na16, mut nb16) =
+        (f32x16::splat(0.0), f32x16::splat(0.0), f32x16::splat(0.0));
+    for (xc, yc) in av16.iter().zip(bv16) {
+        let x = f32x16::from_array(*xc);
+        let y = f32x16::from_array(*yc);
+        dot16 += x * y;
+        na16 += x * x;
+        nb16 += y * y;
+    }
+    let (mut dot, mut na, mut nb) = (dot16.reduce_sum(), na16.reduce_sum(), nb16.reduce_sum());
+    let (av8, at) = at16.as_chunks::<8>();
+    let (bv8, bt) = bt16.as_chunks::<8>();
+    if let (Some(xc), Some(yc)) = (av8.first(), bv8.first()) {
         let x = lane8(xc);
         let y = lane8(yc);
-        dot += x * y;
-        na += x * x;
-        nb += y * y;
+        dot += (x * y).reduce_sum();
+        na += (x * x).reduce_sum();
+        nb += (y * y).reduce_sum();
     }
-    let (mut dot, mut na, mut nb) = (dot.reduce_sum(), na.reduce_sum(), nb.reduce_sum());
     for (x, y) in at.iter().zip(bt) {
         dot += x * y;
         na += x * x;
