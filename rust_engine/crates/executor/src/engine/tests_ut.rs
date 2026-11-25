@@ -11550,6 +11550,238 @@ mod tests {
         );
     }
 
+    /// A phrase child on a sealed chunk reads token offsets only for the
+    /// documents it verifies. The eager path rebuilt one offset array per
+    /// posting of every block the alignment walked into - on a phrase that
+    /// matches rarely, that is the whole posting list for a handful of
+    /// documents (the Q3 report: 22,436 offsets buffered, 144 used).
+    ///
+    /// Three terms over 2000 documents: `a` and `b` are adjacent everywhere,
+    /// `c` only every 400th document, so `"a b c"` matches five documents while
+    /// the alignment hops `a` and `b` across fifteen blocks.
+    #[tokio::test]
+    async fn a_phrase_child_reads_offsets_lazily_on_a_sealed_chunk() {
+        use std::collections::BTreeMap;
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        const DOCS: u64 = 2000;
+        let docs: Vec<(u64, u32)> = (0..DOCS).map(|row| (row, 4)).collect();
+        // `c` appears every 200th document, but only the 400th ones have all
+        // three terms consecutive; the 200/600/... candidates carry `c` at
+        // offset 3 so a stale offset read turns them into false matches.
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        postings.insert("a".into(), (0..DOCS).map(|row| (row, 1, vec![0])).collect());
+        postings.insert("b".into(), (0..DOCS).map(|row| (row, 1, vec![1])).collect());
+        postings.insert(
+            "c".into(),
+            (0..DOCS)
+                .filter(|row| row % 200 == 0)
+                .map(|row| (row, 1, vec![if row % 400 == 0 { 2 } else { 3 }]))
+                .collect(),
+        );
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        storage::invertedindex::disk_segment_reader::write_segment_index(
+            &seg,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .await
+        .unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), DOCS, "the chunk loads");
+
+        let children: Vec<TermStream<'_>> = ["a", "b", "c"]
+            .iter()
+            .map(|t| index.term_stream_capture(t, true))
+            .collect();
+        let mut cursor = PhraseCursor::new(children, 0);
+        let mut hits = Vec::new();
+        while let Some(doc) = cursor.doc() {
+            hits.push(doc);
+            cursor.seek_block(doc + 1);
+        }
+        assert_eq!(
+            hits,
+            vec![0, 400, 800, 1200, 1600],
+            "the phrase occurrences"
+        );
+        assert!(
+            cursor.children.iter().all(|c| c.direct_blocks > 0),
+            "the sealed block was not read directly: {:?}",
+            cursor
+                .children
+                .iter()
+                .map(|c| c.direct_blocks)
+                .collect::<Vec<_>>()
+        );
+        let built: usize = cursor.children.iter().map(|c| c.offsets_built).sum();
+        // Five verifications of three terms: at most a few offsets each. The
+        // eager path would have rebuilt every posting of every block `a` and
+        // `b` hopped through (well over a thousand).
+        assert!(
+            built <= 64,
+            "{built} offsets rebuilt for five phrase verifications"
+        );
+    }
+
+    /// The lazy offset path must keep the block bookkeeping honest across block
+    /// boundaries: a phrase that matches every document walks its children
+    /// linearly, so each child crosses several 128-posting blocks without ever
+    /// seeking. Every document must come back once, in order, with its own
+    /// offsets - a cursor left behind on the block it served would repeat rows,
+    /// and one advanced too far would drop them.
+    #[tokio::test]
+    async fn a_phrase_child_crosses_blocks_reading_offsets_lazily() {
+        use std::collections::BTreeMap;
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        const DOCS: u64 = 700;
+        let docs: Vec<(u64, u32)> = (0..DOCS).map(|row| (row, 10)).collect();
+        // The phrase sits at a different offset in every document, so a stale
+        // or misplaced offset array shows up as a missing match rather than as
+        // an unchanged answer.
+        // Even rows match (`b` at `a + 1`); odd rows (including 127, 255, 383,
+        // 511, 639 right before block boundaries) place `b` at `a + 3` so stale
+        // offsets from an adjacent document produce a false match or miss.
+        let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+        postings.insert(
+            "a".into(),
+            (0..DOCS)
+                .map(|row| (row, 1, vec![(row % 4) as u32]))
+                .collect(),
+        );
+        postings.insert(
+            "b".into(),
+            (0..DOCS)
+                .map(|row| {
+                    let off = (row % 4) as u32 + if row % 2 == 0 { 1 } else { 3 };
+                    (row, 1, vec![off])
+                })
+                .collect(),
+        );
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        storage::invertedindex::disk_segment_reader::write_segment_index(
+            &seg,
+            "ft_0000000000000000",
+            0,
+            &docs,
+            &postings,
+            storage::invertedindex::format::OPTION_FLAG_ALL,
+        )
+        .await
+        .unwrap();
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), DOCS, "the chunk loads");
+
+        let children: Vec<TermStream<'_>> = ["a", "b"]
+            .iter()
+            .map(|t| index.term_stream_capture(t, true))
+            .collect();
+        let mut cursor = PhraseCursor::new(children, 0);
+        let mut hits = Vec::new();
+        while let Some(doc) = cursor.doc() {
+            hits.push(doc);
+            // Resolve the next document; the children step one document at a
+            // time inside a block and refill at its end.
+            let next = doc + 1;
+            for child in cursor.children.iter_mut() {
+                child.advance(next);
+            }
+            cursor.pending = true;
+            cursor.cur = None;
+        }
+        let want: Vec<u64> = (0..DOCS).filter(|row| row % 2 == 0).collect();
+        assert_eq!(hits, want, "every matching document once, in order");
+        assert!(
+            cursor.children.iter().all(|c| c.direct_blocks >= 5),
+            "the walk did not cross blocks: {:?}",
+            cursor
+                .children
+                .iter()
+                .map(|c| c.direct_blocks)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// The shape a real table has after `COPY` + `CREATE INDEX`: several sealed
+    /// chunks concatenated into one posting list. The lazy offset path has to
+    /// take the concatenation (each chunk's block is served by its own cursor)
+    /// and still hand out every document once with its own offsets.
+    #[tokio::test]
+    async fn a_phrase_child_reads_offsets_lazily_across_concatenated_chunks() {
+        use std::collections::BTreeMap;
+        let dir = tempdir().unwrap();
+        let d = dir.path().to_str().unwrap();
+        const PER_CHUNK: u64 = 500;
+        let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
+        for base in [0u64, PER_CHUNK] {
+            let docs: Vec<(u64, u32)> = (base..base + PER_CHUNK).map(|row| (row, 10)).collect();
+            let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
+            postings.insert(
+                "a".into(),
+                docs.iter()
+                    .map(|(row, _)| (*row, 1, vec![(*row % 5) as u32]))
+                    .collect(),
+            );
+            postings.insert(
+                "b".into(),
+                docs.iter()
+                    .map(|(row, _)| {
+                        let off = (*row % 5) as u32 + if row % 2 == 0 { 1 } else { 3 };
+                        (*row, 1, vec![off])
+                    })
+                    .collect(),
+            );
+            storage::invertedindex::disk_segment_reader::write_segment_index(
+                &seg,
+                &format!("ft_{base:016x}"),
+                base,
+                &docs,
+                &postings,
+                storage::invertedindex::format::OPTION_FLAG_ALL,
+            )
+            .await
+            .unwrap();
+        }
+        let mut index = TextIndex::new(d.to_string(), TextTokenizer::default());
+        assert_eq!(index.load_sealed(), 2 * PER_CHUNK, "both chunks load");
+
+        let children: Vec<TermStream<'_>> = ["a", "b"]
+            .iter()
+            .map(|t| index.term_stream_capture(t, true))
+            .collect();
+        let mut cursor = PhraseCursor::new(children, 0);
+        let mut hits = Vec::new();
+        while let Some(doc) = cursor.doc() {
+            hits.push(doc);
+            let next = doc + 1;
+            for child in cursor.children.iter_mut() {
+                child.advance(next);
+            }
+            cursor.pending = true;
+            cursor.cur = None;
+        }
+        assert_eq!(
+            hits,
+            (0..2 * PER_CHUNK)
+                .filter(|row| row % 2 == 0)
+                .collect::<Vec<u64>>(),
+            "every matching document once, in order"
+        );
+        assert!(
+            cursor.children.iter().all(|c| c.direct_blocks >= 4),
+            "the concatenated chunks were not read directly: {:?}",
+            cursor
+                .children
+                .iter()
+                .map(|c| c.direct_blocks)
+                .collect::<Vec<_>>()
+        );
+    }
+
     /// The field-group form (`MATCH TEXT ('', '(doc:…)')`) also starts from the
     /// index: only the documents that hold one of the query terms are
     /// tokenised, in both scoring modes.
