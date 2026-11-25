@@ -30,11 +30,11 @@ export SEC_ROWS=${SEC_ROWS:-$rows}
 
 case "$workload" in
   hnsw)             driver=go/cmd/hnsw_benchmark;            argrow=(-host 127.0.0.1 -port 23817 -dataset synthetic -rows "$rows" -num-queries "$queries" -threads 8 -multi-queries 1000) ;;
-  index-types)      driver=tools/bench_index_types.py;       argrow=("127.0.0.1" 23817 "$rows" "$queries") ;;
-  multivector)      driver=tools/bench_multivector.py;       argrow=("127.0.0.1" 23817 "$rows" "$queries") ;;
-  secondary-lookup) driver=tools/bench_secondary_lookup.py;  argrow=() ;;
-  secondary-maint)  driver=tools/bench_secondary_maint.py;   argrow=() ;;
-  sdk)              driver=tools/bench_sdk_driver.py;        argrow=("127.0.0.1" 23817 "$rows") ;;
+  index-types)      driver=go/cmd/index_types_benchmark;     argrow=("127.0.0.1" 23817 "$rows" "$queries") ;;
+  multivector)      driver=go/cmd/multivector_benchmark;     argrow=("127.0.0.1" 23817 "$rows" "$queries") ;;
+  secondary-lookup) driver=go/cmd/secondary_lookup_benchmark; argrow=() ;;
+  secondary-maint)  driver=go/cmd/secondary_maint_benchmark; argrow=() ;;
+  sdk)              driver=go/cmd/sdk_benchmark;             argrow=("127.0.0.1" 23817 "$rows") ;;
   *) echo "usage: $0 <hnsw|index-types|multivector|secondary-lookup|secondary-maint|sdk> [rows] [queries]"; exit 2 ;;
 esac
 

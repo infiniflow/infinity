@@ -4,7 +4,7 @@
 #   ./scripts/run_gate_e.sh [<golden_log>]
 #
 # With a golden log the script runs the *same* SDK driver that produced it
-# (`tools/bench_sdk_driver.py` over the wire: insert / full select / point
+# (`go/cmd/sdk_benchmark` over the wire: insert / full select / point
 # filter) against a freshly started Rust server, then applies
 # `tools/ci_tools/check_benchmark_result.py` (<7% regression).
 #
@@ -40,7 +40,7 @@ if [[ $# -ge 1 ]]; then
   srv=$!
   trap 'kill "$srv" 2>/dev/null' EXIT
   sleep 4
-  "$root/.venv/bin/python" "$root/tools/bench_sdk_driver.py" 127.0.0.1 23817 "$rows" \
+  go -C "$root/go" run ./cmd/sdk_benchmark 127.0.0.1 23817 "$rows" \
     | tee "$latest" || status=1
   kill "$srv" 2>/dev/null
   trap - EXIT

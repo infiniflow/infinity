@@ -8,7 +8,7 @@
 #
 #   GOLDEN_LOG=/path/to/cpp_golden.log scripts/run_gate_e.sh
 #
-# The driver (`tools/bench_sdk_driver.py`) prints `Total cost : <t> s` lines, so
+# The driver (`go/cmd/sdk_benchmark`) prints `Total cost : <t> s` lines, so
 # the same script produces the golden when pointed at a C++ server.
 set -euo pipefail
 
@@ -41,7 +41,7 @@ run_once() {
         kill -9 "$pid" 2>/dev/null || true
         return 1
     fi
-    "$PY" tools/bench_sdk_driver.py 127.0.0.1 "$PORT" "$ROWS" > "$out"
+    go -C "$ROOT/go" run ./cmd/sdk_benchmark 127.0.0.1 "$PORT" "$ROWS" > "$out"
     kill -9 "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
 }
