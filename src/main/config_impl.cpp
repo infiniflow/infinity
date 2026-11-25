@@ -2151,6 +2151,12 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                 for (auto &elem : *buffer_config_table) {
 
                     std::string var_name = std::string(elem.first);
+                    if (var_name == "unsealed_reclaim_interval" || var_name == "unsealed_max_tables_per_round") {
+                        continue;
+                    }
+                    if (var_name == "unsealed_memory_quota") {
+                        var_name = MEMINDEX_MEMORY_QUOTA_OPTION_NAME;
+                    }
                     GlobalOptionIndex option_index = global_options_.GetOptionIndex(var_name);
                     if (option_index == GlobalOptionIndex::kInvalid) {
                         return Status::InvalidConfig(fmt::format("Unrecognized config parameter: {} in 'buffer' field", var_name));

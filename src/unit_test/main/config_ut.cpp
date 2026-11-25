@@ -258,3 +258,12 @@ TEST_F(ConfigTest, TestValidValues) {
     // persistence
     EXPECT_EQ(config.PersistenceDir(), "/var/infinity/persistence");
 }
+
+TEST_F(ConfigTest, TestDefaultConfWithRustUnsealedOptions) {
+    using namespace infinity;
+    std::shared_ptr<std::string> path = std::make_shared<std::string>("conf/infinity_conf.toml");
+    Config config;
+    auto status = config.Init(path, nullptr);
+    ASSERT_TRUE(status.ok()) << status.message();
+    EXPECT_EQ(config.MemIndexMemoryQuota(), 1024l * 1024l * 1024l);
+}
