@@ -104,12 +104,18 @@ pub(crate) async fn trigger_loop(
             // single transaction, and that process is the one an OOM killer
             // finds. Every lever here is `madvise`/`malloc_trim` - no I/O, no
             // lock on a hot path - so it is safe to run on the tick itself.
-            engine.memory_tick();
-            if !optimize_interval.is_zero() && last_optimize.elapsed() >= optimize_interval {
+            engine.memory_tick().await;
+            if !optimize_interval.is_zero()
+                && last_optimize.elapsed() >= optimize_interval
+                && engine.memory_pressure() == crate::memory::Pressure::Ok
+            {
                 last_optimize = std::time::Instant::now();
                 engine.submit_optimize_indexes();
             }
-            if !compact_interval.is_zero() && last_compact.elapsed() >= compact_interval {
+            if !compact_interval.is_zero()
+                && last_compact.elapsed() >= compact_interval
+                && engine.memory_pressure() == crate::memory::Pressure::Ok
+            {
                 last_compact = std::time::Instant::now();
                 // `CompactionProcessor::NewNotifyCompact`: every table, the
                 // segments `NewCompactionAlg` picks. Awaited like the

@@ -1218,6 +1218,52 @@ impl TxnManager {
         self.current_ts.load(Ordering::Relaxed)
     }
 
+    /// A one-line summary of what a retry loop gave up against: the newest
+    /// commit it could see, and the commit ts whose bottom half is still
+    /// pending (the one the visibility clock waits for).
+    pub fn conflict_give_up_context(&self) -> String {
+        let pending = self
+            .bottom_txns
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(_, done)| !**done)
+            .map(|(ts, _)| *ts);
+        match pending {
+            Some(ts) => format!(
+                "current_ts={}, still publishing commit ts {ts}",
+                self.current_ts()
+            ),
+            None => format!("current_ts={}", self.current_ts()),
+        }
+    }
+
+    /// Waits until the visibility clock moves past `seen`, i.e. until some
+    /// transaction that had already taken a commit ts finishes its bottom half.
+    ///
+    /// A statement that lost a conflict retries against a **newer** snapshot,
+    /// which only becomes available once the transaction it conflicts with has
+    /// committed *and* published. Spinning on the CPU for that (the previous
+    /// `thread::yield_now`) blocks the very task that has to make progress when
+    /// the two share a runtime worker - on a current-thread runtime it cannot
+    /// ever finish, so the retry budget was burned through in a livelock and
+    /// the statement failed with "kept conflicting" instead of retrying.
+    pub async fn wait_bottom_progress(&self, seen: TxnTimeStamp) {
+        loop {
+            let notified = self.bottom_notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            if self.current_ts.load(Ordering::SeqCst) > seen {
+                return;
+            }
+            if self.bottom_txns.lock().unwrap().is_empty() {
+                tokio::task::yield_now().await;
+                return;
+            }
+            notified.await;
+        }
+    }
+
     /// C++: `NewTxnManager::PrepareCommitTS` — the high-water mark committers
     /// take from. It sits one above `CurrentTS` while a write transaction is
     /// between `GetWriteCommitTS` and `CommitBottom`, and equal to it otherwise.

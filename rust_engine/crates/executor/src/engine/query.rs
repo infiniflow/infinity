@@ -578,7 +578,7 @@ impl Engine {
                 // Backpressure, the same admission the direct insert primitives
                 // apply (`Engine::admit_write`): a statement is refused at the
                 // critical watermark, after one reclaim pass.
-                self.admit_write()?;
+                self.admit_write().await?;
             }
             // Result cache: `SELECT` results are reused verbatim when the cache
             // is active; any data-modifying statement invalidates it.
@@ -1104,20 +1104,20 @@ impl Engine {
         stmt: &Statement,
         sql: &str,
     ) -> Result<QueryResult> {
+        let mut last = String::new();
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
             match self.execute_stmt(stmt, sql).await {
-                Err(Error::TxnConflict(_reason)) => {
+                Err(Error::TxnConflict(reason)) => {
+                    last = reason;
                     // `QueryStatementInternal` begins a new transaction for the
                     // retry, so the statement spends another txn id.
                     self.txn.end_statement();
                     self.txn.ensure_statement_id();
-                    // The conflicting transaction may still be committing (its
-                    // commit ts is taken, its entry not yet written): give it
-                    // the CPU instead of binning the statement.
-                    if self.txn.current_ts() == before {
-                        std::thread::yield_now();
-                    }
+                    // The conflicting transaction may still be committing: wait
+                    // for its bottom half to publish instead of spinning, which
+                    // on a current-thread runtime would starve that very commit.
+                    self.txn.wait_bottom_progress(before).await;
                     continue;
                 }
                 Err(Error::TxnConflictNoRetry(reason)) => {
@@ -1127,7 +1127,8 @@ impl Engine {
             }
         }
         Err(Error::TxnConflict(format!(
-            "the statement kept conflicting for {RETRY_LIMIT} attempts"
+            "the statement kept conflicting for {RETRY_LIMIT} attempts (last: {last}; {})",
+            self.txn.conflict_give_up_context()
         )))
     }
 
@@ -1273,7 +1274,7 @@ impl Engine {
                     name.rsplit('.').next().unwrap_or(name),
                 )?;
                 let t = self
-                    .ddl_commit_typed(
+                    .ddl_commit_typed_opts(
                         TxnOp::CreateTable {
                             db: split_table_name(name).0,
                             table: name.clone(),
@@ -1318,6 +1319,7 @@ impl Engine {
                                 other => Some(other),
                             }
                         },
+                        false,
                     )
                     .await?;
                 Ok(QueryResult::CreatedTable {
@@ -2156,37 +2158,39 @@ impl Engine {
                         index_opts[pos].1 = config.to_string();
                     }
                 }
-                self.ddl_commit_typed(
-                    TxnOp::CreateIndex {
-                        table: table.clone(),
-                        index: name.clone(),
-                        columns: vec![column.clone()],
-                    },
-                    || {
-                        self.storage.catalog.create_index_typed(
-                            name,
-                            table,
-                            column,
-                            effective_type,
-                            &index_opts,
-                        )
-                    },
-                    |batch| {
-                        let (db, _) = split_table_name(table);
-                        crate::wal_bridge::create_index_command_from_batch(
-                            batch,
-                            &db,
-                            &table_name,
-                            &table_key,
-                            name,
-                        )
-                    },
-                )
-                .await?;
+                let created_meta = self
+                    .ddl_commit_typed_opts(
+                        TxnOp::CreateIndex {
+                            table: table.clone(),
+                            index: name.clone(),
+                            columns: vec![column.clone()],
+                        },
+                        || {
+                            self.storage.catalog.create_index_typed(
+                                name,
+                                table,
+                                column,
+                                effective_type,
+                                &index_opts,
+                            )
+                        },
+                        |batch| {
+                            let (db, _) = split_table_name(table);
+                            crate::wal_bridge::create_index_command_from_batch(
+                                batch,
+                                &db,
+                                &table_name,
+                                &table_key,
+                                name,
+                            )
+                        },
+                        false,
+                    )
+                    .await?;
                 // The index's catalog id, which is its identity in every
                 // in-memory registry (the reference keys `MemIndex` by
                 // `(index_id, segment)`); a column may carry several indexes.
-                let created_index_id = self.index_position(table, name).ok().map(|id| id as u64);
+                let created_index_id = Some(created_meta.id);
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 // The option name is `ANALYZER` in SQL but `analyzer` over the
                 // API (the reference lower-cases every `InitParameter` there),

@@ -102,23 +102,56 @@ impl Engine {
     pub(crate) async fn reclaim_unsealed(&self) -> usize {
         // `unsealed_memory_quota == 0` disables the budget (and, with it, this
         // loop): a zero target would otherwise read as "drain everything".
-        if self.context.memindex_quota.load(Ordering::Relaxed) == 0 {
+        if self.context.unsealed_memory_quota.load(Ordering::Relaxed) == 0 {
             return 0;
         }
-        let now_ts = self.current_ts();
+        let _guard = self.context.unsealed_reclaim_lock.lock().await;
         // The retry gate is a monotonic deadline, not a commit ts: ageing the
         // ranking on commit ts is right, but no commit has to happen for a
         // backed-off round to become due again.
         if monotonic_now_ms() < self.context.unsealed_backoff_until.load(Ordering::Relaxed) {
             return 0;
         }
-        let cap = self
-            .context
-            .unsealed_max_tables_per_round
-            .load(Ordering::Relaxed);
-
         let target = self.reclaim_target();
         if self.reclaim_target_met(target) {
+            return 0;
+        }
+        self.reclaim_unsealed_until(false, || self.reclaim_target_met(target))
+            .await
+    }
+
+    /// Reclaims unsealed tables (append buffers + in-memory index tails) under
+    /// process RSS pressure, reusing the same RRF ranking and `dump_table` path
+    /// until `process_rss_bytes() <= target_rss` or no eligible tables remain.
+    pub(crate) async fn reclaim_unsealed_under_pressure(&self, target_rss: u64) -> usize {
+        if self.budget_bytes() == 0 {
+            return 0;
+        }
+        let _guard = self.context.unsealed_reclaim_lock.lock().await;
+        if crate::engine::state::process_rss_bytes() <= target_rss {
+            return 0;
+        }
+        self.reclaim_unsealed_until(true, || {
+            storage::trim_allocator();
+            crate::engine::state::process_rss_bytes() <= target_rss || self.budget_bytes() == 0
+        })
+        .await
+    }
+
+    async fn reclaim_unsealed_until<F>(&self, ignore_backoff: bool, mut stop: F) -> usize
+    where
+        F: FnMut() -> bool,
+    {
+        let now_ts = self.current_ts();
+        let cap = if ignore_backoff {
+            0
+        } else {
+            self.context
+                .unsealed_max_tables_per_round
+                .load(Ordering::Relaxed)
+        };
+
+        if stop() {
             return 0;
         }
 
@@ -128,7 +161,13 @@ impl Engine {
         }
         let candidates: Vec<ReclaimCandidate> = stats
             .iter()
-            .filter(|stat| self.reclaim_candidate_eligible(stat))
+            .filter(|stat| {
+                if ignore_backoff {
+                    !self.import_in_flight(&stat.key) && self.table_has_unsealed(&stat.key)
+                } else {
+                    self.reclaim_candidate_eligible(stat)
+                }
+            })
             .map(|stat| ReclaimCandidate {
                 key: stat.key.clone(),
                 bytes: stat.footprint,
@@ -152,7 +191,7 @@ impl Engine {
         // widespread storage failure walk every eligible table in one tick.
         for (attempted, at) in order.into_iter().enumerate() {
             let key = candidates[at].key.clone();
-            if self.reclaim_target_met(target) {
+            if stop() {
                 break;
             }
             if cap != 0 && attempted >= cap {
@@ -166,29 +205,31 @@ impl Engine {
         // A round that released nothing must not be repeated on the next slot: it
         // would walk the same hopeless candidates and pay one `list_indexes()`
         // per table, for ever.
-        if progressed {
-            self.context
-                .unsealed_backoff_until
-                .store(0, Ordering::Relaxed);
-        } else {
-            // A **monotonic deadline**, not a commit ts. A failed round may not
-            // advance `current_ts()` at all (a block write that errors before
-            // its commit), and a deadline expressed in commit ts would then
-            // never be reached: once storage recovered, every later tick still
-            // failed the gate until an unrelated commit moved the clock.
-            //
-            // The floor is the tick: a drain only runs on one, so a shorter
-            // deadline could not be observed anyway. It also keeps an interval
-            // of `0` (sweep off, write-triggered drains only) from retrying a
-            // failure every tick.
-            let interval = self
-                .context
-                .unsealed_reclaim_interval
-                .load(Ordering::Relaxed);
-            let wait = std::time::Duration::from_millis(interval.max(TICK_MS));
-            self.context
-                .unsealed_backoff_until
-                .store(monotonic_deadline(wait), Ordering::Relaxed);
+        if !ignore_backoff {
+            if progressed {
+                self.context
+                    .unsealed_backoff_until
+                    .store(0, Ordering::Relaxed);
+            } else {
+                // A **monotonic deadline**, not a commit ts. A failed round may not
+                // advance `current_ts()` at all (a block write that errors before
+                // its commit), and a deadline expressed in commit ts would then
+                // never be reached: once storage recovered, every later tick still
+                // failed the gate until an unrelated commit moved the clock.
+                //
+                // The floor is the tick: a drain only runs on one, so a shorter
+                // deadline could not be observed anyway. It also keeps an interval
+                // of `0` (sweep off, write-triggered drains only) from retrying a
+                // failure every tick.
+                let interval = self
+                    .context
+                    .unsealed_reclaim_interval
+                    .load(Ordering::Relaxed);
+                let wait = std::time::Duration::from_millis(interval.max(TICK_MS));
+                self.context
+                    .unsealed_backoff_until
+                    .store(monotonic_deadline(wait), Ordering::Relaxed);
+            }
         }
         dumped
     }
@@ -217,7 +258,7 @@ impl Engine {
     /// crosses the line again immediately and the loop chases the write path
     /// forever.
     pub(crate) fn reclaim_target(&self) -> u64 {
-        self.context.memindex_quota.load(Ordering::Relaxed) / 2
+        self.context.unsealed_memory_quota.load(Ordering::Relaxed) / 2
     }
 
     /// Whether the round's goal is reached.

@@ -69,6 +69,9 @@ pub struct WalManager {
     /// `NewFlush` appends a batch of entries and then fsyncs once, so the
     /// commit ts of the newest entry in the file is what that `Sync()` covers.
     appended_ts: TxnTimeStamp,
+    /// Tracked byte length of the active WAL file to avoid an async `fstat`
+    /// (`metadata().await`) on every `append`.
+    file_size: u64,
 }
 
 impl WalManager {
@@ -81,10 +84,12 @@ impl WalManager {
             .open(&path)
             .await
             .map_err(|e| Error::io(&path, e))?;
+        let file_size = file.metadata().await.map(|m| m.len()).unwrap_or(0);
         Ok(Self {
             path,
             file,
             appended_ts: 0,
+            file_size,
         })
     }
 
@@ -96,7 +101,7 @@ impl WalManager {
     pub async fn append(&mut self, entry: &WalEntry) -> Result<u64> {
         let mut buf = Vec::with_capacity(entry.size_in_bytes());
         entry.write_adv(&mut buf);
-        let offset = self.file.metadata().await.map(|m| m.len()).unwrap_or(0);
+        let offset = self.file_size;
         self.file
             .write_all(&buf)
             .await
@@ -111,6 +116,7 @@ impl WalManager {
             .flush()
             .await
             .map_err(|e| Error::io(&self.path, e))?;
+        self.file_size += buf.len() as u64;
         self.appended_ts = self.appended_ts.max(entry.commit_ts);
         // The write itself is not synced: `WalManager::NewFlush` owns that
         // decision. Upstream ends every flush batch with
@@ -262,6 +268,7 @@ impl WalManager {
             .open(&self.path)
             .await
             .map_err(|e| Error::io(&self.path, e))?;
+        self.file_size = 0;
         // A directory is synced through a plain `File`: `tokio::fs::File`
         // cannot open one portably, and the fsync is the whole point (the
         // rename is only durable once the directory entry is). It is still a
@@ -280,12 +287,7 @@ impl WalManager {
 
     /// Current size of the WAL in bytes.
     pub async fn file_size(&self) -> Result<u64> {
-        Ok(self
-            .file
-            .metadata()
-            .await
-            .map_err(|e| Error::io(&self.path, e))?
-            .len())
+        Ok(self.file_size)
     }
 
     /// Rewrites the WAL keeping only entries with `commit_ts > ts`, streaming

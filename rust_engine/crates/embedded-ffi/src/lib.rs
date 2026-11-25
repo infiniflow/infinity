@@ -136,7 +136,7 @@ fn boot(
     // would have paid, once per dump, during the import instead of on the
     // first search. The chunks it writes are what later opens and queries
     // map.
-    engine.set_memindex_quota(1 << 30);
+    engine.set_unsealed_memory_quota(1 << 30);
     // `install_engine_handle` records the running runtime, so the bind has
     // to happen inside its context.
     let bound = {

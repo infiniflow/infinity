@@ -60,8 +60,8 @@ async fn replay_create_db() {
         .into_iter()
         .map(|r| r[0].clone())
         .collect::<Vec<_>>();
-    assert!(dbs.contains(&"db1".to_string()));
-    assert!(dbs.contains(&"default_db".to_string()));
+    assert!(dbs.iter().any(|i| i == "db1"));
+    assert!(dbs.iter().any(|i| i == "default_db"));
 }
 
 /// C++ `src/unit_test/storage/new_catalog/new_txn_replay_ut.cpp:99`
@@ -84,7 +84,7 @@ async fn replay_create_db2() {
         .map(|r| r[0].clone())
         .collect::<Vec<_>>();
     for db in ["db1", "db2", "default_db"] {
-        assert!(dbs.contains(&db.to_string()), "{db} missing");
+        assert!(dbs.iter().any(|i| i == db), "{db} missing");
     }
 }
 

@@ -16,7 +16,7 @@
 //!
 //! Four budgets already existed and none of them is the process's:
 //! `buffer_budget` (the block mappings and the decoded index chunks),
-//! `memindex_quota` (the index tails), `spann_page_budget` /
+//! `unsealed_memory_quota` (the index tails), `spann_page_budget` /
 //! `spann_dirty_budget` (one delta write). The only place that compared a number
 //! with the process was the cleanup task - and it ran only when a transaction
 //! had committed since the last pass, so a read-only server that grew its page
@@ -543,7 +543,10 @@ impl super::Engine {
     /// most to redo - the SPANN handles' own page bookkeeping and the caches
     /// that are pure copies (results, plans, the whole-column vector cache an
     /// exact scan builds when it has no index).
-    pub(crate) fn reclaim_memory(&self, want: u64, forced: bool) -> u64 {
+    /// Synchronous part of [`Self::reclaim_memory`]: allocator arenas, resident
+    /// mapped pages, SPANN bookkeeping, pure-copy caches, and unmapping idle
+    /// block mappings. Used directly from synchronous CPU loops.
+    pub(crate) fn reclaim_memory_sync(&self, want: u64, forced: bool) -> u64 {
         storage::trim_allocator();
         let mut released = storage::mapped::release_mapped_pages(want as usize) as u64;
         if forced {
@@ -563,8 +566,114 @@ impl super::Engine {
             let over = self.memory_usage().saturating_sub(self.memory_low());
             let remaining = want.saturating_sub(released).max(over);
             released += self.shrink_block_maps(remaining as usize) as u64;
+            if forced || pressure != Pressure::Ok {
+                let over = self.memory_usage().saturating_sub(self.memory_low());
+                let remaining = want.saturating_sub(released).max(over);
+                if remaining > 0 {
+                    let evicted = self.evict_table_caches(remaining as usize, forced) as u64;
+                    if evicted > 0 {
+                        released += evicted;
+                        storage::trim_allocator();
+                    }
+                }
+            }
         }
         released
+    }
+
+    pub(crate) async fn reclaim_memory(&self, want: u64, forced: bool) -> u64 {
+        let mut released = self.reclaim_memory_sync(want, forced);
+        let (_, cgroup) = cgroup_snapshot();
+        let pressure = self.measure_pressure(cgroup.as_ref());
+        if (forced || pressure != Pressure::Ok) && self.budget_bytes() > 0 {
+            let before = self.memory_usage();
+            let dumped = self
+                .reclaim_unsealed_under_pressure(self.memory_low())
+                .await;
+            if dumped > 0 {
+                storage::trim_allocator();
+                let over = self.memory_usage().saturating_sub(self.memory_low());
+                if over > 0 {
+                    released += self.shrink_block_maps(over as usize) as u64;
+                    let over = self.memory_usage().saturating_sub(self.memory_low());
+                    if over > 0 {
+                        let evicted = self.evict_table_caches(over as usize, forced) as u64;
+                        if evicted > 0 {
+                            released += evicted;
+                            storage::trim_allocator();
+                        }
+                    }
+                }
+                let after = self.memory_usage();
+                released = released.saturating_add(before.saturating_sub(after));
+            }
+        }
+        released
+    }
+
+    /// Evicts reloadable table-level caches (`row_cache`, decoded HNSW chunk
+    /// graphs in `vector`, and when `forced`, decoded `ivf` segments) up to
+    /// `want` bytes. Dropped `Arc`s are collected and freed outside `self.tables`
+    /// so concurrent readers/writers are not stalled during deallocation.
+    fn evict_table_caches(&self, want: usize, forced: bool) -> usize {
+        if want == 0 {
+            return 0;
+        }
+        let mut freed = 0usize;
+        let mut dropped_rows = Vec::new();
+        let mut dropped_vectors = Vec::new();
+        let mut dropped_ivf = Vec::new();
+        {
+            let mut tables = self.tables.lock().unwrap();
+            for entry in tables.values_mut() {
+                if freed >= want {
+                    break;
+                }
+                if let Some(cache) = entry.row_cache.take() {
+                    freed = freed.saturating_add(cache.bytes);
+                    dropped_rows.push(cache);
+                }
+            }
+            for entry in tables.values_mut() {
+                if freed >= want {
+                    break;
+                }
+                let mut empty_ids = Vec::new();
+                for (&id, list) in &mut entry.vector {
+                    while freed < want {
+                        let Some(chunk) = list.pop() else {
+                            break;
+                        };
+                        freed = freed.saturating_add(chunk.bytes);
+                        dropped_vectors.push(chunk);
+                    }
+                    if list.is_empty() {
+                        empty_ids.push(id);
+                    }
+                    if freed >= want {
+                        break;
+                    }
+                }
+                for id in empty_ids {
+                    entry.vector.remove(&id);
+                }
+            }
+            if forced && freed < want {
+                for entry in tables.values_mut() {
+                    if !entry.ivf.is_empty() {
+                        dropped_ivf.push(std::mem::take(&mut entry.ivf));
+                    }
+                }
+            }
+        }
+        let had_ivf = !dropped_ivf.is_empty();
+        drop(dropped_rows);
+        drop(dropped_vectors);
+        drop(dropped_ivf);
+        if freed == 0 && had_ivf {
+            return 1;
+        }
+        freed
     }
 
     /// The low watermark: the level a pass reclaims down to. `0` when no
@@ -609,15 +718,35 @@ impl super::Engine {
         matches!(error, ::common::Error::Invalid(message) if message.starts_with(ADMISSION_REFUSED))
     }
 
-    pub(crate) fn admit_write(&self) -> ::common::Result<()> {
+    pub(crate) async fn admit_write(&self) -> ::common::Result<()> {
         if !self.memory_pressure().blocks_writes() {
             return Ok(());
         }
-        // One reclaim pass now, so a burst that just needs its page cache
-        // dropped does not turn into a user-visible error.
-        let _ = self.memory_tick();
-        if !self.memory_pressure().blocks_writes() {
-            return Ok(());
+        // Reclaim now; if memory is actively draining (released > 0 or RSS is
+        // falling across a transient dump/compact spike), retry briefly before
+        // turning a burst into a user-visible error.
+        for attempt in 0..5 {
+            let before = self.memory_usage();
+            let released = self.memory_tick().await;
+            let (generation, cgroup) = cgroup_snapshot();
+            let after_usage = self.usage_against(cgroup.as_ref());
+            let after = self.measure_pressure(cgroup.as_ref());
+            self.context
+                .memory_pressure_level
+                .store(after as u8, Ordering::Relaxed);
+            self.context
+                .memory_checked_at
+                .store(elapsed_millis(), Ordering::Relaxed);
+            self.context
+                .memory_ceiling_generation
+                .store(generation, Ordering::Relaxed);
+            if !after.blocks_writes() {
+                return Ok(());
+            }
+            if attempt == 4 || (released == 0 && after_usage >= before) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         let ceiling = self.memory_ceiling();
         Err(::common::Error::Invalid(format!(
@@ -632,7 +761,7 @@ impl super::Engine {
     /// One pass of the governor, run on the periodic tick - deliberately **not**
     /// behind `needs_cleanup`: a read-only server can grow its page cache without
     /// a single transaction. Returns the bytes it released.
-    pub(crate) fn memory_tick(&self) -> u64 {
+    pub(crate) async fn memory_tick(&self) -> u64 {
         // One snapshot: the pass measures and stamps against the same limit.
         let (generation, cgroup) = cgroup_snapshot();
         let ceiling = self.ceiling_from(cgroup.as_ref());
@@ -642,12 +771,21 @@ impl super::Engine {
         let usage = self.usage_against(cgroup.as_ref());
         let (low, high, critical) = watermarks(ceiling.bytes, cgroup_high());
         if usage < high {
+            self.context
+                .memory_pressure_level
+                .store(Pressure::Ok as u8, Ordering::Relaxed);
+            self.context
+                .memory_checked_at
+                .store(elapsed_millis(), Ordering::Relaxed);
+            self.context
+                .memory_ceiling_generation
+                .store(generation, Ordering::Relaxed);
             return 0;
         }
         // Down to the low watermark, not by one page: a pass that stops at `high`
         // reruns on the next tick and thrashes the working set.
         let want = usage.saturating_sub(low);
-        let released = self.reclaim_memory(want, usage >= critical);
+        let released = self.reclaim_memory(want, usage >= critical).await;
         // Measure again rather than assuming the pass worked: when nothing can
         // be released (a ceiling below the working set) the level is still
         // critical, and the next write must see that.
@@ -698,7 +836,7 @@ mod tests {
         // which is exactly the state that must not take the process down.
         e.set_memory_limit(1);
         assert!(e.memory_pressure().blocks_writes());
-        let _ = e.memory_tick();
+        let _ = e.memory_tick().await;
         assert_eq!(
             e.context.memory_reclaim_passes.load(Ordering::Relaxed),
             1,
@@ -735,7 +873,7 @@ mod tests {
 
         // A terabyte the page advice cannot produce on its own: the pass has to
         // go on to the block map.
-        let released = e.reclaim_memory(1 << 40, false);
+        let released = e.reclaim_memory(1 << 40, false).await;
         assert!(released > 0);
         assert!(
             e.buffer_objects().is_empty(),
@@ -769,7 +907,7 @@ mod tests {
         // One byte: every measurement is critical, which is the state that must
         // reclaim rather than wait for a write.
         e.set_memory_limit(1);
-        e.memory_tick();
+        e.memory_tick().await;
         assert!(
             e.buffer_objects().is_empty(),
             "the tick unmapped the block instead of leaving it resident"
@@ -881,7 +1019,7 @@ mod tests {
 
         // One pass over the ceiling: pages advised away, mappings dropped.
         e.set_memory_limit(1);
-        let released = e.memory_tick();
+        let released = e.memory_tick().await;
         println!(
             "reclaim:         released {} MB, mapped {} MB left",
             released / (1024 * 1024),
@@ -952,7 +1090,7 @@ mod tests {
             // The tick runs once a second; queries here are a few ms, so every
             // eighth query stands in for "one query fell in the tick's window".
             if i % 8 == 0 {
-                e.memory_tick();
+                e.memory_tick().await;
             }
             let t0 = std::time::Instant::now();
             e.execute(&q).await.unwrap();

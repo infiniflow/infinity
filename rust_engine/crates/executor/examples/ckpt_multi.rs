@@ -64,7 +64,7 @@ async fn run() {
     let e = Engine::open_async(dir.path(), Default::default())
         .await
         .unwrap();
-    e.set_memindex_quota(1 << 30);
+    e.set_unsealed_memory_quota(1 << 30);
     for t in 0..tables {
         e.execute(&format!(
             "CREATE TABLE m{t} (id INT, a INT, b INT, c VARCHAR);"

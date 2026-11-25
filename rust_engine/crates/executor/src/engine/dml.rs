@@ -602,20 +602,23 @@ impl Engine {
             }
             return Ok(QueryResult::Inserted { count: inserted });
         }
+        let mut last = String::new();
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
             match self
                 .insert_literals_inner(table, columns, rows.clone(), false)
                 .await
             {
-                Err(Error::TxnConflict(_reason)) => {
+                Err(Error::TxnConflict(reason)) => {
+                    last = reason;
                     // The retry spends another txn id, as
                     // `QueryStatementInternal` does for a re-run statement.
                     self.txn.end_statement();
                     self.txn.ensure_statement_id();
-                    if self.txn.current_ts() == before {
-                        std::thread::yield_now();
-                    }
+                    // Wait for the transaction this one lost to, instead of
+                    // spinning: a retry needs a newer snapshot, which only
+                    // exists after that commit publishes its bottom half.
+                    self.txn.wait_bottom_progress(before).await;
                     continue;
                 }
                 Err(Error::TxnConflictNoRetry(reason)) => {
@@ -625,7 +628,8 @@ impl Engine {
             }
         }
         Err(Error::TxnConflict(format!(
-            "the insert kept conflicting for {RETRY_LIMIT} attempts"
+            "the insert kept conflicting for {RETRY_LIMIT} attempts (last: {last}; {})",
+            self.txn.conflict_give_up_context()
         )))
     }
 
@@ -776,7 +780,7 @@ impl Engine {
         // directly by the RPC and the REST handler, so a direct insert has to be
         // refused at the same ceiling - before the row range is allocated and
         // before the WAL frame is written.
-        self.admit_write()?;
+        self.admit_write().await?;
         let meta = self
             .storage
             .catalog
@@ -857,9 +861,9 @@ impl Engine {
         // A commit changes visible rows, so cached `SELECT` results must not
         // survive it. The SQL path clears on the mutating statement; callers
         // that reach this primitive directly (Thrift insert, import) would
-        // otherwise keep serving a stale `count(*)`.
+        // otherwise keep serving a stale `count(*)`. (DML does not alter
+        // schema, so `plan_cache` stays valid.)
         self.result_cache.lock().unwrap().clear();
-        self.plan_cache.clear();
         // The analyzer is the most expensive CPU step of a write and takes no
         // shared state, so it runs **before** the table's write gate: a second
         // writer to the same table then tokenises while the gate's holder is
@@ -867,6 +871,8 @@ impl Engine {
         // whole statement. The batch is capped at `TEXT_BATCH_ROWS` so a big
         // `COPY` keeps the bounded shape (it tokenises a chunk at a time inside
         // the gate).
+        let cells = Arc::new(cells);
+        let rows = Arc::new(rows);
         let mut prepared_text = if rows.len() <= Self::TEXT_BATCH_ROWS {
             self.prepare_text_terms(table, &cells).await
         } else {
@@ -903,36 +909,21 @@ impl Engine {
                 table: table.to_string(),
             }
         });
-        // The stored row text is a tab-join of the cells above wherever storage
-        // keeps the display form (a float vector is one of those), and the
-        // stored form of the columns where it does not (a multivector is
-        // reshaped, a sparse vector re-spelled). Reusing the display string
-        // keeps the append buffer from formatting every vector element twice.
-        // `row_text::encode` escapes a cell that carries a TAB itself; a plain
-        // join would let such a value shift every following column.
-        let encoded_rows: Vec<String> = rows
-            .iter()
-            .zip(&cells)
-            .map(|(row, rendered)| {
-                let mut parts: Vec<String> = Vec::with_capacity(row.len());
-                for (i, cell) in row.iter().enumerate() {
-                    match types.get(i) {
-                        Some(ty) if !stored_text_is_display(ty) => {
-                            parts.push(encode_cell_stored(cell, Some(ty)))
-                        }
-                        _ => parts.push(rendered.get(i).cloned().unwrap_or_default()),
-                    }
-                }
-                common::row_text::encode(&parts)
-            })
-            .collect();
         // Emit the reference `WalCmdAppendV2` (real typed columns) when the
         // table's types are covered; otherwise the transaction writes the
         // text-column block through `build_commands`.
         // A block that does not carry one row per row range makes an `Append`
         // command replay cannot decode (`append_rows` needs row *n*); fall back
         // to the text record in that case rather than write such a frame.
-        let typed = typed_append_block(&rows, &types);
+        let typed = if rows.len() >= 16 {
+            let rows_bg = Arc::clone(&rows);
+            let types_bg = types.clone();
+            tokio::task::spawn_blocking(move || typed_append_block(&rows_bg, &types_bg))
+                .await
+                .unwrap_or_else(|_| typed_append_block(&rows, &types))
+        } else {
+            typed_append_block(&rows, &types)
+        };
         // `GetWriteCommitTS` -> `SubmitForAllocation`: the range is allocated
         // inside the commit, after the conflict check, so the ids follow
         // commit-ts order and a transaction that loses the conflict never
@@ -994,7 +985,6 @@ impl Engine {
         let bottom_row_count = rows.len();
         let bottom_rows = rows;
         let bottom_cells = cells;
-        let bottom_encoded = encoded_rows;
         // The gate now covers the **critical section only**: the index entries
         // and the block append of this commit. Everything above it - validation,
         // encoding, the WAL write and the row-range allocation - runs
@@ -1036,11 +1026,6 @@ impl Engine {
                     // full-text hook tokenises them, the multi-value/sparse/vector
                     // hooks parse their own column and the secondary hook decodes
                     // only the columns it indexes.
-                    let index_rows: Vec<(usize, Vec<String>)> = bottom_cells
-                        .into_iter()
-                        .enumerate()
-                        .map(|(k, cells)| (range_seq(k), cells))
-                        .collect();
                     // The index work runs on **this table's** bottom worker: every
                     // index has its own lock and two tables share none, so a
                     // directory with a hundred thousand tables keeps its index
@@ -1050,9 +1035,8 @@ impl Engine {
                     let schema = engine.table_schema(&index_table).unwrap_or_default();
                     // One batch: the full-text terms of the whole append are
                     // tokenised without the column lock and inserted under it once.
-                    let batch: Vec<(usize, &[String])> = index_rows
-                        .iter()
-                        .map(|(seq, texts)| (*seq, texts.as_slice()))
+                    let batch: Vec<(usize, &[String])> = (0..bottom_row_count)
+                        .map(|k| (range_seq(k), bottom_cells[k].as_slice()))
                         .collect();
                     // A `NULL` must reach a secondary index as `Value::Null`
                     // (`value_to_tail_keys` skips it). The batch form converts the
@@ -1079,8 +1063,20 @@ impl Engine {
                             prepared_text.as_mut(),
                         )
                         .await;
-                    for (seq, texts) in &index_rows {
-                        engine.update_vector_caches(&index_table, *seq, texts).await;
+                    engine.note_hnsw_insert_batch(&index_table, &batch).await;
+                    let has_ivf = {
+                        let tkey = engine.table_key(&index_table);
+                        engine
+                            .tables
+                            .lock()
+                            .unwrap()
+                            .get(&tkey)
+                            .is_some_and(|e| !e.ivf_mem.is_empty())
+                    };
+                    if has_ivf {
+                        for (seq, texts) in &batch {
+                            engine.note_ivf_insert(&index_table, *seq as u64, texts);
+                        }
                     }
                     // C++ `AppendMemIndex`: a segment that reached
                     // `mem_index_capacity` rows is dumped right after the batch.
@@ -1099,21 +1095,18 @@ impl Engine {
                 // `AppendInBlock`: this batch's rows go into the block's buffer -
                 // they are the batch's only copy, there is no `row:` key to read
                 // them back from.
-                // Borrowed, not cloned: the buffer parses each row and keeps the
-                // values, so the batch's text does not need a second full copy
-                // (2048-dim rows: ~80 MB per 5000-row batch).
-                let published: Vec<(usize, &str)> = bottom_encoded
-                    .iter()
-                    .enumerate()
-                    .map(|(k, text)| (range_seq(k), text.as_str()))
-                    .collect();
-                // The decoded-row cache rides on this parse: it used to run
-                // *before* this call and parse the same text again, which doubled
-                // the parse for every insert on a scalar table.
-                engine.publish_encoded_rows_with(&bottom_table, &published, |table, batch| {
-                    engine.note_row_cache(table, batch);
-                    Ok(())
-                })?;
+                // The decoded-row cache rides on this publish: convert directly
+                // from `Literal` + rendered cells without encoding/re-parsing.
+                engine.publish_literal_rows_with(
+                    &bottom_table,
+                    &bottom_rows,
+                    &bottom_cells,
+                    range_seq,
+                    |table, batch| {
+                        engine.note_row_cache(table, batch);
+                        Ok(())
+                    },
+                )?;
                 // The rows are readable now (`AppendInBlock`), so the record may
                 // carry this transaction's ts (`BlockVersion::Append(commit_ts, …)`).
                 engine.settle_append_at(&bottom_table, append_record, ts);
@@ -1649,17 +1642,16 @@ impl Engine {
         // column this table entry has not seen): the catalog record decides.
         self.storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .unwrap_or_default()
             .iter()
             .any(|im| {
-                (im.table == table || im.table == self.qualified_table(table))
-                    && (im.index_type.eq_ignore_ascii_case("FULLTEXT")
-                        || im.index_type.eq_ignore_ascii_case("HNSW")
-                        || im.index_type.eq_ignore_ascii_case("IVF")
-                        || im.index_type.eq_ignore_ascii_case("BMP")
-                        || im.index_type.eq_ignore_ascii_case("SPARSE")
-                        || im.index_type.eq_ignore_ascii_case("EMVB"))
+                im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                    || im.index_type.eq_ignore_ascii_case("HNSW")
+                    || im.index_type.eq_ignore_ascii_case("IVF")
+                    || im.index_type.eq_ignore_ascii_case("BMP")
+                    || im.index_type.eq_ignore_ascii_case("SPARSE")
+                    || im.index_type.eq_ignore_ascii_case("EMVB")
             })
     }
 
@@ -1793,17 +1785,14 @@ impl Engine {
         // reference's `MemIndex` map is keyed by index id, so two indexes on
         // one column never share one.
         if topup {
-            let Ok(indexes) = self.storage.catalog.list_indexes() else {
+            let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
                 return Vec::new();
             };
             let Ok(types) = self.column_types(table) else {
                 return Vec::new();
             };
-            let short = table.split('.').next_back().unwrap_or(table);
             for im in indexes {
-                if !(im.table == table || im.table == short)
-                    || !im.index_type.eq_ignore_ascii_case("HNSW")
-                {
+                if !im.index_type.eq_ignore_ascii_case("HNSW") {
                     continue;
                 }
                 let Some(ci) = schema.iter().position(|c| c == &im.column) else {
@@ -2108,37 +2097,45 @@ impl Engine {
         }
     }
 
-    pub(crate) async fn update_multivector_indexes(
+    pub(crate) fn update_multivector_indexes_batch(
         &self,
         table: &str,
-        seq: usize,
-        cells: &[String],
+        rows: &[(usize, &[String])],
+        schema: &[String],
     ) {
+        if rows.is_empty() {
+            return;
+        }
         let tkey = self.table_key(table);
-        let by_id = self.index_column_map(table);
-        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .map(|e| {
-                e.mv.iter()
-                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<MultiVectorIndex>>)> = {
+            let tables = self.tables.lock().unwrap();
+            let Some(e) = tables.get(&tkey) else {
+                return;
+            };
+            if e.mv.is_empty() {
+                return;
+            }
+            drop(tables);
+            let by_id = self.index_column_map(table);
+            self.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .map(|e| {
+                    e.mv.iter()
+                        .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
         if indexes.is_empty() {
             return;
         }
-        let Ok(schema) = self.table_schema(table) else {
-            return;
-        };
         let Ok(types) = self.column_types(table) else {
             return;
         };
         for (index_id, column, shared) in indexes {
-            let column = &column;
-            let Some(ci) = schema.iter().position(|c| c == column) else {
+            let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
             let Some(dims) = types.get(ci).and_then(|t| type_dim(t)) else {
@@ -2148,68 +2145,74 @@ impl Engine {
                 continue;
             }
             let mut index = shared.write().unwrap();
-            index.remove(seq as u64);
-            // The row is seen whether or not it carries a tensor. A NULL cell
-            // adds no PLAID document, but the coverage counter has to advance
-            // anyway: `is_complete(reserved)` compares it with the table's live
-            // rows, and a row it never counts keeps every later search
-            // rebuilding the index from scratch.
-            index.note_row();
-            let Some(text) = cells.get(ci) else { continue };
-            if let Some(doc) = parse_multivector_doc(text, dims) {
-                index.insert(seq as u64, doc);
+            for (seq, cells) in rows {
+                index.remove(*seq as u64);
+                index.note_row();
+                let Some(text) = cells.get(ci) else { continue };
+                if let Some(doc) = parse_multivector_doc(text, dims) {
+                    index.insert(*seq as u64, doc);
+                }
             }
             drop(index);
-            self.note_unsealed(table, index_id, 1);
+            self.note_unsealed(table, index_id, rows.len() as u64);
         }
     }
 
-    /// Keeps existing sparse indexes in step with an inserted/rewritten row.
-    pub(crate) async fn update_sparse_indexes(&self, table: &str, seq: usize, cells: &[String]) {
+    pub(crate) fn update_sparse_indexes_batch(
+        &self,
+        table: &str,
+        rows: &[(usize, &[String])],
+        schema: &[String],
+    ) {
+        if rows.is_empty() {
+            return;
+        }
         let tkey = self.table_key(table);
-        let by_id = self.index_column_map(table);
-        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<SparseIndex>>)> = self
-            .tables
-            .lock()
-            .unwrap()
-            .get(&tkey)
-            .map(|e| {
-                e.sparse
-                    .iter()
-                    .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
-                    .collect()
-            })
-            .unwrap_or_default();
+        let indexes: Vec<(u64, String, Arc<std::sync::RwLock<SparseIndex>>)> = {
+            let tables = self.tables.lock().unwrap();
+            let Some(e) = tables.get(&tkey) else {
+                return;
+            };
+            if e.sparse.is_empty() {
+                return;
+            }
+            drop(tables);
+            let by_id = self.index_column_map(table);
+            self.tables
+                .lock()
+                .unwrap()
+                .get(&tkey)
+                .map(|e| {
+                    e.sparse
+                        .iter()
+                        .filter_map(|(id, v)| Some((*id, by_id.get(id)?.clone(), v.clone())))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
         if indexes.is_empty() {
             return;
         }
-        let Ok(schema) = self.table_schema(table) else {
-            return;
-        };
         for (index_id, column, shared) in indexes {
-            let column = &column;
-            let Some(ci) = schema.iter().position(|c| c == column) else {
+            let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
             };
             let mut index = shared.write().unwrap();
-            index.remove(seq as u64);
-            // The index has seen this row whether or not it carries postings:
-            // the coverage check counts rows, not documents (a NULL sparse cell
-            // writes no term). A rewritten row counts twice, which only makes
-            // the index look more complete than it is - it was just updated.
-            index.note_row();
-            let Some(text) = cells.get(ci) else { continue };
-            // A NULL cell stores the literal `null`; it has no postings.
-            if text.trim().eq_ignore_ascii_case("null") {
-                continue;
+            for (seq, cells) in rows {
+                index.remove(*seq as u64);
+                index.note_row();
+                let Some(text) = cells.get(ci) else { continue };
+                if text.trim().eq_ignore_ascii_case("null") {
+                    continue;
+                }
+                let entries: Vec<(i32, f32)> = parse_sparse_str(text)
+                    .into_iter()
+                    .map(|(i, x)| (i as i32, x as f32))
+                    .collect();
+                index.insert(*seq as u64, entries);
             }
-            let entries: Vec<(i32, f32)> = parse_sparse_str(text)
-                .into_iter()
-                .map(|(i, x)| (i as i32, x as f32))
-                .collect();
-            index.insert(seq as u64, entries);
             drop(index);
-            self.note_unsealed(table, index_id, 1);
+            self.note_unsealed(table, index_id, rows.len() as u64);
         }
     }
 
@@ -2232,7 +2235,7 @@ impl Engine {
     pub(crate) async fn prepare_text_terms(
         &self,
         table: &str,
-        cells: &[Vec<String>],
+        cells: &Arc<Vec<Vec<String>>>,
     ) -> Option<PreparedText> {
         if cells.is_empty() {
             return None;
@@ -2257,7 +2260,7 @@ impl Engine {
             return None;
         }
         let schema = self.table_schema(table).unwrap_or_default();
-        let mut columns: Vec<(String, Vec<Option<PreparedTerms>>)> = Vec::new();
+        let mut jobs = Vec::new();
         for (column, shared) in indexes {
             let Some(ci) = schema.iter().position(|c| c == &column) else {
                 continue;
@@ -2266,16 +2269,45 @@ impl Engine {
                 let index = shared.read().await;
                 index.tokenizer.clone()
             };
-            let rows = cells
-                .iter()
-                .map(|cells| {
-                    let text = cells.get(ci)?;
-                    let doc = prepare_doc(0, text, &tokenizer);
-                    Some((doc.terms, doc.cost))
-                })
-                .collect();
-            columns.push((column, rows));
+            jobs.push((column, ci, tokenizer));
         }
+        if jobs.is_empty() {
+            return None;
+        }
+        let columns: Vec<(String, Vec<Option<PreparedTerms>>)> = if cells.len() >= 16 {
+            let cells_bg = Arc::clone(cells);
+            tokio::task::spawn_blocking(move || {
+                jobs.into_iter()
+                    .map(|(column, ci, tokenizer)| {
+                        let rows = cells_bg
+                            .iter()
+                            .map(|row| {
+                                let text = row.get(ci)?;
+                                let doc = prepare_doc(0, text, &tokenizer);
+                                Some((doc.terms, doc.cost))
+                            })
+                            .collect();
+                        (column, rows)
+                    })
+                    .collect()
+            })
+            .await
+            .unwrap_or_default()
+        } else {
+            jobs.into_iter()
+                .map(|(column, ci, tokenizer)| {
+                    let rows = cells
+                        .iter()
+                        .map(|row| {
+                            let text = row.get(ci)?;
+                            let doc = prepare_doc(0, text, &tokenizer);
+                            Some((doc.terms, doc.cost))
+                        })
+                        .collect();
+                    (column, rows)
+                })
+                .collect()
+        };
         if columns.is_empty() {
             return None;
         }
@@ -2308,7 +2340,7 @@ impl Engine {
     ) {
         self.update_text_indexes_batch_inner(table, rows, schema, prepared)
             .await;
-        self.enforce_memindex_quota(Some(table));
+        self.enforce_unsealed_memory_quota(Some(table));
     }
 
     /// The batch's work, without the quota check.
@@ -2325,10 +2357,8 @@ impl Engine {
         // The multi-vector and sparse indexes share this DML hook: it is the one
         // place every write path (SQL INSERT/UPDATE, COPY, Thrift insert) goes
         // through.
-        for (seq, cells) in rows {
-            self.update_multivector_indexes(table, *seq, cells).await;
-            self.update_sparse_indexes(table, *seq, cells).await;
-        }
+        self.update_multivector_indexes_batch(table, rows, schema);
+        self.update_sparse_indexes_batch(table, rows, schema);
         let tkey = self.table_key(table);
         let by_id = self.index_column_map(table);
         let mut indexes: Vec<(u64, String, SharedTextIndex)> = self
@@ -3121,16 +3151,8 @@ impl Engine {
     /// the two can never disagree about what "over" means. `0` turns the whole
     /// mechanism off.
     pub fn set_unsealed_memory_quota(&self, bytes: u64) {
-        self.set_memindex_quota(bytes)
-    }
-
-    /// The old name for [`Self::set_unsealed_memory_quota`].
-    ///
-    /// Kept because the field it writes (`Context::memindex_quota`) is still the
-    /// engine's one byte ledger; callers that predate the rename keep working.
-    pub fn set_memindex_quota(&self, bytes: u64) {
         self.context
-            .memindex_quota
+            .unsealed_memory_quota
             .store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
@@ -3250,7 +3272,7 @@ impl Engine {
     pub(crate) fn note_index_insert(&self, table: &str, count: usize) {
         let quota = self
             .context
-            .memindex_quota
+            .unsealed_memory_quota
             .load(std::sync::atomic::Ordering::Relaxed) as usize;
         if quota == 0 || count == 0 {
             return;
@@ -3261,20 +3283,11 @@ impl Engine {
         let Ok(types) = self.column_types(table) else {
             return;
         };
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
             return;
         };
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("HNSW") {
-                continue;
-            }
-            // The index metadata may hold either a qualified or a short table
-            // name, so match fully when both are qualified and by short name
-            // when either side is unqualified.
-            let same_table = im.table == table
-                || (im.table.rsplit('.').next() == table.rsplit('.').next()
-                    && (!im.table.contains('.') || !table.contains('.')));
-            if !same_table {
                 continue;
             }
             let Some(col) = schema.iter().position(|c| c == &im.column) else {

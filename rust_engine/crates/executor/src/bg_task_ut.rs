@@ -296,7 +296,7 @@ async fn close_waits_for_the_queued_tasks() {
             .await
             .unwrap(),
     );
-    engine.set_memindex_quota(1024);
+    engine.set_unsealed_memory_quota(1024);
     secondary_fixture(&engine).await;
     let processor = Arc::new(BGTaskProcessor::new(1));
     processor.start().await;
@@ -344,7 +344,7 @@ async fn dump_index_task_row_cnt_exceed_memory_quota() {
             .await
             .unwrap(),
     );
-    engine.set_memindex_quota(1024);
+    engine.set_unsealed_memory_quota(1024);
     secondary_fixture(&engine).await;
     let processor = Arc::new(BGTaskProcessor::new(1));
     engine.attach_bg_task_processor(Arc::clone(&processor));
