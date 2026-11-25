@@ -3310,7 +3310,7 @@ mod tests {
         assert_eq!(counts.get("puts"), 0);
         assert_eq!(counts.get("deletes"), 0);
         assert!(c.get_table_by_name("db2.t").unwrap().is_none());
-        assert!(c.list_databases().unwrap().contains(&"db2".to_string()));
+        assert!(c.list_databases().unwrap().iter().any(|i| i == "db2"));
     }
 
     /// The batched writer must produce byte-identical records to the direct

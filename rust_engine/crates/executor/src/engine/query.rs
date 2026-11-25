@@ -1104,20 +1104,20 @@ impl Engine {
         stmt: &Statement,
         sql: &str,
     ) -> Result<QueryResult> {
+        let mut last = String::new();
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
             match self.execute_stmt(stmt, sql).await {
-                Err(Error::TxnConflict(_reason)) => {
+                Err(Error::TxnConflict(reason)) => {
+                    last = reason;
                     // `QueryStatementInternal` begins a new transaction for the
                     // retry, so the statement spends another txn id.
                     self.txn.end_statement();
                     self.txn.ensure_statement_id();
-                    // The conflicting transaction may still be committing (its
-                    // commit ts is taken, its entry not yet written): give it
-                    // the CPU instead of binning the statement.
-                    if self.txn.current_ts() == before {
-                        std::thread::yield_now();
-                    }
+                    // The conflicting transaction may still be committing: wait
+                    // for its bottom half to publish instead of spinning, which
+                    // on a current-thread runtime would starve that very commit.
+                    self.txn.wait_bottom_progress(before).await;
                     continue;
                 }
                 Err(Error::TxnConflictNoRetry(reason)) => {
@@ -1127,7 +1127,8 @@ impl Engine {
             }
         }
         Err(Error::TxnConflict(format!(
-            "the statement kept conflicting for {RETRY_LIMIT} attempts"
+            "the statement kept conflicting for {RETRY_LIMIT} attempts (last: {last}; {})",
+            self.txn.conflict_give_up_context()
         )))
     }
 

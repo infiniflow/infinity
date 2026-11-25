@@ -602,20 +602,23 @@ impl Engine {
             }
             return Ok(QueryResult::Inserted { count: inserted });
         }
+        let mut last = String::new();
         for _ in 0..RETRY_LIMIT {
             let before = self.txn.current_ts();
             match self
                 .insert_literals_inner(table, columns, rows.clone(), false)
                 .await
             {
-                Err(Error::TxnConflict(_reason)) => {
+                Err(Error::TxnConflict(reason)) => {
+                    last = reason;
                     // The retry spends another txn id, as
                     // `QueryStatementInternal` does for a re-run statement.
                     self.txn.end_statement();
                     self.txn.ensure_statement_id();
-                    if self.txn.current_ts() == before {
-                        std::thread::yield_now();
-                    }
+                    // Wait for the transaction this one lost to, instead of
+                    // spinning: a retry needs a newer snapshot, which only
+                    // exists after that commit publishes its bottom half.
+                    self.txn.wait_bottom_progress(before).await;
                     continue;
                 }
                 Err(Error::TxnConflictNoRetry(reason)) => {
@@ -625,7 +628,8 @@ impl Engine {
             }
         }
         Err(Error::TxnConflict(format!(
-            "the insert kept conflicting for {RETRY_LIMIT} attempts"
+            "the insert kept conflicting for {RETRY_LIMIT} attempts (last: {last}; {})",
+            self.txn.conflict_give_up_context()
         )))
     }
 

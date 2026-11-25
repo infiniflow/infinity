@@ -3762,7 +3762,8 @@ mod tests {
         assert!(imported
             .list_databases()
             .unwrap()
-            .contains(&"default_db".to_string()));
+            .iter()
+            .any(|i| i == "default_db"));
         let t = imported.get_table_by_name("default_db.t").unwrap().unwrap();
         assert_eq!(t.columns, columns);
         // Types round-trip through the reverse mapping.

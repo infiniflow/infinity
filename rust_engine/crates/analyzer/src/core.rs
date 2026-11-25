@@ -2669,8 +2669,8 @@ mod analyzer_pool_tests {
             .into_iter()
             .map(|term| term.text)
             .collect();
-        assert!(grams.contains(&"数".to_string()), "{grams:?}");
-        assert!(grams.contains(&"数据".to_string()), "{grams:?}");
+        assert!(grams.iter().any(|i| i == "数"), "{grams:?}");
+        assert!(grams.iter().any(|i| i == "数据"), "{grams:?}");
 
         let folded = AnalyzerPool::instance()
             .get_analyzer("sparsegram-3-12-fold")

@@ -17262,7 +17262,7 @@ mod tests {
         let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
         assert_eq!(ids.first().map(String::as_str), Some("40"), "got {ids:?}");
         assert!(
-            !ids.contains(&"41".to_string()),
+            !ids.iter().any(|i| i == "41"),
             "a deleted row must not be answered: {ids:?}"
         );
     }
