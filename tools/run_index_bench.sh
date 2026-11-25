@@ -38,6 +38,10 @@ case "$workload" in
   *) echo "usage: $0 <hnsw|index-types|multivector|secondary-lookup|secondary-maint|sdk> [rows] [queries]"; exit 2 ;;
 esac
 
+if [[ "$driver" == go/* ]]; then
+  go -C "$root/go" mod download
+fi
+
 status=0
 for engine in cpp rust; do
   if ! bwrap --dev-bind / / --unshare-net -- bash "$here/run_index_bench_one.sh" \
