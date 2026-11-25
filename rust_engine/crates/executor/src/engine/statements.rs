@@ -2606,6 +2606,8 @@ impl Engine {
                     Literal::Int(v) => {
                         if keeps_text {
                             Value::Str(ren_str.to_string())
+                        } else if ty.is_some_and(|t| is_float_type(t)) {
+                            Value::Float(*v as f64)
                         } else {
                             Value::Int(*v)
                         }
