@@ -74,6 +74,34 @@ pub fn trim_allocator() {
     }
 }
 
+/// Pins the calling OS thread to the given logical CPU indices on Linux.
+#[cfg(target_os = "linux")]
+#[allow(unsafe_code)]
+pub fn pin_current_thread_to_cpus(cpus: &[usize]) {
+    // Linux `cpu_set_t` is a 1024-bit (128-byte) bitmask aligned to `usize`.
+    const WORDS: usize = 1024 / (std::mem::size_of::<usize>() * 8);
+    #[repr(C)]
+    struct CpuSet([usize; WORDS]);
+    unsafe extern "C" {
+        fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const CpuSet) -> i32;
+    }
+    let mut set = CpuSet([0; WORDS]);
+    let bits_per_word = std::mem::size_of::<usize>() * 8;
+    for &cpu in cpus {
+        if cpu < 1024 {
+            set.0[cpu / bits_per_word] |= 1usize << (cpu % bits_per_word);
+        }
+    }
+    // SAFETY: `pid == 0` targets the calling thread and `set` is a valid `cpu_set_t`.
+    unsafe {
+        sched_setaffinity(0, std::mem::size_of::<CpuSet>(), &set);
+    }
+}
+
+/// No-op on non-Linux targets.
+#[cfg(not(target_os = "linux"))]
+pub fn pin_current_thread_to_cpus(_cpus: &[usize]) {}
+
 /// Drops clean page cache for one file after writing it back. Long imports
 /// write gigabytes of segment/sidecar files; without this the cache grows
 /// until the OOM killer fires (the reference bounds it with its buffer manager).

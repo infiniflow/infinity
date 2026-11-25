@@ -60,5 +60,21 @@ else
   python3 "$checker" "$golden" "$latest" || status=1
 fi
 
+if command -v go >/dev/null 2>&1; then
+  echo "== Gate E (Go HNSW benchmark) =="
+  hnsw_data="$scratch/gate-e-hnsw"
+  rm -rf "$hnsw_data"
+  "$here/../target/release/infinity" serve "$hnsw_data" >"$scratch/infinity-hnsw-server.log" 2>&1 &
+  hnsw_srv=$!
+  trap 'kill "$hnsw_srv" 2>/dev/null' EXIT
+  go -C "$root/go" run ./cmd/hnsw_benchmark \
+    -host 127.0.0.1 -port 23817 -dataset synthetic \
+    -rows "${INFINITY_BENCH_ROWS:-20000}" -num-queries 200 -threads 8 -multi-queries 1000 -ci \
+    | tee "$scratch/infinity-hnsw-bench.log" || status=1
+  kill "$hnsw_srv" 2>/dev/null
+  wait "$hnsw_srv" 2>/dev/null || true
+  trap - EXIT
+fi
+
 echo "== Gate E result: $([[ $status -eq 0 ]] && echo PASS || echo FAIL) =="
 exit $status

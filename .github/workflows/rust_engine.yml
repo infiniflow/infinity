@@ -1081,6 +1081,9 @@ jobs:
           cargo test --workspace --no-fail-fast -- --ignored "${args[@]}"
       - name: Build the server
         run: (cd rust_engine && cargo build --release -p cli)
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
       - name: Gate E (performance)
         # Two runs of the same CLI benchmark driver on the same machine; the
         # checker fails on a >7% regression (tools/ci_tools/

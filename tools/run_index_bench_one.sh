@@ -87,7 +87,11 @@ done
 if [[ $up -eq 0 ]]; then
   echo "engine did not come up"; kill "$srv" 2>/dev/null; exit 1
 fi
-"$root/.venv/bin/python" "$driver" "$@"
+if [[ "$driver" == go/* ]]; then
+  go -C "$root/go" run "./${driver#go/}" "$@"
+else
+  "$root/.venv/bin/python" "$driver" "$@"
+fi
 code=$?
 kill "$srv" 2>/dev/null
 wait "$srv" 2>/dev/null

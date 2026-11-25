@@ -29,7 +29,35 @@
 //!   statement's thread (`block_in_place`), which is what `QueryContext`
 //!   waiting for the fragment looks like here.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
+
+#[cfg(target_os = "linux")]
+fn parse_cpu_list(path: &str) -> Option<Vec<usize>> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut cpus = Vec::new();
+    for part in text.trim().split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        if let Some((start, end)) = part.split_once('-') {
+            let s: usize = start.trim().parse().ok()?;
+            let e: usize = end.trim().parse().ok()?;
+            if s <= e {
+                cpus.extend(s..=e);
+            }
+        } else {
+            cpus.push(part.parse().ok()?);
+        }
+    }
+    (!cpus.is_empty()).then_some(cpus)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn parse_cpu_list(_path: &str) -> Option<Vec<usize>> {
+    None
+}
 
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
@@ -39,16 +67,25 @@ pub struct TaskScheduler {
 
 impl TaskScheduler {
     fn start() -> Self {
+        let total_cpus = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
+        let pin_enabled = std::env::var("INFINITY_PIN_PCORES")
+            .map(|v| v.trim() != "0")
+            .unwrap_or(true);
+        let p_cores = if pin_enabled {
+            parse_cpu_list("/sys/devices/cpu_core/cpus").filter(|cpus| cpus.len() < total_cpus)
+        } else {
+            None
+        };
         // `TaskScheduler::Init`: `min(hardware_concurrency, CPULimit)` workers.
+        // On hybrid P/E-core CPUs, default worker count to the P-core count so
+        // async query workers stay on P-cores instead of spilling to E-cores.
         let workers = std::env::var("INFINITY_WORKER_THREADS")
             .ok()
             .and_then(|v| v.trim().parse::<usize>().ok())
             .filter(|n| *n > 0)
-            .unwrap_or_else(|| {
-                std::thread::available_parallelism()
-                    .map(|n| n.get())
-                    .unwrap_or(1)
-            });
+            .unwrap_or_else(|| p_cores.as_ref().map_or(total_cpus, Vec::len));
         // The blocking pool is left at tokio's default. It is not a concurrency
         // limit for the engine: tasklets are async tasks now, so the pool only
         // holds work that genuinely blocks. A cap of `cores + 4` made the pool
@@ -83,6 +120,18 @@ impl TaskScheduler {
             .filter(|n| *n > 0)
         {
             builder.max_blocking_threads(limit);
+        }
+        if let Some(cpus) = p_cores {
+            // `builder.build()` spawns the `workers` runtime worker threads
+            // up front before returning; blocking pool threads are spawned
+            // lazily afterwards, so pinning only the first `workers` threads
+            // keeps `spawn_blocking` / background work free to use all cores.
+            let worker_idx = AtomicUsize::new(0);
+            builder.on_thread_start(move || {
+                if worker_idx.fetch_add(1, Ordering::Relaxed) < workers {
+                    storage::pin_current_thread_to_cpus(&cpus);
+                }
+            });
         }
         let runtime = builder.build().expect("build the task scheduler runtime");
         // This is the process's **only** runtime. The fan-out primitives spawn
