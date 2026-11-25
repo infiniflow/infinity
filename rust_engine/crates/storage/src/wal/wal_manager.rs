@@ -106,10 +106,12 @@ impl WalManager {
         let mut buf = Vec::with_capacity(entry.size_in_bytes());
         entry.write_adv(&mut buf);
         let offset = self.file_size;
-        self.file
-            .write_all(&buf)
-            .await
-            .map_err(|e| Error::io(&self.path, e))?;
+        if let Err(e) = self.file.write_all(&buf).await {
+            if let Ok(meta) = self.file.metadata().await {
+                self.file_size = meta.len();
+            }
+            return Err(Error::io(&self.path, e));
+        }
         self.file_size += buf.len() as u64;
         // Hand the bytes to the kernel before returning. `write_all` on a
         // `tokio::fs::File` completes the write, but the handle's own buffer is
