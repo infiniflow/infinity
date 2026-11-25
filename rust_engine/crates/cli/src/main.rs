@@ -249,9 +249,10 @@ async fn serve_from_config(path: Option<&str>, maintenance: bool) -> common::Res
     if let Some(client) = object_store {
         engine.set_object_store(client);
     }
-    // `[wal] wal_flush` — `only_write` (the reference's default) appends the
-    // entry and lets the OS flush; the checkpoint is the durability boundary.
-    let wal_flush = toml_value(&text, "wal_flush").unwrap_or_default();
+    // `[wal] wal_flush` / `flush_method_at_commit` — defaults to `flush_at_once`.
+    let wal_flush = toml_value(&text, "wal_flush")
+        .or_else(|| toml_value(&text, "flush_method_at_commit"))
+        .unwrap_or_else(|| "flush_at_once".into());
     engine.set_wal_flush(txn::WalFlush::parse(&wal_flush));
     // `[buffer] unsealed_memory_quota` — everything not yet on disk (the append
     // buffer plus every index tail) is drained once it passes this. The byte

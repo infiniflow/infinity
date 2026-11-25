@@ -1,0 +1,22 @@
+[package]
+name = "m2v"
+version = "0.1.0"
+edition = "2021"
+description = "Static-embedding C ABI for the Infinity RAGFlow load test (Go calls this via cgo)"
+
+# Standalone crate, deliberately outside the engine workspace: it is a test
+# dependency of the load generator, never a part of `infinity` itself.
+[workspace]
+
+[lib]
+name = "m2v"
+# cdylib, not staticlib: Rust's std ships LTO bitcode in its archive members and
+# Go's cgo refuses to link an archive containing a `.llvmbc` section (it treats
+# it as a disallowed LTO input). A shared object sidesteps that entirely, and for
+# a test harness the loader overhead is irrelevant.
+crate-type = ["cdylib"]
+
+[dependencies]
+# local-only: the load path must not touch the network once the model is pinned.
+# onig: the tokenizer backend the model's tokenizer.json needs (off by default).
+model2vec-rs = { version = "0.5", default-features = false, features = ["onig", "local-only"] }

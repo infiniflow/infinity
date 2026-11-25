@@ -2669,10 +2669,21 @@ impl Engine {
         f: impl FnOnce() -> Result<T>,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
     ) -> Result<T> {
-        // One DDL at a time: a second capture would interleave two statements'
-        // layout rewrites, and only one capture slot exists.
-        let _ddl = self.ddl_lock.lock().await;
+        // One DDL at a time for `catalog.capture`: a second capture would
+        // interleave two statements' layout rewrites, and only one capture slot
+        // exists. Hold `ddl_lock` across `commit_at` for operations that
+        // allocate shared catalog counters (`CreateTable`, `CreateDatabase`,
+        // `CreateIndex`, etc.) or mutate shared table index sets (`DropIndex`)
+        // so concurrent captures cannot read stale counters or race on
+        // `CreateIndex`/`DropIndex` conflicts before the first commits. Only
+        // `DropTable` releases the lock before `commit_at` so concurrent drops
+        // can coalesce in `sync_wal_grouped`.
+        let release_before_commit = matches!(op, TxnOp::DropTable { .. });
+        let mut ddl_guard = Some(self.ddl_lock.lock().await);
         let (out, mut batch) = self.storage.catalog.capture(f)?;
+        if release_before_commit {
+            ddl_guard.take();
+        }
         // A statement that changes nothing must not spend a timestamp. The
         // reference commits such a transaction through `GetReadCommitTS` — an
         // odd ts, no WAL entry — so `DROP TABLE IF EXISTS <missing>` leaves

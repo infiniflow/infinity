@@ -2101,9 +2101,9 @@ impl Engine {
                 let existing = self
                     .storage
                     .catalog
-                    .list_indexes()?
+                    .list_indexes_for_table(table)?
                     .into_iter()
-                    .find(|im| im.name == *name && im.table == *table)
+                    .find(|im| im.name == *name)
                     .map(|im| im.column);
                 if let Some(existing_column) = existing {
                     if !*if_not_exists {

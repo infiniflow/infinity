@@ -1989,7 +1989,6 @@ pub(crate) mod chunk_file {
         {
             let mut file = std::fs::File::create(&temp).expect("create HNSW file");
             file.write_all(&out).expect("write HNSW file");
-            file.sync_all().expect("sync HNSW file");
         }
         std::fs::rename(&temp, path).expect("rename HNSW file");
     }

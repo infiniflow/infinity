@@ -738,6 +738,11 @@ impl Engine {
         // between left the frame and the deprecations durable while the merged
         // segment had no blocks at all - the table came back with those rows
         // gone.
+        // Ensure merged block/index-chunk files are durable on the data
+        // filesystem before committing the compaction, so a concurrent
+        // checkpoint's `txn.flush()` cannot advance `synced` past this commit
+        // while its files are still only in the page cache.
+        storage::wal::WalManager::sync_dir_fs(&self.dir.join("data")).await?;
         let turn = self.txn.reserve_commit_ts();
         let compact_ts = turn.ts();
         // `compact_turn` (taken at the top of this pass) is still held, which is
@@ -1490,6 +1495,10 @@ impl Engine {
         }
         mirror?;
         mark("catalog_rewrite");
+        // Make block/chunk files and their directory entries on the data
+        // filesystem durable before `txn.flush()` raises `synced` (even when
+        // `data/` and `wal/` live on separate filesystems).
+        storage::wal::WalManager::sync_dir_fs(&self.dir.join("data")).await?;
         // The checkpoint's one store flush, at the end as in
         // `NewTxn::Checkpoint` (`kv_store()->Flush()`, `new_txn_impl.cpp:1814`).
         // It covers everything the mirror published - `catalog|seg|…`,

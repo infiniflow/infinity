@@ -1955,10 +1955,24 @@ type IndexSlot = ((String, String, String), (u64, String));
 /// `drop|idx|…` marker, the way `DBMeta::GetIndexID` resolves it; `DROP INDEX`
 /// leaves both records in place until `Cleanup`.
 pub fn read_indexes(store: &dyn MetaStore) -> Result<Vec<IndexDefValue>> {
+    read_indexes_with_prefix(store, b"catalog|idx|")
+}
+
+/// Reads the index definitions for a single `(db_id, table_id)` pair.
+pub fn read_table_indexes(
+    store: &dyn MetaStore,
+    db_id: &str,
+    table_id: &str,
+) -> Result<Vec<IndexDefValue>> {
+    let prefix = format!("catalog|idx|{db_id}|{table_id}|");
+    read_indexes_with_prefix(store, prefix.as_bytes())
+}
+
+fn read_indexes_with_prefix(store: &dyn MetaStore, prefix: &[u8]) -> Result<Vec<IndexDefValue>> {
     // `catalog|idx|{db}|{tbl}|{name}|{ts}` -> `(ts, id)`, newest per name.
     let mut newest: std::collections::HashMap<(String, String, String), (u64, String)> =
         std::collections::HashMap::new();
-    for (k, v) in store.scan_prefix(b"catalog|idx|")? {
+    for (k, v) in store.scan_prefix(prefix)? {
         let key = String::from_utf8_lossy(&k).to_string();
         // Six fields: the value is the numeric index id that locates the
         // `index_base` tag.
