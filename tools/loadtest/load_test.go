@@ -12,7 +12,7 @@ package loadtest
 //	LT_MAPPING=/path/to/ragflow/conf/infinity_mapping.json \
 //	LT_MODEL=/path/to/model2vec-1024 \
 //	LT_SCENARIO=S \
-//	go test -v -timeout 6h -run TestLoadTest ./...
+//	go test -count=1 -v -timeout 6h -run TestLoadTest ./...
 //
 // LT_SCENARIO may be S / M / L / XL, or "S:10x200" for a custom table count and
 // rows per table. LT_TABLES / LT_ROWS override either.
@@ -185,19 +185,36 @@ func TestLoadTest(t *testing.T) {
 	run.Execute()
 }
 
+// PinnedMappingSHA256 is the authoritative RAGFlow conf/infinity_mapping.json hash (plan §4.1.1).
+const PinnedMappingSHA256 = "d779cf10185bdfea89ef787c4f7643c8a12269df7096faab82d1bf86037f4532"
+
 // Run holds the state a run accumulates, so the report can be assembled at the
 // end even when a phase fails.
 type Run struct {
 	Cfg config
 	T   *testing.T
 
-	mapping *Mapping
-	corpus  *Corpus
-	emb     *Embedder
-	alloc   Allocation
-	engine  *Engine
+	dbName        string
+	mapping       *Mapping
+	mappingSHA    string
+	modelHashes   map[string]string
+	effectiveSkew bool
+	corpus        *Corpus
+	emb           *Embedder
+	alloc         Allocation
+	engine        *Engine
+
+	createdMu     sync.Mutex
+	createdTables []string
+	teardownDone  bool
 
 	report []phaseResult
+}
+
+func (r *Run) trackCreated(name string) {
+	r.createdMu.Lock()
+	r.createdTables = append(r.createdTables, name)
+	r.createdMu.Unlock()
 }
 
 // phaseResult is one measured phase.
@@ -225,13 +242,23 @@ func (r *Run) Execute() {
 	if err != nil {
 		t.Fatalf("load mapping: %v", err)
 	}
+	if m.SHA256 != PinnedMappingSHA256 {
+		t.Fatalf("mapping sha256 mismatch: %s != %s", m.SHA256, PinnedMappingSHA256)
+	}
 	r.mapping = m
+	r.mappingSHA = m.SHA256
 
 	arts, sha, err := LoadCorpus(wikiPath(), PinnedWikiSHA256)
 	if err != nil {
 		t.Fatalf("load corpus: %v", err)
 	}
 	r.corpus = NewCorpus(arts)
+
+	modelHashes, err := ValidatePinnedModel(r.Cfg.Model)
+	if err != nil {
+		t.Fatalf("validate model: %v", err)
+	}
+	r.modelHashes = modelHashes
 
 	emb, err := LoadEmbedder(r.Cfg.Model, 1024)
 	if err != nil {
@@ -240,28 +267,35 @@ func (r *Run) Execute() {
 	defer emb.Close()
 	r.emb = emb
 
-	r.alloc = PlanAllocation(r.Cfg.Scenario, r.Cfg.Seed, r.Cfg.Skew, "ragflow_lt")
+	r.effectiveSkew = r.Cfg.Skew && r.Cfg.Scenario.Tables >= 200
+	if r.Cfg.Skew && !r.effectiveSkew {
+		t.Logf("LT_SKEW=1 requested, but scenario %s has %d tables (< 200); using uniform allocation",
+			r.Cfg.Scenario.Name, r.Cfg.Scenario.Tables)
+	}
+	r.alloc = PlanAllocation(r.Cfg.Scenario, r.Cfg.Seed, r.effectiveSkew, "ragflow_lt")
 	if n := r.Cfg.LimitTables; n > 0 && n < len(r.alloc.Rows) {
 		r.alloc.Rows = r.alloc.Rows[:n]
 		r.alloc.Docs = r.alloc.Docs[:n]
 		r.alloc.Names = r.alloc.Names[:n]
 		t.Logf("LT_LIMIT_TABLES=%d: plan trimmed to the first %d tables", n, n)
 	}
-	t.Logf("scenario %s: %s", r.Cfg.Scenario.Name, r.alloc.Summary())
+	t.Logf("scenario %s: %s (skew=%v)", r.Cfg.Scenario.Name, r.alloc.Summary(), r.effectiveSkew)
 	t.Logf("corpus: %d articles, %d start positions, sha256 %s", len(arts), r.corpus.Starts(), sha[:16])
-	t.Logf("schema: %d mapping columns + 1 vector, %d index objects (variant=%s)",
-		len(m.Columns), m.IndexObjects(r.Cfg.Sparsegram), variantName(r.Cfg.Sparsegram))
+	t.Logf("schema: %d mapping columns + 1 vector, %d index objects (variant=%s), sha256 %s",
+		len(m.Columns), m.IndexObjects(r.Cfg.Sparsegram), variantName(r.Cfg.Sparsegram), r.mappingSHA[:16])
 
 	host, port, err := splitHostPort(r.Cfg.Server)
 	if err != nil {
 		t.Fatalf("LT_SERVER: %v", err)
 	}
-	eng, err := Connect(host, port, "lt_load", m, 1024)
+	r.dbName = fmt.Sprintf("lt_load_%d_%d", r.Cfg.Seed, time.Now().UnixNano())
+	eng, err := Connect(host, port, r.dbName, m, 1024)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
 	defer eng.Close()
 	r.engine = eng
+	t.Cleanup(r.cleanupOnExit)
 	r.record("setup", time.Since(start), 0, "mapping+corpus+embedder+connect")
 
 	// ---- P0: create tables ----------------------------------------------
@@ -282,7 +316,7 @@ func (r *Run) Execute() {
 	}
 	// Exercise each kind against the same query set, so the difference between
 	// the numbers is the query shape and nothing else.
-	kinds := []string{"dense", "text", "hybrid", "filtered", "like"}
+	kinds := []string{"dense", "text", "hybrid", "filtered", "like", "point"}
 	for _, k := range kinds {
 		r.phaseQueries(k, withKind(queries, k))
 	}
@@ -328,7 +362,9 @@ func splitHostPort(s string) (string, int, error) {
 // be idempotent, and CREATE TABLE with ConflictTypeError would otherwise fail on
 // the second run against the same database (which is how this was found).
 func (r *Run) phaseCreate() {
-	r.dropExisting()
+	if os.Getenv("LT_CLEAN_STALE") != "" {
+		r.dropExisting()
+	}
 
 	start := time.Now()
 	// Step 1: CREATE TABLE serially (catalog next_table_id is a single key).
@@ -336,6 +372,7 @@ func (r *Run) phaseCreate() {
 		if _, err := r.engine.CreateTable(name, false, r.Cfg.Sparsegram); err != nil {
 			r.T.Fatalf("create table %d/%d (%s): %v", i+1, len(r.alloc.Names), name, err)
 		}
+		r.trackCreated(name)
 	}
 	// Step 2: CREATE INDEX concurrently across tables.
 	if !r.Cfg.IndexLast && len(r.alloc.Names) > 0 {
@@ -356,7 +393,7 @@ func (r *Run) phaseCreate() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+				eng, err := Connect(host, port, r.dbName, r.mapping, 1024)
 				if err != nil {
 					errCh <- err
 					return
@@ -488,7 +525,7 @@ func (r *Run) phaseIngest() {
 			// not shared, and reusing one connection across goroutines would
 			// serialise the inserts and measure the SDK's mutex.
 			host, port, _ := splitHostPort(r.Cfg.Server)
-			eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+			eng, err := Connect(host, port, r.dbName, r.mapping, 1024)
 			if err != nil {
 				errCh <- fmt.Errorf("worker %d connect: %w", worker, err)
 				return
@@ -566,7 +603,8 @@ func (r *Run) ingestTable(eng *Engine, tbl *infinity.Table, idx, batchSize int, 
 	for i := 0; i < rows; i++ {
 		art, text := r.corpus.Sample(rng)
 		docID := docIDs[i%docs]
-		row, err := rb.Build(rng, art, text, docID, kbID, i%chunksPerDoc, 1+(i%chunksPerDoc)/10)
+		order := i / docs
+		row, err := rb.Build(rng, art, text, docID, kbID, order, 1+order/10)
 		if err != nil {
 			return fmt.Errorf("build row: %w", err)
 		}
@@ -647,7 +685,7 @@ func (r *Run) phaseQueries(kind string, specs []QuerySpec) {
 		if err != nil {
 			r.T.Fatalf("splitHostPort: %v", err)
 		}
-		timings = RunConcurrent(ctx, host, port, "lt_load", r.mapping, 1024, specs, r.Cfg.QueryWorkers)
+		timings = RunConcurrent(ctx, host, port, r.dbName, r.mapping, 1024, specs, r.Cfg.QueryWorkers)
 	}
 	dur := time.Since(start)
 
@@ -670,12 +708,11 @@ func (r *Run) phaseQueries(kind string, specs []QuerySpec) {
 		len(timings), p50.Round(time.Microsecond), p99.Round(time.Microsecond), errs))
 }
 
-// pointSpecs resolves a real doc_id or kb_id for each point query, so Q5/Q6 hit
-// rows instead of missing.
+// pointSpecs resolves a real doc_id or kb_id for each point query, so both
+// Q5 (kb_id secondary index) and Q6 (doc_id) hit rows instead of missing.
 func (r *Run) pointSpecs(specs []QuerySpec) []QuerySpec {
-	// kb_id is known from the allocation: table i uses kb_%05d.
 	out := make([]QuerySpec, 0, len(specs))
-	for _, s := range specs {
+	for i, s := range specs {
 		if s.Table == "" {
 			continue
 		}
@@ -683,8 +720,18 @@ func (r *Run) pointSpecs(specs []QuerySpec) []QuerySpec {
 		if _, err := fmt.Sscanf(s.Table, "ragflow_lt_%05d", &idx); err != nil {
 			continue
 		}
-		s.KBID = fmt.Sprintf("kb_%05d", idx)
-		s.DocID = ""
+		if i%2 == 0 {
+			s.KBID = fmt.Sprintf("kb_%05d", idx)
+			s.DocID = ""
+		} else {
+			docs := 1
+			if idx >= 0 && idx < len(r.alloc.Docs) && r.alloc.Docs[idx] > 0 {
+				docs = r.alloc.Docs[idx]
+			}
+			docIdx := i % docs
+			s.DocID = fmt.Sprintf("%032x", rand.New(rand.NewSource(int64(idx)<<32|int64(docIdx))).Int63())
+			s.KBID = ""
+		}
 		out = append(out, s)
 	}
 	return out
@@ -736,9 +783,11 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 	defer cancel()
 
 	var readLats sync.Map // goroutine -> *[]time.Duration
+	var readSuccess atomic.Int64
 	var readErrs atomic.Int64
-	var firstReadErr atomic.Value // error, so a failure can be attributed
-	var aborted atomic.Bool       // set once the server is gone; stops the phase
+	var firstReadErrOnce sync.Once
+	var firstReadErr error
+	var aborted atomic.Bool // set once the server is gone; stops the phase
 	var wg sync.WaitGroup
 
 	// cancelOnServerLoss ends the phase when reads keep failing: at that point
@@ -761,7 +810,7 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 					continue
 				}
 				last = cur
-				if cur > 0 && len(allReadLatencies(&readLats)) == 0 {
+				if cur > 0 && readSuccess.Load() == 0 {
 					aborted.Store(true)
 					stopPhase()
 					return
@@ -776,10 +825,10 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 		go func(id int) {
 			defer wg.Done()
 			host, port, _ := splitHostPort(r.Cfg.Server)
-			eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+			eng, err := Connect(host, port, r.dbName, r.mapping, 1024)
 			if err != nil {
 				readErrs.Add(1)
-				firstReadErr.CompareAndSwap(nil, err)
+				firstReadErrOnce.Do(func() { firstReadErr = err })
 				return
 			}
 			defer eng.Close()
@@ -789,12 +838,12 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 				s := hybrid[j%len(hybrid)]
 				j++
 				st := time.Now()
-				if _, err := eng.RunQuery(ctx, s); err != nil {
+				if _, err := eng.RunQuery(phaseCtx, s); err != nil {
 					// A cancelled context is the phase ending, not a failure;
 					// the SDK surfaces it as an error like any other.
 					if phaseCtx.Err() == nil {
 						readErrs.Add(1)
-						firstReadErr.CompareAndSwap(nil, err)
+						firstReadErrOnce.Do(func() { firstReadErr = err })
 						// Back off on failure. Without this, a server that has
 						// gone away turns the reader loop into a busy spin: one
 						// run recorded 33,572,219 errors in 10 s and the error
@@ -806,6 +855,7 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 					}
 					continue
 				}
+				readSuccess.Add(1)
 				lats = append(lats, time.Since(st))
 			}
 			readLats.Store(id, lats)
@@ -822,13 +872,21 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 	// are counted as their own step.
 	var createMu sync.Mutex
 	var written atomic.Int64
+	var writerErrMu sync.Mutex
+	var writerErrs []error
+	recordWriterErr := func(err error) {
+		writerErrMu.Lock()
+		writerErrs = append(writerErrs, err)
+		writerErrMu.Unlock()
+	}
 	for i := 0; i < writers; i++ {
 		wg.Add(1)
 		go func(id int) {
 			defer wg.Done()
 			host, port, _ := splitHostPort(r.Cfg.Server)
-			eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+			eng, err := Connect(host, port, r.dbName, r.mapping, 1024)
 			if err != nil {
+				recordWriterErr(fmt.Errorf("writer %d connect: %w", id, err))
 				return
 			}
 			defer eng.Close()
@@ -846,7 +904,7 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 			tbl, err := eng.CreateTable(name, false, r.Cfg.Sparsegram)
 			createMu.Unlock()
 			if err != nil {
-				r.T.Logf("P7 writer %d: create %s: %v", id, name, err)
+				recordWriterErr(fmt.Errorf("writer %d create %s: %w", id, name, err))
 				return
 			}
 			defer eng.DB.DropTable(name, infinity.ConflictTypeIgnore)
@@ -859,6 +917,7 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 					art, text := r.corpus.Sample(rng)
 					row, err := rb.Build(rng, art, text, fmt.Sprintf("%032x", rng.Int63()), "kb_w", k, 1)
 					if err != nil {
+						recordWriterErr(fmt.Errorf("writer %d build row: %w", id, err))
 						return
 					}
 					rows = append(rows, row)
@@ -866,10 +925,11 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 				}
 				vecs, err := r.emb.Encode(texts, fallbackTokens)
 				if err != nil {
+					recordWriterErr(fmt.Errorf("writer %d encode: %w", id, err))
 					return
 				}
 				if err := eng.IngestBatch(tbl, rows, vecs); err != nil {
-					r.T.Logf("P7 writer %d: insert: %v", id, err)
+					recordWriterErr(fmt.Errorf("writer %d insert: %w", id, err))
 					return
 				}
 				written.Add(int64(len(rows)))
@@ -883,12 +943,17 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 	p50, p99 := percentiles(all)
 	if aborted.Load() {
 		r.T.Errorf("P7: server stopped answering; phase aborted after %s", dur)
+	} else if readers > 0 && len(all) == 0 {
+		r.T.Errorf("P7: %d readers configured, but 0 reads succeeded (first error: %v)", readers, firstReadErr)
+	}
+	if writers > 0 && len(writerErrs) > 0 {
+		r.T.Errorf("P7: %d writer error(s); first: %v", len(writerErrs), writerErrs[0])
 	}
 	detail := fmt.Sprintf("%d readers / %d writers for %s: %d reads, p50 %s p99 %s, %d read errors, %d rows written",
 		readers, writers, dur, len(all), p50.Round(time.Microsecond), p99.Round(time.Microsecond),
 		readErrs.Load(), written.Load())
-	if err, _ := firstReadErr.Load().(error); err != nil {
-		detail += fmt.Sprintf("; first error: %v", err)
+	if firstReadErr != nil {
+		detail += fmt.Sprintf("; first error: %v", firstReadErr)
 	}
 	r.record("P7 mixed", dur, int(written.Load()), detail)
 }
@@ -897,18 +962,66 @@ func (r *Run) phaseMixed(queries []QuerySpec) {
 func (r *Run) phaseTeardown() {
 	if os.Getenv("LT_KEEP_TABLES") != "" {
 		r.T.Log("P8 skipped: LT_KEEP_TABLES is set")
+		r.teardownDone = true
 		return
 	}
 	start := time.Now()
+	dropped, dropErrs := r.dropTableList(r.alloc.Names)
+	r.teardownDone = true
+	if r.engine != nil && r.engine.Conn != nil && r.dbName != "" {
+		if _, err := r.engine.Conn.DropDatabase(r.dbName, infinity.ConflictTypeIgnore); err != nil {
+			dropErrs = append(dropErrs, fmt.Sprintf("drop database %s: %v", r.dbName, err))
+		}
+	}
+	if len(dropErrs) > 0 {
+		r.T.Errorf("P8 teardown failed (%d error(s)): %s", len(dropErrs), strings.Join(dropErrs, "; "))
+	}
+	r.record("P8 teardown", time.Since(start), 0, fmt.Sprintf("dropped %d tables", dropped))
+}
+
+func (r *Run) cleanupOnExit() {
+	if r.teardownDone || os.Getenv("LT_KEEP_TABLES") != "" {
+		return
+	}
+	r.createdMu.Lock()
+	names := append([]string(nil), r.createdTables...)
+	r.createdMu.Unlock()
+	if len(names) > 0 {
+		_, errs := r.dropTableList(names)
+		if len(errs) > 0 {
+			r.T.Errorf("cleanup teardown failed: %s", strings.Join(errs, "; "))
+		}
+	}
+	if r.dbName != "" {
+		host, port, err := splitHostPort(r.Cfg.Server)
+		if err == nil {
+			if eng, err := Connect(host, port, r.dbName, r.mapping, 1024); err == nil {
+				if _, err := eng.Conn.DropDatabase(r.dbName, infinity.ConflictTypeIgnore); err != nil {
+					r.T.Logf("cleanup drop database %s: %v", r.dbName, err)
+				}
+				eng.Close()
+			}
+		}
+	}
+}
+
+func (r *Run) dropTableList(names []string) (int64, []string) {
 	var dropped atomic.Int64
-	if len(r.alloc.Names) > 0 {
+	var errMu sync.Mutex
+	var errs []string
+	addErr := func(msg string) {
+		errMu.Lock()
+		errs = append(errs, msg)
+		errMu.Unlock()
+	}
+	if len(names) > 0 {
 		host, port, err := splitHostPort(r.Cfg.Server)
 		if err != nil {
-			r.T.Fatalf("splitHostPort: %v", err)
+			return 0, []string{fmt.Sprintf("splitHostPort: %v", err)}
 		}
-		workers := min(max(1, getenvInt("LT_DDL_WORKERS", 16)), len(r.alloc.Names))
-		jobs := make(chan string, len(r.alloc.Names))
-		for _, name := range r.alloc.Names {
+		workers := min(max(1, getenvInt("LT_DDL_WORKERS", 16)), len(names))
+		jobs := make(chan string, len(names))
+		for _, name := range names {
 			jobs <- name
 		}
 		close(jobs)
@@ -917,15 +1030,15 @@ func (r *Run) phaseTeardown() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+				eng, err := Connect(host, port, r.dbName, r.mapping, 1024)
 				if err != nil {
-					r.T.Logf("teardown connect: %v", err)
+					addErr(fmt.Sprintf("teardown connect: %v", err))
 					return
 				}
 				defer eng.Close()
 				for name := range jobs {
 					if _, err := eng.DB.DropTable(name, infinity.ConflictTypeIgnore); err != nil {
-						r.T.Logf("drop %s: %v", name, err)
+						addErr(fmt.Sprintf("drop %s: %v", name, err))
 						continue
 					}
 					dropped.Add(1)
@@ -934,7 +1047,7 @@ func (r *Run) phaseTeardown() {
 		}
 		wg.Wait()
 	}
-	r.record("P8 teardown", time.Since(start), 0, fmt.Sprintf("dropped %d tables", dropped.Load()))
+	return dropped.Load(), errs
 }
 
 // printReport writes the phase table and the environment, so two runs can be
@@ -942,7 +1055,16 @@ func (r *Run) phaseTeardown() {
 func (r *Run) printReport() {
 	var b strings.Builder
 	b.WriteString("\n=== load test report ===\n")
-	fmt.Fprintf(&b, "scenario     %s\n", r.Cfg.Scenario.Name)
+	fmt.Fprintf(&b, "scenario     %s (skew=%v)\n", r.Cfg.Scenario.Name, r.effectiveSkew)
+	fmt.Fprintf(&b, "database     %s\n", r.dbName)
+	if r.mappingSHA != "" {
+		fmt.Fprintf(&b, "mapping      sha256 %s\n", r.mappingSHA)
+	}
+	for _, spec := range PinnedModelFiles {
+		if h, ok := r.modelHashes[spec.RelPath]; ok {
+			fmt.Fprintf(&b, "model        %s sha256 %s\n", spec.RelPath, h)
+		}
+	}
 	fmt.Fprintf(&b, "variant      %s (%d index objects/table)\n",
 		variantName(r.Cfg.Sparsegram), r.mapping.IndexObjects(r.Cfg.Sparsegram))
 	fmt.Fprintf(&b, "import order %s\n", map[bool]string{true: "load then index (P1b)", false: "indexes first (P1a)"}[r.Cfg.IndexLast])

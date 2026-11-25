@@ -2671,12 +2671,21 @@ impl Engine {
     ) -> Result<T> {
         // One DDL at a time for `catalog.capture`: a second capture would
         // interleave two statements' layout rewrites, and only one capture slot
-        // exists. Drop the lock before `commit_at` so concurrent DDLs can batch
-        // their WAL syncs in `sync_wal_grouped`, matching `ddl_commit_with_effects`.
-        let (out, mut batch) = {
-            let _ddl = self.ddl_lock.lock().await;
-            self.storage.catalog.capture(f)?
-        };
+        // exists. Hold `ddl_lock` across `commit_at` for operations that
+        // allocate shared catalog counters (`CreateTable`, `CreateDatabase`,
+        // etc.) so concurrent captures cannot read the same counter before the
+        // first commits. Only `CreateIndex`, `DropIndex`, and `DropTable`
+        // release the lock before `commit_at` so concurrent batches can coalesce
+        // in `sync_wal_grouped`.
+        let release_before_commit = matches!(
+            op,
+            TxnOp::CreateIndex { .. } | TxnOp::DropIndex { .. } | TxnOp::DropTable { .. }
+        );
+        let mut ddl_guard = Some(self.ddl_lock.lock().await);
+        let (out, mut batch) = self.storage.catalog.capture(f)?;
+        if release_before_commit {
+            ddl_guard.take();
+        }
         // A statement that changes nothing must not spend a timestamp. The
         // reference commits such a transaction through `GetReadCommitTS` — an
         // odd ts, no WAL entry — so `DROP TABLE IF EXISTS <missing>` leaves

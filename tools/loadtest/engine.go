@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	infinity "github.com/infiniflow/infinity-go-sdk"
@@ -157,6 +158,27 @@ type QuerySpec struct {
 // RunQuery executes one query and returns the row count actually read, which is
 // what a latency number has to be conditioned on.
 func (e *Engine) RunQuery(ctx context.Context, spec QuerySpec) (int, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	type queryRes struct {
+		rows int
+		err  error
+	}
+	done := make(chan queryRes, 1)
+	go func() {
+		rows, err := e.runQuerySync(spec)
+		done <- queryRes{rows: rows, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return 0, ctx.Err()
+	case res := <-done:
+		return res.rows, res.err
+	}
+}
+
+func (e *Engine) runQuerySync(spec QuerySpec) (int, error) {
 	table, err := e.DB.GetTable(spec.Table)
 	if err != nil {
 		return 0, fmt.Errorf("get table %s: %w", spec.Table, err)
@@ -434,19 +456,27 @@ func RunConcurrent(ctx context.Context, host string, port int, dbName string, m 
 	close(jobs)
 
 	var wg sync.WaitGroup
+	var connected atomic.Int32
+	var connMu sync.Mutex
+	var connErrs []error
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			eng, err := Connect(host, port, dbName, m, dim)
 			if err != nil {
-				for idx := range jobs {
-					out[idx] = Timed{Kind: specs[idx].Kind, Err: err}
-				}
+				connMu.Lock()
+				connErrs = append(connErrs, err)
+				connMu.Unlock()
 				return
 			}
+			connected.Add(1)
 			defer eng.Close()
 			for idx := range jobs {
+				if ctx.Err() != nil {
+					out[idx] = Timed{Kind: specs[idx].Kind, Err: ctx.Err()}
+					continue
+				}
 				start := time.Now()
 				n, qerr := eng.RunQuery(ctx, specs[idx])
 				out[idx] = Timed{Kind: specs[idx].Kind, Latency: time.Since(start), Rows: n, Err: qerr}
@@ -454,6 +484,12 @@ func RunConcurrent(ctx context.Context, host string, port int, dbName string, m 
 		}()
 	}
 	wg.Wait()
+	if connected.Load() == 0 && len(connErrs) > 0 {
+		err := fmt.Errorf("all %d query workers failed to connect: %w", workers, connErrs[0])
+		for i := range out {
+			out[i] = Timed{Kind: specs[i].Kind, Err: err}
+		}
+	}
 	return out
 }
 

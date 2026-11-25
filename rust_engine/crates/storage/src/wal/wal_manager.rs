@@ -186,6 +186,43 @@ impl WalManager {
         Ok(())
     }
 
+    /// Flushes all dirty data and metadata on the filesystem containing `dir`
+    /// on the blocking pool. Used as a data-filesystem barrier before a
+    /// checkpoint frame is appended to the WAL.
+    pub async fn sync_dir_fs(dir: &Path) -> Result<()> {
+        let dir = dir.to_path_buf();
+        tokio::task::spawn_blocking(move || -> std::io::Result<()> {
+            let file = match std::fs::File::open(&dir) {
+                Ok(f) => f,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+                Err(e) => return Err(e),
+            };
+            #[cfg(target_os = "linux")]
+            {
+                use std::os::fd::AsRawFd;
+                extern "C" {
+                    fn syncfs(fd: std::os::raw::c_int) -> std::os::raw::c_int;
+                }
+                #[allow(unsafe_code)]
+                // SAFETY: `file` is a valid open fd; `syncfs` flushes all
+                // dirty data and metadata on its filesystem.
+                let rc = unsafe { syncfs(file.as_raw_fd()) };
+                if rc != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                file.sync_all()?;
+            }
+            Ok(())
+        })
+        .await
+        .map_err(|e| Error::Wal(format!("data syncfs join: {e}")))?
+        .map_err(|e| Error::Wal(format!("data syncfs: {e}")))?;
+        Ok(())
+    }
+
     /// Seals the active log as `wal.log.{seal_ts}` and starts a fresh one.
     /// Rotation is O(1); like `WalManager::SwapWalFile` it closes the old file
     /// and renames it. The directory is synced because the rename and the new

@@ -32,10 +32,54 @@ int        m2v_error(char* buf, size_t buf_len);
 import "C"
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"unsafe"
 )
+
+// PinnedModelFiles lists the expected SHA-256 hashes for the pinned
+// sentence-transformers/static-retrieval-mrl-en-v1 model (plan §4.2.6).
+var PinnedModelFiles = []struct {
+	RelPath string
+	SHA256  string
+}{
+	{"0_StaticEmbedding/model.safetensors", "164fc63ee9f9267be7378fcbd7df99d09788a2f45244c92aa99ae5a574925716"},
+	{"0_StaticEmbedding/tokenizer.json", "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"},
+	{"config_sentence_transformers.json", "5f6e0d37fdb5cc3d7812a204acd8fa26298ce75a4e5d99b903e8068d1a007653"},
+}
+
+// ValidatePinnedModel verifies that all pinned model files in dir match their
+// Section 4.2.6 SHA-256 hashes and returns the validated hashes by relative path.
+func ValidatePinnedModel(dir string) (map[string]string, error) {
+	hashes := make(map[string]string, len(PinnedModelFiles))
+	for _, spec := range PinnedModelFiles {
+		p := filepath.Join(dir, spec.RelPath)
+		f, err := os.Open(p)
+		if err != nil {
+			return nil, fmt.Errorf("validate model %s: %w", spec.RelPath, err)
+		}
+		h := sha256.New()
+		_, copyErr := io.Copy(h, f)
+		closeErr := f.Close()
+		if copyErr != nil {
+			return nil, fmt.Errorf("hash model %s: %w", spec.RelPath, copyErr)
+		}
+		if closeErr != nil {
+			return nil, fmt.Errorf("close model %s: %w", spec.RelPath, closeErr)
+		}
+		got := hex.EncodeToString(h.Sum(nil))
+		if got != spec.SHA256 {
+			return nil, fmt.Errorf("model %s sha256 mismatch: %s != %s", spec.RelPath, got, spec.SHA256)
+		}
+		hashes[spec.RelPath] = got
+	}
+	return hashes, nil
+}
 
 // Embedder is a loaded static embedding model.
 //

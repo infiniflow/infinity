@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the model2vec C ABI static library that the Go load test links against.
+# Build the model2vec C ABI shared library (cdylib) that the Go load test links against.
 #
 # The Go program (package loadtest) is the whole harness: it reads the wiki
 # extract, cleans it, embeds through this library, creates tables, imports, and
@@ -11,11 +11,11 @@ cd "$here/m2v"
 
 cargo build --release
 
-lib="$here/m2v/target/release/libm2v.a"
+lib="$here/m2v/target/release/libm2v.so"
 if [[ ! -f "$lib" ]]; then
   echo "expected $lib to exist after cargo build" >&2
   exit 1
 fi
 
 echo "built $lib"
-echo "run: go test -v -run TestLoadTestS ./..."
+echo "run: go test -count=1 -v -run TestLoadTest ./..."

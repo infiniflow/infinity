@@ -35,18 +35,23 @@ M2V_MODEL=/path/to/model2vec-1024 \
   go test ./...
 
 # end-to-end, cheapest scenario
+# Note: test/data/benchmark/enwiki/enwiki-10w.csv is a git-ignored symlink on a
+# clean checkout. Provision the hash-pinned corpus (sha256 72a981c3..., see
+# docs/load_test_plan_ragflow_prod.md §4.2.1) and pass LT_WIKI to point at it.
 LT_SERVER=127.0.0.1:28317 \
 LT_MAPPING=/path/to/ragflow/conf/infinity_mapping.json \
 LT_MODEL=/path/to/model2vec-1024 \
+LT_WIKI=/path/to/enwiki-10w.csv \
 LT_SCENARIO=S \
-  go test -v -timeout 2h -run TestLoadTest ./...
+  go test -count=1 -v -timeout 2h -run TestLoadTest ./...
 ```
 
 | Variable | Meaning |
 |---|---|
 | `LT_SERVER` | `host:port` of the client (thrift) port. Unset ⇒ the end-to-end test skips. |
 | `LT_MAPPING` | RAGFlow `conf/infinity_mapping.json` — the schema source of truth. |
-| `LT_MODEL` | local model2vec directory; must be 1024-d. |
+| `LT_MODEL` | local model2vec directory; must be 1024-d (validated against §4.2.6 pins). |
+| `LT_WIKI` | path to the pinned `enwiki-10w.csv` extract (defaults to `../../test/data/benchmark/enwiki/enwiki-10w.csv`). |
 | `LT_SCENARIO` | `S`, `M`, `L`, `XL`, or `S:10x200` (tables × rows/table). A trailing `/N` scales a named scenario, e.g. `L/100`. |
 | `LT_TABLES`, `LT_ROWS` | override either dimension of the scenario. |
 | `LT_QUERIES` | query count per kind (default 200). |
