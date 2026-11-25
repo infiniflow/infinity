@@ -6816,6 +6816,10 @@ pub struct Engine {
     /// check (`ddl_commit_with_effects`), so those commit phases are ordered by
     /// the transaction manager's conflict matrix instead of this lock.
     pub(crate) ddl_lock: tokio::sync::Mutex<()>,
+    /// Per-table DDL lock held across `commit_at` for index DDLs (`CreateIndex`,
+    /// `DropIndex`) so same-table index mutations serialize without blocking
+    /// unrelated tables from coalescing in `sync_wal_grouped`.
+    pub(crate) table_ddl_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// Optional background task processor (`BGTaskProcessor`). When attached,
     /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
     /// quota is enforced synchronously.

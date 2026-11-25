@@ -408,6 +408,14 @@ pub struct Catalog {
     /// publish what it read: the record it holds may predate the change that
     /// caused the invalidation.
     ddl_epoch: std::sync::atomic::AtomicU64,
+    /// Monotonic in-memory `next_table_id` per `db_id`, initialized lazily from
+    /// the store so concurrent `CreateTable` calls can allocate IDs under
+    /// `counter_lock` and release `ddl_lock` before `commit_at`.
+    next_table_ids: Mutex<HashMap<String, u64>>,
+    /// Monotonic in-memory `next_index_id` per `(db_id, table_id)`, initialized
+    /// lazily from the store so `CreateIndex` can allocate IDs without waiting
+    /// for prior commits to land.
+    next_index_ids: Mutex<HashMap<(String, u64), u64>>,
 }
 
 /// Ends a DDL call: leaves the depth and drops what was cached while it ran.
@@ -524,6 +532,8 @@ impl Catalog {
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
+            next_table_ids: Mutex::new(HashMap::new()),
+            next_index_ids: Mutex::new(HashMap::new()),
         }
     }
 
@@ -539,6 +549,8 @@ impl Catalog {
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
+            next_table_ids: Mutex::new(HashMap::new()),
+            next_index_ids: Mutex::new(HashMap::new()),
         }
     }
 
@@ -566,6 +578,18 @@ impl Catalog {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         cache.clear();
         self.index_cache.lock().unwrap().clear();
+    }
+
+    /// Invalidates cached table and index metadata for a single table only,
+    /// avoiding a global cache wipe on concurrent per-table DDLs.
+    pub fn invalidate_table(&self, table: &str) {
+        let mut cache = self.table_cache.lock().unwrap();
+        self.ddl_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let bare = table.rsplit('.').next().unwrap_or(table);
+        cache.retain(|k, _| k != table && k != bare && k.rsplit('.').next() != Some(bare));
+        let mut idx_cache = self.index_cache.lock().unwrap();
+        idx_cache.retain(|k, _| k != table && k != bare && k.rsplit('.').next() != Some(bare));
     }
 
     /// Whether this catalog persists only the C++ key space.
@@ -1238,6 +1262,14 @@ impl Catalog {
             // table would inherit its block directory.
             let db_name = table.split('.').next().unwrap_or(table);
             let db_id = self.database_id_of_name(db_name)?.unwrap_or(1).to_string();
+            {
+                let mut ids = self.next_table_ids.lock().unwrap();
+                if let Some(next) = ids.get_mut(&db_id) {
+                    let cur = *next;
+                    *next = cur + 1;
+                    return Ok((cur, cur + 1));
+                }
+            }
             let tag = storage::catalog_format::catalog_db_tag_key(&db_id, "next_table_id");
             let previous = self
                 .with_view(|store| store.get(tag.as_bytes()))?
@@ -1255,6 +1287,7 @@ impl Catalog {
                     .max()
                     .unwrap_or(0),
             };
+            self.next_table_ids.lock().unwrap().insert(db_id, next + 1);
             return Ok((next, next + 1));
         }
         // Table ids start at 0, as the C++ engine's do; the counter holds the
@@ -2339,14 +2372,24 @@ impl Catalog {
             &table_id.to_string(),
             "next_index_id",
         );
-        let previous = self
-            .with_view(|store| store.get(tag.as_bytes()))?
-            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
-            .unwrap_or(0);
-        // The counter is the authority, but a catalog that has records and no
-        // tag yet (one written before the tag existed) still has to start past
-        // the live ids.
-        let id = previous.max(live_max(self)) + 1;
+        let id = {
+            let mut ids = self.next_index_ids.lock().unwrap();
+            if let Some(cached) = ids.get_mut(&(db_id.clone(), table_id)) {
+                *cached += 1;
+                *cached
+            } else {
+                let previous = self
+                    .with_view(|store| store.get(tag.as_bytes()))?
+                    .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                    .unwrap_or(0);
+                // The counter is the authority, but a catalog that has records and no
+                // tag yet (one written before the tag existed) still has to start past
+                // the live ids.
+                let next_id = previous.max(live_max(self)) + 1;
+                ids.insert((db_id, table_id), next_id);
+                next_id
+            }
+        };
         // The layout rewrite below re-reads this tag and keeps the larger value,
         // so staging it is what makes the counter survive the rewrite.
         self.stage(&[(tag.into_bytes(), Some(id.to_string().into_bytes()))])?;
@@ -2387,8 +2430,17 @@ impl Catalog {
             let db_name = table.split('.').next().unwrap_or(table);
             let bare = table.rsplit('.').next().unwrap_or(table);
             let (db_str, _) = self.db_and_bare_name(table)?;
-            let Some(layout) = crate::layout::read_table(self.store.as_ref(), db_name, bare)?
-            else {
+            let needs_columns = !meta.column.is_empty()
+                && !matches!(
+                    meta.index_type.as_str(),
+                    "HNSW" | "SPANN" | "FULLTEXT" | "BMP" | "SMVE" | "PLAID" | "EMVB" | "DISKANN"
+                );
+            let layout = if needs_columns {
+                crate::layout::read_table(self.store.as_ref(), db_name, bare)?
+            } else {
+                crate::layout::read_table_header_only(self.store.as_ref(), db_name, bare)?
+            };
+            let Some(layout) = layout else {
                 return Err(Error::Catalog(format!("table '{table}' does not exist")));
             };
             let table_id = layout.table_id.to_string();

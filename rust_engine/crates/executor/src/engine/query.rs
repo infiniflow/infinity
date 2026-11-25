@@ -1273,7 +1273,7 @@ impl Engine {
                     name.rsplit('.').next().unwrap_or(name),
                 )?;
                 let t = self
-                    .ddl_commit_typed(
+                    .ddl_commit_typed_opts(
                         TxnOp::CreateTable {
                             db: split_table_name(name).0,
                             table: name.clone(),
@@ -1318,6 +1318,7 @@ impl Engine {
                                 other => Some(other),
                             }
                         },
+                        false,
                     )
                     .await?;
                 Ok(QueryResult::CreatedTable {
@@ -2156,37 +2157,39 @@ impl Engine {
                         index_opts[pos].1 = config.to_string();
                     }
                 }
-                self.ddl_commit_typed(
-                    TxnOp::CreateIndex {
-                        table: table.clone(),
-                        index: name.clone(),
-                        columns: vec![column.clone()],
-                    },
-                    || {
-                        self.storage.catalog.create_index_typed(
-                            name,
-                            table,
-                            column,
-                            effective_type,
-                            &index_opts,
-                        )
-                    },
-                    |batch| {
-                        let (db, _) = split_table_name(table);
-                        crate::wal_bridge::create_index_command_from_batch(
-                            batch,
-                            &db,
-                            &table_name,
-                            &table_key,
-                            name,
-                        )
-                    },
-                )
-                .await?;
+                let created_meta = self
+                    .ddl_commit_typed_opts(
+                        TxnOp::CreateIndex {
+                            table: table.clone(),
+                            index: name.clone(),
+                            columns: vec![column.clone()],
+                        },
+                        || {
+                            self.storage.catalog.create_index_typed(
+                                name,
+                                table,
+                                column,
+                                effective_type,
+                                &index_opts,
+                            )
+                        },
+                        |batch| {
+                            let (db, _) = split_table_name(table);
+                            crate::wal_bridge::create_index_command_from_batch(
+                                batch,
+                                &db,
+                                &table_name,
+                                &table_key,
+                                name,
+                            )
+                        },
+                        false,
+                    )
+                    .await?;
                 // The index's catalog id, which is its identity in every
                 // in-memory registry (the reference keys `MemIndex` by
                 // `(index_id, segment)`); a column may carry several indexes.
-                let created_index_id = self.index_position(table, name).ok().map(|id| id as u64);
+                let created_index_id = Some(created_meta.id);
                 // remember the analyzer so fulltext matching can tokenise compatibly
                 // The option name is `ANALYZER` in SQL but `analyzer` over the
                 // API (the reference lower-cases every `InitParameter` there),

@@ -572,6 +572,7 @@ impl Engine {
             sessions: Mutex::new(HashMap::new()),
             tables: Arc::new(Mutex::new(HashMap::new())),
             ddl_lock: tokio::sync::Mutex::new(()),
+            table_ddl_locks: Mutex::new(HashMap::new()),
             bg_processor: Mutex::new(None),
             self_weak: Mutex::new(std::sync::Weak::new()),
             spann_builds_inflight: Mutex::new(std::collections::HashSet::new()),
@@ -2572,6 +2573,93 @@ impl Engine {
         Ok(())
     }
 
+    /// Direct-from-`Literal` sibling of [`Self::publish_encoded_rows_with`]:
+    /// avoids encoding every column into tab-escaped `row_text` only to split
+    /// and parse it back cell by cell.
+    pub(crate) fn publish_literal_rows_with<F>(
+        &self,
+        table: &str,
+        rows: &[Vec<Literal>],
+        rendered: &[Vec<String>],
+        seq_at: impl Fn(usize) -> usize,
+        mut also: F,
+    ) -> Result<()>
+    where
+        F: FnMut(&str, &[(usize, Vec<Value>)]) -> Result<()>,
+    {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let defaults = self.table_defaults(table).unwrap_or_default();
+        let types = self.column_types(table).unwrap_or_default();
+        const CHUNK: usize = 8192;
+        let mut published: Vec<(usize, Vec<Value>)> = Vec::with_capacity(CHUNK.min(rows.len()));
+        for (k, (row, ren)) in rows.iter().zip(rendered.iter()).enumerate() {
+            let mut values: Vec<Value> = Vec::with_capacity(row.len().max(defaults.len()));
+            for (i, lit) in row.iter().enumerate() {
+                let ty = types.get(i);
+                let ren_str = ren.get(i).map(|s| s.as_str()).unwrap_or("");
+                let keeps_text = ty.is_some_and(|t| crate::blocks::keeps_cell_text(t));
+                let val = match lit {
+                    Literal::Null => Value::Null,
+                    Literal::Int(v) => {
+                        if keeps_text {
+                            Value::Str(ren_str.to_string())
+                        } else {
+                            Value::Int(*v)
+                        }
+                    }
+                    Literal::Float(v) => {
+                        if keeps_text {
+                            Value::Str(ren_str.to_string())
+                        } else {
+                            Value::Float(*v)
+                        }
+                    }
+                    Literal::Str(s) => {
+                        if keeps_text {
+                            if s.eq_ignore_ascii_case("null") {
+                                Value::Null
+                            } else {
+                                Value::Str(s.clone())
+                            }
+                        } else if ty.is_some_and(|t| !stored_text_is_display(t)) {
+                            parse_value(&encode_cell_stored(lit, ty))
+                        } else {
+                            parse_value(s)
+                        }
+                    }
+                    Literal::Array(_) | Literal::Vector(_) => {
+                        if ty.is_some_and(|t| !stored_text_is_display(t)) {
+                            Value::Str(encode_cell_stored(lit, ty))
+                        } else {
+                            Value::Str(ren_str.to_string())
+                        }
+                    }
+                };
+                values.push(val);
+            }
+            while values.len() < defaults.len() {
+                let i = values.len();
+                values.push(match defaults.get(i).and_then(|d| d.as_deref()) {
+                    Some(d) => Value::from_literal(&default_literal(d)),
+                    None => Value::Null,
+                });
+            }
+            published.push((seq_at(k), values));
+            if published.len() >= CHUNK {
+                also(table, &published)?;
+                self.refresh_block_mirror_extra(table, &published)?;
+                published.clear();
+            }
+        }
+        if !published.is_empty() {
+            also(table, &published)?;
+            self.refresh_block_mirror_extra(table, &published)?;
+        }
+        Ok(())
+    }
+
     /// [`Self::publish_encoded_rows`] over a `COPY`'s staged rows.
     ///
     /// The rows may be spilled to disk ([`crate::engine::import::StagedRows`]),
@@ -2663,22 +2751,54 @@ impl Engine {
     /// `WalCmdCreateIndexV2`, …). The catalog writes are still applied to the
     /// store by `commit_at`; replay deliberately skips typed DDL (the catalog
     /// is durable at commit), so this only changes the WAL's bytes.
+    async fn table_ddl_lock(&self, table: &str) -> tokio::sync::OwnedMutexGuard<()> {
+        let key = self.table_key(table);
+        let lock = {
+            let mut locks = self.table_ddl_locks.lock().unwrap();
+            locks
+                .entry(key)
+                .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
+                .clone()
+        };
+        lock.lock_owned().await
+    }
+
     pub(crate) async fn ddl_commit_typed<T>(
         &self,
         op: TxnOp,
         f: impl FnOnce() -> Result<T>,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
     ) -> Result<T> {
-        // One DDL at a time for `catalog.capture`: a second capture would
-        // interleave two statements' layout rewrites, and only one capture slot
-        // exists. Hold `ddl_lock` across `commit_at` for operations that
-        // allocate shared catalog counters (`CreateTable`, `CreateDatabase`,
-        // `CreateIndex`, etc.) or mutate shared table index sets (`DropIndex`)
-        // so concurrent captures cannot read stale counters or race on
-        // `CreateIndex`/`DropIndex` conflicts before the first commits. Only
-        // `DropTable` releases the lock before `commit_at` so concurrent drops
-        // can coalesce in `sync_wal_grouped`.
-        let release_before_commit = matches!(op, TxnOp::DropTable { .. });
+        self.ddl_commit_typed_opts(op, f, typed_builder, true).await
+    }
+
+    pub(crate) async fn ddl_commit_typed_opts<T>(
+        &self,
+        op: TxnOp,
+        f: impl FnOnce() -> Result<T>,
+        typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
+        check_noop: bool,
+    ) -> Result<T> {
+        // Lock order: per-table `table_ddl_lock` (if any) -> global `ddl_lock`.
+        // `CreateIndex` and `DropIndex` hold `table_ddl_lock` across `commit_at`
+        // so same-table index mutations cannot conflict on `CheckConflictTxnStore`,
+        // while releasing the global `ddl_lock` immediately after `capture` so
+        // unrelated tables coalesce in `sync_wal_grouped`.
+        // `CreateTable` and `DropTable` also release `ddl_lock` after `capture`
+        // because `next_table_id` is allocated atomically in memory.
+        let _table_guard = match &op {
+            TxnOp::CreateIndex { table, .. } | TxnOp::DropIndex { table, .. } => {
+                Some(self.table_ddl_lock(table).await)
+            }
+            _ => None,
+        };
+        let release_before_commit = matches!(
+            op,
+            TxnOp::CreateTable { .. }
+                | TxnOp::DropTable { .. }
+                | TxnOp::CreateIndex { .. }
+                | TxnOp::DropIndex { .. }
+        );
         let mut ddl_guard = Some(self.ddl_lock.lock().await);
         let (out, mut batch) = self.storage.catalog.capture(f)?;
         if release_before_commit {
@@ -2692,7 +2812,7 @@ impl Engine {
         // "nothing changed" has to be decided by comparing the batch with the
         // store: a put that would write the same bytes and a delete of a key
         // that is already absent are both no-ops.
-        if batch.is_empty() || self.batch_is_noop(&batch)? {
+        if batch.is_empty() || (check_noop && self.batch_is_noop(&batch)?) {
             return Ok(out);
         }
         let turn = self.txn.reserve_commit_ts();
@@ -2703,6 +2823,13 @@ impl Engine {
         // The reference's store type: the conflict matrix reads it, so a DDL
         // meets the appends/updates/compactions that overlap with it
         // (`NewTxn::CheckConflictTxnStore`).
+        let invalidate_table_name = match &op {
+            TxnOp::CreateTable { table, .. }
+            | TxnOp::DropTable { table, .. }
+            | TxnOp::CreateIndex { table, .. }
+            | TxnOp::DropIndex { table, .. } => Some(table.clone()),
+            _ => None,
+        };
         txn.set_op(op);
         for (key, value) in batch {
             match value {
@@ -2718,7 +2845,11 @@ impl Engine {
         // be dropped again here: a reader between the two would otherwise
         // repopulate it with the pre-commit schema.
         let committed = self.txn.commit_at(txn, commit_ts).await;
-        self.storage.catalog.invalidate_tables();
+        if let Some(tbl) = invalidate_table_name.as_deref() {
+            self.storage.catalog.invalidate_table(tbl);
+        } else {
+            self.storage.catalog.invalidate_tables();
+        }
         committed?;
         // The catalog records this DDL wrote are made durable by the commit
         // (`apply_split` flushes the store the moment it takes a batch without

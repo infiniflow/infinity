@@ -1603,6 +1603,26 @@ pub fn read_table(
     db_name: &str,
     table_name: &str,
 ) -> Result<Option<TableLayout>> {
+    read_table_impl(store, db_name, table_name, true)
+}
+
+/// Like [`read_table`], but skips reading and decoding column records.
+/// Used by `CreateIndex` for non-secondary index types that only need
+/// `db_id`/`table_id`/`table_name`.
+pub fn read_table_header_only(
+    store: &dyn MetaStore,
+    db_name: &str,
+    table_name: &str,
+) -> Result<Option<TableLayout>> {
+    read_table_impl(store, db_name, table_name, false)
+}
+
+fn read_table_impl(
+    store: &dyn MetaStore,
+    db_name: &str,
+    table_name: &str,
+    with_columns: bool,
+) -> Result<Option<TableLayout>> {
     let Some((db_id, db_ts)) = db_record(store, db_name)? else {
         return Ok(None);
     };
@@ -1635,7 +1655,11 @@ pub fn read_table(
     )? {
         return Ok(None);
     }
-    let (columns, next_column_id) = read_columns(store, db_id, table_id)?;
+    let (columns, next_column_id) = if with_columns {
+        read_columns(store, db_id, table_id)?
+    } else {
+        (Vec::new(), 0)
+    };
     Ok(Some(TableLayout {
         db_name: db_name.to_string(),
         db_id,
