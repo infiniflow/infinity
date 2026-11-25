@@ -2148,6 +2148,9 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
             if (config_toml.contains("buffer")) {
                 auto buffer_config = config_toml["buffer"];
                 auto buffer_config_table = buffer_config.as_table();
+                if (buffer_config_table->contains("unsealed_memory_quota") && buffer_config_table->contains(MEMINDEX_MEMORY_QUOTA_OPTION_NAME)) {
+                    return Status::InvalidConfig("Cannot specify both 'memindex_memory_quota' and 'unsealed_memory_quota' in 'buffer' field.");
+                }
                 for (auto &elem : *buffer_config_table) {
 
                     std::string var_name = std::string(elem.first);
@@ -2213,14 +2216,16 @@ Status Config::Init(const std::shared_ptr<std::string> &config_path, DefaultConf
                         }
                         case GlobalOptionIndex::kMemIndexMemoryQuota: {
                             i64 mem_index_memory_quota = DEFAULT_MEMINDEX_MEMORY_QUOTA;
-                            if (elem.second.is_string()) {
+                            if (elem.second.is_integer() && elem.second.value_or(-1) == 0) {
+                                mem_index_memory_quota = 0;
+                            } else if (elem.second.is_string()) {
                                 std::string mem_index_memory_quota_str = elem.second.value_or(DEFAULT_MEMINDEX_MEMORY_QUOTA_STR.data());
                                 auto res = ParseByteSize(mem_index_memory_quota_str, mem_index_memory_quota);
                                 if (!res.ok()) {
                                     return res;
                                 }
                             } else {
-                                return Status::InvalidConfig("'mem_index_memory_quota' field isn't string.");
+                                return Status::InvalidConfig("'mem_index_memory_quota' field isn't string or 0.");
                             }
                             std::unique_ptr<IntegerOption> mem_index_memory_quota_option =
                                 std::make_unique<IntegerOption>(MEMINDEX_MEMORY_QUOTA_OPTION_NAME,
