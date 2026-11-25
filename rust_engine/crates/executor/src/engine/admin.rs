@@ -738,6 +738,11 @@ impl Engine {
         // between left the frame and the deprecations durable while the merged
         // segment had no blocks at all - the table came back with those rows
         // gone.
+        // Ensure merged block/index-chunk files are durable on the data
+        // filesystem before committing the compaction, so a concurrent
+        // checkpoint's `txn.flush()` cannot advance `synced` past this commit
+        // while its files are still only in the page cache.
+        storage::wal::WalManager::sync_dir_fs(&self.dir.join("data")).await?;
         let turn = self.txn.reserve_commit_ts();
         let compact_ts = turn.ts();
         // `compact_turn` (taken at the top of this pass) is still held, which is

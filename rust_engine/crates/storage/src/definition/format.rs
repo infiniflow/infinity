@@ -608,8 +608,10 @@ pub fn write_parts_no_sync(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> 
     write_parts(path, parts, false)
 }
 
-/// `VirtualStore::Open` + `Append` + `Sync`: write the file and fsync it - and
-/// the directory entry the rename creates - before returning.
+/// `VirtualStore::Open` + `Append` + atomic rename: write the file to a
+/// sibling temp file and rename it over `path` before returning. Durability is
+/// enforced in batch by `WalManager::sync_dir_fs` before a compaction or
+/// checkpoint commits/advances `synced`.
 ///
 /// This is the raw primitive that bypasses the chunk store: [`write_synced`]
 /// publishes through the store and both of its backends bottom out here, so a
@@ -641,8 +643,8 @@ pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// `knn_index::spann::writer::write_to` streams it precisely so it never has to
 /// be resident: buffering it here just to hand the store a slice would undo
 /// that. The durability rule is the buffered form's, unchanged: a sibling temp
-/// file, `fsync`, a rename over `path`, then an `fsync` of the directory, so a
-/// chunk a catalog record names is on the disk rather than in the page cache.
+/// file and an atomic rename over `path`, with durability flushed in batch by
+/// `WalManager::sync_dir_fs` before a compaction or checkpoint advances.
 pub fn write_synced_stream(
     path: &Path,
     produce: &mut dyn FnMut(&mut dyn std::io::Write) -> std::io::Result<()>,
