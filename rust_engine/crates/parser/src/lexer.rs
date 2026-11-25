@@ -61,7 +61,7 @@ pub fn tokenize(sql: &str) -> Result<Vec<Token>> {
     while i < len {
         let b = bytes[i];
         match b {
-            b if b.is_ascii_whitespace() => {
+            b if b.is_ascii_whitespace() || b == b'\x0b' => {
                 i += 1;
             }
             b',' => {
@@ -348,6 +348,15 @@ mod tests {
                 Token::Int(2),
                 Token::Eof
             ]
+        );
+    }
+
+    #[test]
+    fn lexes_vertical_tab_whitespace() {
+        let t = tokenize("SELECT\u{000B}1").unwrap();
+        assert_eq!(
+            t,
+            vec![Token::Ident("SELECT".into()), Token::Int(1), Token::Eof]
         );
     }
 }

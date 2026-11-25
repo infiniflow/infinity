@@ -11187,15 +11187,18 @@ impl Engine {
         // that here is what made a mostly-deleted table answer a short - or
         // empty - top-k: the beam and the candidate pool were sized for
         // `topn`, and every row they reached had been deleted.
-        let tombstones = if has_filter {
-            None
+        let (tombstones, tombstones_ok) = if has_filter {
+            (None, true)
         } else {
             // Only needed when nothing else reads the journal for this
             // statement: a predicate's mask is built from the live row set,
             // which already excludes the tombstones. A journal that cannot be
             // read leaves the mask out, which falls back to the exact scan -
             // never to answering a row the statement may not see.
-            self.tombstone_set_at(table, crate::read_ts()).ok()
+            match self.tombstone_set_at(table, crate::read_ts()) {
+                Ok(dead) => (Some(dead), true),
+                Err(_) => (None, false),
+            }
         };
         let allowed: Option<common::RowMask> = match (has_filter, tombstones) {
             (true, _) => {
@@ -11414,9 +11417,13 @@ impl Engine {
                     beam,
                 })
                 .await;
+            let read_ts = crate::read_ts();
+            let no_newer_commit = read_ts == u64::MAX || self.txn.current_ts() < read_ts;
             match probe {
                 Some(probe)
                     if !has_filter
+                        && tombstones_ok
+                        && no_newer_commit
                         && probe.scored.is_some()
                         && crate::blocks::embedding_shape(&col_type).is_some_and(
                             |(dim, element_type)| dim == query_f32.len() && element_type == 6,

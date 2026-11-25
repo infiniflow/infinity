@@ -520,10 +520,21 @@ impl Engine {
         // `encode=plain` HNSW already computes exact `f32` distances inside the
         // graph, so it does not need a `topn * 4` rerank pool (which would
         // also silently inflate `ef.max(k)` above the user's `WITH (ef = ...)`).
-        let mut all_plain = segments
-            .iter()
-            .all(|seg| seg.index.index().encoding() == index::vector::HnswEncoding::Plain);
-        let k = if all_plain {
+        // Pre-scored hits are valid only when every graph is plain AND its
+        // metric matches the query metric.
+        let query_metric = index::vector::Metric::parse(q.metric);
+        let mut can_prescore = segments.iter().all(|seg| {
+            let idx = seg.index.index();
+            idx.encoding() == index::vector::HnswEncoding::Plain && idx.metric() == query_metric
+        });
+        for mem in &mems {
+            if let Ok(mem) = mem.try_lock() {
+                let idx = mem.index();
+                can_prescore &= idx.encoding() == index::vector::HnswEncoding::Plain
+                    && idx.metric() == query_metric;
+            }
+        }
+        let k = if can_prescore {
             q.topn.max(1)
         } else {
             self.candidate_budget(q)
@@ -532,13 +543,13 @@ impl Engine {
             hits.iter()
                 .map(|&(d, row)| {
                     let df = f64::from(d);
-                    let (sim, dist) = match q.metric {
-                        "ip" => (-df, df),
-                        "cosine" => {
+                    let (sim, dist) = match query_metric {
+                        index::vector::Metric::Ip => (-df, df),
+                        index::vector::Metric::Cos => {
                             let c = -df;
                             (c, 1.0 - c)
                         }
-                        _ => (1.0 / (1.0 + df), df),
+                        index::vector::Metric::L2 => (1.0 / (1.0 + df), df),
                     };
                     (row as usize, sim, dist)
                 })
@@ -546,7 +557,7 @@ impl Engine {
         };
         // Fast path for a single sealed plain segment with no in-memory tail:
         // skip `MergeKnn` and intermediate `hits` allocation.
-        if segments.len() == 1 && mems.is_empty() && all_plain {
+        if segments.len() == 1 && mems.is_empty() && can_prescore {
             let seg = &segments[0];
             if seg.index.dims() != q.query.len() {
                 return None;
@@ -573,13 +584,13 @@ impl Engine {
                     .iter()
                     .map(|&(node, d)| {
                         let df = f64::from(d);
-                        let (sim, dist) = match q.metric {
-                            "ip" => (-df, df),
-                            "cosine" => {
+                        let (sim, dist) = match query_metric {
+                            index::vector::Metric::Ip => (-df, df),
+                            index::vector::Metric::Cos => {
                                 let c = -df;
                                 (c, 1.0 - c)
                             }
-                            _ => (1.0 / (1.0 + df), df),
+                            index::vector::Metric::L2 => (1.0 / (1.0 + df), df),
                         };
                         (seg.labels[node] as usize, sim, dist)
                     })
@@ -626,7 +637,9 @@ impl Engine {
                 if mem.dims != q.query.len() {
                     return None;
                 }
-                all_plain &= mem.index().encoding() == index::vector::HnswEncoding::Plain;
+                let idx = mem.index();
+                can_prescore &= idx.encoding() == index::vector::HnswEncoding::Plain
+                    && idx.metric() == query_metric;
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
@@ -652,7 +665,7 @@ impl Engine {
             .map(|&(_, r)| r as usize)
             .collect();
         if all_covered(q, labelled) {
-            let scored = all_plain.then(|| plain_scored(merge.hits_by_idx(0)));
+            let scored = can_prescore.then(|| plain_scored(merge.hits_by_idx(0)));
             return answered_scored(candidates, Vec::new(), scored);
         }
         // The counts disagree, so which rows are missing has to be answered with
