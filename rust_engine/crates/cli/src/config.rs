@@ -163,7 +163,7 @@ impl Default for Config {
             unsealed_max_tables_per_round: 100,
             checkpoint_interval: 86400,
             wal_compact_threshold: 1024 * 1024 * 1024,
-            wal_flush: "only_write".into(),
+            wal_flush: "flush_at_once".into(),
             result_cache: "off".into(),
             cache_result_capacity: 10000,
             resource_dir: "/usr/share/infinity/resource".into(),

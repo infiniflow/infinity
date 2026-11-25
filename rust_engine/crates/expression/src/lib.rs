@@ -1028,6 +1028,27 @@ fn eval_func(name: &str, args: &[Expr], row: &[Value]) -> Value {
             Value::Str(s) => Value::Str(s.trim_end().to_string()),
             _ => Value::Null,
         },
+        "LIKE" | "NOT_LIKE" | "ILIKE" | "NOT_ILIKE" => {
+            let text = match a0() {
+                Value::Null => return Value::Null,
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            let pattern = match a1() {
+                Value::Null => return Value::Null,
+                Value::Str(s) => s,
+                other => other.to_slt_string(),
+            };
+            let up = name.to_ascii_uppercase();
+            let ci = up == "ILIKE" || up == "NOT_ILIKE";
+            let neg = up == "NOT_LIKE" || up == "NOT_ILIKE";
+            let matched = if ci {
+                like_match(&text.to_lowercase(), &pattern.to_lowercase(), '\\')
+            } else {
+                like_match(&text, &pattern, '\\')
+            };
+            Value::Bool(matched != neg)
+        }
         "SUBSTRING" | "SUBSTR" => match a0() {
             Value::Str(s) => {
                 let chars: Vec<char> = s.chars().collect();

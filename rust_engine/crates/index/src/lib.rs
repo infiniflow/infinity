@@ -72,7 +72,6 @@ pub(crate) fn write_synced(path: &Path, bytes: &[u8]) -> Result<()> {
     }
     let mut file = fs::File::create(path).map_err(|e| Error::io(path, e))?;
     file.write_all(bytes).map_err(|e| Error::io(path, e))?;
-    file.sync_all().map_err(|e| Error::io(path, e))?;
     Ok(())
 }
 
@@ -418,7 +417,6 @@ impl SecondaryIndex {
         }
         let mut f = fs::File::create(path).map_err(|e| Error::io(path, e))?;
         f.write_all(&buf).map_err(|e| Error::io(path, e))?;
-        f.sync_all().map_err(|e| Error::io(path, e))?;
         Ok(())
     }
 

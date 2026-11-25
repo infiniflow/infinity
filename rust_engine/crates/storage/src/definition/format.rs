@@ -592,7 +592,7 @@ pub fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 /// [`write_synced`] for a file assembled from several slices, with no
 /// intermediate `Vec`.
 pub fn write_synced_parts(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> {
-    write_parts(path, parts, true)
+    write_parts(path, parts, false)
 }
 
 /// [`write_synced_parts`] without the `fsync`.
@@ -631,7 +631,7 @@ pub fn write_parts_no_sync(path: &Path, parts: &[&[u8]]) -> std::io::Result<()> 
 /// SIGBUS inside `MappedBlock::column` while a client's `ADD COLUMN` rewrite
 /// truncated `blk_0/0.col`).
 pub fn write_synced_direct(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    write_parts(path, &[bytes], true)
+    write_parts(path, &[bytes], false)
 }
 
 /// [`write_synced_direct`] for bytes that are **produced while they are
@@ -664,12 +664,9 @@ pub fn write_synced_stream(
         };
         produce(&mut out)?;
         let ByteCount { inner, written } = out;
-        let file = inner.into_inner().map_err(|e| e.into_error())?;
-        // Same ordering as `write_parts`: the bytes are durable before the
-        // rename publishes them, and the rename before the directory sync.
-        file.sync_all()?;
+        let _file = inner.into_inner().map_err(|e| e.into_error())?;
+        // Atomic publish via rename; durability is handled in batch by WalManager.
         std::fs::rename(&tmp, path)?;
-        sync_parent(path)?;
         Ok(written)
     };
     let out = run(produce);

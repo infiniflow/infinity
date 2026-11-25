@@ -420,6 +420,43 @@ func (e *Engine) RunSequential(ctx context.Context, specs []QuerySpec) []Timed {
 	return out
 }
 
+// RunConcurrent distributes specs across N worker connections and times each.
+func RunConcurrent(ctx context.Context, host string, port int, dbName string, m *Mapping, dim int, specs []QuerySpec, workers int) []Timed {
+	out := make([]Timed, len(specs))
+	if len(specs) == 0 {
+		return out
+	}
+	workers = min(max(1, workers), len(specs))
+	jobs := make(chan int, len(specs))
+	for i := range specs {
+		jobs <- i
+	}
+	close(jobs)
+
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			eng, err := Connect(host, port, dbName, m, dim)
+			if err != nil {
+				for idx := range jobs {
+					out[idx] = Timed{Kind: specs[idx].Kind, Err: err}
+				}
+				return
+			}
+			defer eng.Close()
+			for idx := range jobs {
+				start := time.Now()
+				n, qerr := eng.RunQuery(ctx, specs[idx])
+				out[idx] = Timed{Kind: specs[idx].Kind, Latency: time.Since(start), Rows: n, Err: qerr}
+			}
+		}()
+	}
+	wg.Wait()
+	return out
+}
+
 
 // allReadLatencies flattens the per-goroutine latency slices.
 func allReadLatencies(m *sync.Map) []time.Duration {

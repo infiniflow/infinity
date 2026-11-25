@@ -223,22 +223,18 @@ impl WalLog {
         f(&mut wal).await
     }
 
-    /// fsyncs everything appended so far (`NewFlush`'s `wal_handle_->Sync()`).
+    /// Syncs everything appended so far plus all process files on the
+    /// filesystem (via `syncfs` on Linux) in one batch.
     ///
-    /// The handle is cloned under the guard, so it covers exactly the bytes
-    /// this point in the commit order has written. The fsync itself runs through
-    /// `tokio::fs`, so it executes on the blocking pool and the guard is
-    /// released before the wait - the clone, not the fsync, is what has to be
-    /// ordered with the writers.
+    /// The handle is cloned under the guard, so it covers at least the bytes
+    /// this point in the commit order has written. The `syncfs` runs on the
+    /// blocking pool after the guard is released (`AGENTS.md` §7.10).
     async fn sync(&self) -> Result<TxnTimeStamp> {
         let (handle, appended) = {
             let wal = self.wal.lock().await;
             (wal.sync_handle().await?, wal.appended_ts())
         };
-        handle
-            .sync_all()
-            .await
-            .map_err(|e| Error::Wal(format!("WAL sync: {e}")))?;
+        WalManager::sync_fs(handle).await?;
         Ok(appended)
     }
 }
@@ -493,7 +489,7 @@ impl TxnManager {
             last_frame: AtomicU64::new(applied_ts),
             wal_synced: Arc::new(AtomicU64::new(start_ts)),
             sync_lock: tokio::sync::Mutex::new(()),
-            wal_flush: AtomicU64::new(WalFlush::OnlyWrite as u64),
+            wal_flush: AtomicU64::new(WalFlush::FlushAtOnce as u64),
             last_wal_sync_ms: AtomicU64::new(0),
             total_committed: AtomicU64::new(0),
             total_rolled_back: AtomicU64::new(0),
@@ -2471,9 +2467,9 @@ pub enum WalFlush {
 impl WalFlush {
     pub fn parse(mode: &str) -> Self {
         match mode.trim().to_ascii_lowercase().as_str() {
-            "flush_at_once" => WalFlush::FlushAtOnce,
+            "only_write" => WalFlush::OnlyWrite,
             "flush_per_second" => WalFlush::FlushPerSecond,
-            _ => WalFlush::OnlyWrite,
+            _ => WalFlush::FlushAtOnce,
         }
     }
 }

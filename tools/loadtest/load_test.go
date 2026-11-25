@@ -43,9 +43,10 @@ type config struct {
 	Queries   int
 	Sparsegram bool
 	Skew      bool
-	IndexLast bool // P1b: load first, then build indexes
-	Batches   int  // concurrent ingest workers
-	LimitTables int // 0 = all tables in the scenario
+	IndexLast    bool // P1b: load first, then build indexes
+	Batches      int  // concurrent ingest/DDL workers
+	QueryWorkers int  // concurrent query workers
+	LimitTables  int  // 0 = all tables in the scenario
 }
 
 func loadConfig(t *testing.T) config {
@@ -95,8 +96,9 @@ func loadConfig(t *testing.T) config {
 		Queries:  getenvInt("LT_QUERIES", 200),
 		Sparsegram: os.Getenv("LT_SPARSEGRAM") != "",
 		Skew:     os.Getenv("LT_SKEW") != "",
-		IndexLast: os.Getenv("LT_INDEX_LAST") != "",
-		Batches:  getenvInt("LT_BATCHES", 4),
+		IndexLast:    os.Getenv("LT_INDEX_LAST") != "",
+		Batches:      getenvInt("LT_BATCHES", 4),
+		QueryWorkers: getenvInt("LT_QUERY_WORKERS", 4),
 		// LimitTables trims the plan to the first N tables. It exists so a run
 		// fits inside a window where the machine is not reclaimed underneath it;
 		// it is not a way to measure a smaller workload (the per-table shape is
@@ -329,9 +331,54 @@ func (r *Run) phaseCreate() {
 	r.dropExisting()
 
 	start := time.Now()
+	// Step 1: CREATE TABLE serially (catalog next_table_id is a single key).
 	for i, name := range r.alloc.Names {
-		if _, err := r.engine.CreateTable(name, !r.Cfg.IndexLast, r.Cfg.Sparsegram); err != nil {
+		if _, err := r.engine.CreateTable(name, false, r.Cfg.Sparsegram); err != nil {
 			r.T.Fatalf("create table %d/%d (%s): %v", i+1, len(r.alloc.Names), name, err)
+		}
+	}
+	// Step 2: CREATE INDEX concurrently across tables.
+	if !r.Cfg.IndexLast && len(r.alloc.Names) > 0 {
+		host, port, err := splitHostPort(r.Cfg.Server)
+		if err != nil {
+			r.T.Fatalf("splitHostPort: %v", err)
+		}
+		workers := min(max(1, getenvInt("LT_DDL_WORKERS", 16)), len(r.alloc.Names))
+		jobs := make(chan string, len(r.alloc.Names))
+		for _, name := range r.alloc.Names {
+			jobs <- name
+		}
+		close(jobs)
+
+		var wg sync.WaitGroup
+		errCh := make(chan error, len(r.alloc.Names))
+		for w := 0; w < workers; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				defer eng.Close()
+				for name := range jobs {
+					tbl, err := eng.DB.GetTable(name)
+					if err != nil {
+						errCh <- fmt.Errorf("get table %s: %w", name, err)
+						return
+					}
+					if err := eng.CreateIndexes(tbl, r.Cfg.Sparsegram); err != nil {
+						errCh <- fmt.Errorf("create indexes %s: %w", name, err)
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+		close(errCh)
+		for err := range errCh {
+			r.T.Fatalf("create indexes: %v", err)
 		}
 	}
 	dur := time.Since(start)
@@ -592,7 +639,16 @@ func (r *Run) phaseQueries(kind string, specs []QuerySpec) {
 	}
 	ctx := context.Background()
 	start := time.Now()
-	timings := r.engine.RunSequential(ctx, specs)
+	var timings []Timed
+	if r.Cfg.QueryWorkers <= 1 {
+		timings = r.engine.RunSequential(ctx, specs)
+	} else {
+		host, port, err := splitHostPort(r.Cfg.Server)
+		if err != nil {
+			r.T.Fatalf("splitHostPort: %v", err)
+		}
+		timings = RunConcurrent(ctx, host, port, "lt_load", r.mapping, 1024, specs, r.Cfg.QueryWorkers)
+	}
 	dur := time.Since(start)
 
 	errs := 0
@@ -844,15 +900,41 @@ func (r *Run) phaseTeardown() {
 		return
 	}
 	start := time.Now()
-	dropped := 0
-	for _, name := range r.alloc.Names {
-		if _, err := r.engine.DB.DropTable(name, infinity.ConflictTypeIgnore); err != nil {
-			r.T.Logf("drop %s: %v", name, err)
-			continue
+	var dropped atomic.Int64
+	if len(r.alloc.Names) > 0 {
+		host, port, err := splitHostPort(r.Cfg.Server)
+		if err != nil {
+			r.T.Fatalf("splitHostPort: %v", err)
 		}
-		dropped++
+		workers := min(max(1, getenvInt("LT_DDL_WORKERS", 16)), len(r.alloc.Names))
+		jobs := make(chan string, len(r.alloc.Names))
+		for _, name := range r.alloc.Names {
+			jobs <- name
+		}
+		close(jobs)
+		var wg sync.WaitGroup
+		for w := 0; w < workers; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				eng, err := Connect(host, port, "lt_load", r.mapping, 1024)
+				if err != nil {
+					r.T.Logf("teardown connect: %v", err)
+					return
+				}
+				defer eng.Close()
+				for name := range jobs {
+					if _, err := eng.DB.DropTable(name, infinity.ConflictTypeIgnore); err != nil {
+						r.T.Logf("drop %s: %v", name, err)
+						continue
+					}
+					dropped.Add(1)
+				}
+			}()
+		}
+		wg.Wait()
 	}
-	r.record("P8 teardown", time.Since(start), 0, fmt.Sprintf("dropped %d tables", dropped))
+	r.record("P8 teardown", time.Since(start), 0, fmt.Sprintf("dropped %d tables", dropped.Load()))
 }
 
 // printReport writes the phase table and the environment, so two runs can be

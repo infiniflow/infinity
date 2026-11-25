@@ -2318,7 +2318,7 @@ impl Catalog {
         let (db_id, bare) = self.db_and_bare_name(table)?;
         let live_max = |cat: &Self| -> u64 {
             let short = table.split('.').next_back().unwrap_or(table);
-            cat.list_indexes()
+            cat.list_indexes_for_table(table)
                 .unwrap_or_default()
                 .iter()
                 .filter(|i| i.table == table || i.table == short)
@@ -2464,6 +2464,59 @@ impl Catalog {
             .into_iter()
             .map(|(k, v)| IndexMeta::decode(&k[INDEX_PREFIX.len()..], &v))
             .collect()
+    }
+
+    /// Lists the indexes belonging to a single table (`db.table` or bare name).
+    pub fn list_indexes_for_table(&self, table: &str) -> Result<Vec<IndexMeta>> {
+        if !self.catalog_only {
+            let short = table.split('.').next_back().unwrap_or(table);
+            return Ok(self
+                .list_indexes()?
+                .into_iter()
+                .filter(|i| i.table == table || i.table == short)
+                .collect());
+        }
+        self.with_view(|store| {
+            let db_name = table.split('.').next().unwrap_or(table);
+            let bare = table.rsplit('.').next().unwrap_or(table);
+            let Some(layout) = crate::layout::read_table(store, db_name, bare)? else {
+                return Ok(Vec::new());
+            };
+            let tables = [layout];
+            let t = &tables[0];
+            let mut out = Vec::new();
+            for def in crate::layout::read_table_indexes(
+                store,
+                &t.db_id.to_string(),
+                &t.table_id.to_string(),
+            )? {
+                if let Some(meta) = crate::layout::index_meta_of(&def, &tables) {
+                    out.push(meta);
+                }
+            }
+            Self::assign_fallback_ids(&mut out);
+            let tag = storage::catalog_format::catalog_table_tag_key(
+                &t.db_id.to_string(),
+                &t.table_id.to_string(),
+                "rust_name_only_indexes",
+            );
+            if let Some(bytes) = store.get(tag.as_bytes())? {
+                for name in String::from_utf8_lossy(&bytes).split(',') {
+                    let name = name.trim();
+                    if !name.is_empty() {
+                        out.push(IndexMeta {
+                            name: name.to_string(),
+                            table: format!("{}.{}", t.db_name, t.table_name),
+                            column: String::new(),
+                            index_type: String::new(),
+                            options: Vec::new(),
+                            id: 0,
+                        });
+                    }
+                }
+            }
+            Ok(out)
+        })
     }
 
     /// Drops every index named `name` (the plain `DROP INDEX name` statement

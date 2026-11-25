@@ -2669,10 +2669,14 @@ impl Engine {
         f: impl FnOnce() -> Result<T>,
         typed_builder: impl FnOnce(&[(Vec<u8>, Option<Vec<u8>>)]) -> Option<storage::WalCmd>,
     ) -> Result<T> {
-        // One DDL at a time: a second capture would interleave two statements'
-        // layout rewrites, and only one capture slot exists.
-        let _ddl = self.ddl_lock.lock().await;
-        let (out, mut batch) = self.storage.catalog.capture(f)?;
+        // One DDL at a time for `catalog.capture`: a second capture would
+        // interleave two statements' layout rewrites, and only one capture slot
+        // exists. Drop the lock before `commit_at` so concurrent DDLs can batch
+        // their WAL syncs in `sync_wal_grouped`, matching `ddl_commit_with_effects`.
+        let (out, mut batch) = {
+            let _ddl = self.ddl_lock.lock().await;
+            self.storage.catalog.capture(f)?
+        };
         // A statement that changes nothing must not spend a timestamp. The
         // reference commits such a transaction through `GetReadCommitTS` — an
         // odd ts, no WAL entry — so `DROP TABLE IF EXISTS <missing>` leaves

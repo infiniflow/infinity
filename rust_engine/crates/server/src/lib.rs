@@ -4834,6 +4834,10 @@ fn is_boolean_fn(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
         "regex"
+            | "like"
+            | "not_like"
+            | "ilike"
+            | "not_ilike"
             | "filter_text"
             | "filter_fulltext"
             | "filter_sparse"
