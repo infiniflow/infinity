@@ -2867,11 +2867,26 @@ pub(crate) struct TermStream<'a> {
     /// Keep each posting's token offsets (phrase children need them).
     pub(crate) capture: bool,
     pub(crate) pos: PosArena,
+    /// `pos` is not used for this block: the offsets come straight from the
+    /// sealed segment's cursor in `merge.sources[lazy_source]`, which is kept
+    /// at the block's first document. A phrase child reads the offsets of the
+    /// documents it actually verifies, so the block is no longer materialised
+    /// for every posting it holds.
+    pub(crate) pos_direct: bool,
     /// When `Some(src_idx)`, `tfs` and `lens` are not copied into `TermStream`;
     /// instead `tf()` / `len()` read lazily from `merge.sources[src_idx]`
     /// (`Source::Segment`) at `seg_base + self.at`.
     pub(crate) lazy_source: Option<usize>,
     pub(crate) seg_base: usize,
+    /// Token offsets rebuilt for this stream (test only): the eager capture
+    /// path pays one rebuild per posting of a block, the direct path only for
+    /// the documents a verification asks about.
+    #[cfg(test)]
+    pub(crate) offsets_built: usize,
+    /// Blocks loaded through [`Self::try_load_direct`] (test only), so a test
+    /// can tell "no offsets were built" apart from "the direct path never ran".
+    #[cfg(test)]
+    pub(crate) direct_blocks: usize,
 }
 
 /// The number of postings a block-max bound covers (MAX_DOC_PER_RECORD, the
@@ -2908,8 +2923,13 @@ impl<'a> TermStream<'a> {
             max_pct: 0.0,
             capture,
             pos: PosArena::default(),
+            pos_direct: false,
             lazy_source: None,
             seg_base: 0,
+            #[cfg(test)]
+            offsets_built: 0,
+            #[cfg(test)]
+            direct_blocks: 0,
         }
     }
 
@@ -2997,6 +3017,15 @@ impl<'a> TermStream<'a> {
     }
 
     fn load_slow(&mut self) -> bool {
+        // A direct block leaves the segment cursor on the block it served -
+        // that is where `positions()` reads from, and nothing else moves it
+        // while the block is walked. Leaving the block means consuming what is
+        // left of it, otherwise the next `block_stats` would answer for the
+        // same block again and the rows would come back a second time. The
+        // seek path (`advance` past the block) has already cleared the flag.
+        if self.pos_direct {
+            self.close_direct_block();
+        }
         self.docs.clear();
         self.tfs.clear();
         self.lens.clear();
@@ -3004,26 +3033,31 @@ impl<'a> TermStream<'a> {
         self.at = 0;
         self.stats_ready = false;
         self.lazy_source = None;
+        self.pos_direct = false;
         // The stored bound of the block the sources are on; `None` degrades to
         // one 128-posting window and a bound computed from the postings.
         self.stored = self.merge.block_stats();
         let until = self.stored.map(|s| s.0).unwrap_or(u64::MAX);
         if self.capture {
-            // A phrase child needs each posting's offsets, which only the
-            // per-posting path can hand back.
-            while self.docs.len() < WAND_BLOCK {
-                let Some((doc, tf, len)) = self.merge.posting() else {
-                    break;
-                };
-                if doc > until {
-                    break;
+            // A phrase child verifies only the documents where its terms align,
+            // yet the eager path paid one offset rebuild per posting of the
+            // block - 128 of them to keep a handful. When the block comes from
+            // one sealed segment's decoded mini-block, that cursor stays on it
+            // and answers `positions()` for exactly the documents a
+            // verification asks about; the rest are skipped by counting their
+            // term frequency (`TermDocCursor::positions`).
+            let mut loaded = false;
+            if let Some(src) = self.direct_positions_source() {
+                if self.merge.concat && self.merge.cached.is_none() {
+                    self.merge.cached = self.merge.pull_concat();
                 }
-                let positions = self.merge.positions();
-                self.pos.push(positions);
-                self.docs.push(doc);
-                self.tfs.push(tf);
-                self.lens.push(len);
-                self.merge.advance(doc + 1);
+                loaded = self.try_load_direct(src, until);
+            }
+            if !loaded {
+                // A memory tail, a spilled run, or a block the source does not
+                // cover alone: the per-posting path is the only one that can
+                // hand back offsets for every shape.
+                self.capture_eager(until);
             }
         } else if self.merge.single {
             if let Source::Segment(cur) = &mut self.merge.sources[0] {
@@ -3180,10 +3214,139 @@ impl<'a> TermStream<'a> {
         self.lens.get(self.at).copied().unwrap_or(1)
     }
 
+    /// Leaves the block a direct load is serving: consumes the rest of the
+    /// segment's decoded mini-block, so the merged cursor is positioned at the
+    /// block's end (the reference's `MoveToCurrentDoc`-style accounting, done
+    /// once per block instead of once per posting).
+    fn close_direct_block(&mut self) {
+        if !self.pos_direct {
+            return;
+        }
+        self.pos_direct = false;
+        let Some(idx) = self.lazy_source else { return };
+        if let Source::Segment(cur) = &mut self.merge.sources[idx] {
+            let rest = cur.block_rows().map_or(0, <[u64]>::len);
+            cur.skip(rest);
+        }
+        if self.merge.concat {
+            // The concat cache names the block's first row; the source has
+            // moved past it, so the next `pull_concat` has to look again.
+            self.merge.cached = None;
+        }
+    }
+
+    /// The source whose decoded mini-block can answer `positions()` on demand,
+    /// or `None` when the block cannot come from one (a memory tail, a spilled
+    /// run, or a merge of overlapping sources).
+    ///
+    /// Needs a stored block bound that names the block's end: that is what
+    /// tells `try_load_direct` how much of the mini-block belongs to this
+    /// TermStream block.
+    fn direct_positions_source(&self) -> Option<usize> {
+        self.stored?;
+        let idx = if self.merge.single {
+            0
+        } else if self.merge.concat {
+            self.merge.next
+        } else {
+            return None;
+        };
+        matches!(self.merge.sources.get(idx), Some(Source::Segment(_))).then_some(idx)
+    }
+
+    /// Loads the block from one sealed segment's decoded mini-block without
+    /// touching the position stream. `false` when that block cannot supply the
+    /// whole TermStream block (it straddles sources, or the cursor has nothing
+    /// decoded), in which case the caller runs the eager loop.
+    fn try_load_direct(&mut self, idx: usize, until: u64) -> bool {
+        let Some(Source::Segment(cur)) = self.merge.sources.get_mut(idx) else {
+            return false;
+        };
+        if cur.doc().is_none() {
+            return false;
+        }
+        let base = cur.pos();
+        let Some(rows) = cur.block_rows() else {
+            return false;
+        };
+        let n = rows
+            .iter()
+            .position(|row| *row > until)
+            .unwrap_or(rows.len())
+            .min(WAND_BLOCK);
+        if n == 0 {
+            return false;
+        }
+        if self.merge.concat && !(n == WAND_BLOCK || rows.len() > n || cur.is_exhausted()) {
+            // The block continues into the next concatenated source; only
+            // `extend_block` can pull those postings.
+            return false;
+        }
+        self.docs.extend_from_slice(&rows[..n]);
+        // `tf()`/`len()` read the decoded block lazily; the cursor is left on
+        // the block's first document so `positions()` can walk it forward.
+        self.lazy_source = Some(idx);
+        self.seg_base = base;
+        self.pos_direct = true;
+        #[cfg(test)]
+        {
+            self.direct_blocks += 1;
+        }
+        true
+    }
+
+    /// The eager form of a capture block load: one offset rebuild per posting,
+    /// kept for the shapes [`Self::direct_positions_available`] rules out.
+    fn capture_eager(&mut self, until: u64) {
+        while self.docs.len() < WAND_BLOCK {
+            let Some((doc, tf, len)) = self.merge.posting() else {
+                break;
+            };
+            if doc > until {
+                break;
+            }
+            let positions = self.merge.positions();
+            self.pos.push(positions);
+            self.docs.push(doc);
+            self.tfs.push(tf);
+            self.lens.push(len);
+            self.merge.advance(doc + 1);
+        }
+    }
+
     /// The current document's token offsets.
     pub(crate) fn positions(&mut self) -> &[u32] {
         if !self.load() {
             return &[];
+        }
+        if self.pos_direct {
+            let want = self.seg_base + self.at;
+            let Some(idx) = self.lazy_source else {
+                return &[];
+            };
+            let Source::Segment(cur) = &mut self.merge.sources[idx] else {
+                return &[];
+            };
+            // The cursor was left on the block's first document; walk it to the
+            // one being verified. `positions()` then skips the documents in
+            // between by counting their term frequency, so an unread posting
+            // costs nothing. Nothing else moves the cursor while `pos_direct`
+            // holds - a seek closes the direct block first - so this is always
+            // a forward step.
+            let have = cur.pos();
+            debug_assert!(
+                want >= have,
+                "direct offsets would have to rewind: want {want}, cursor at {have}"
+            );
+            if want > have {
+                cur.skip(want - have);
+            }
+            let offsets = cur.positions();
+            #[cfg(test)]
+            {
+                self.offsets_built += offsets.len();
+            }
+            return offsets;
         }
         self.pos.get(self.at)
     }
@@ -3237,6 +3400,11 @@ impl<'a> TermStream<'a> {
             // other term (a real answer change on enwiki: 15.15 vs 10.92).
             self.stored = None;
             self.stats_ready = false;
+            // The seek takes the cursor out of this block itself; consuming the
+            // rest first keeps the merged cursor consistent with the columns
+            // (and lets it hop instead of stepping to the block's end).
+            self.close_direct_block();
+            self.lazy_source = None;
             self.merge.advance(target);
         }
     }
@@ -3270,6 +3438,7 @@ impl<'a> TermStream<'a> {
                 self.stored = None;
                 self.stats_ready = false;
                 self.lazy_source = None;
+                self.pos_direct = false;
                 match self.merge.block_last_shallow() {
                     Some(last) => self.last = last,
                     None => {

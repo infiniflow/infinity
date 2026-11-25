@@ -1096,10 +1096,12 @@ pub struct TermDocCursor<'a> {
     /// without a skip item (shorter than one block), where the caller has to
     /// compute the bound from the decoded postings.
     block_max: Option<(u32, u16)>,
-    /// Occurrences still to drop from the position stream, counted from
-    /// `pos_off`: the prefix of the record a hop landed in, discarded lazily on
-    /// the first `positions()` call. At most one record's worth
-    /// (`MAX_POS_PER_RECORD`); a hop no longer replays the whole prefix.
+    /// Occurrences still to drop from the position stream, discarded lazily by
+    /// [`Self::next_delta`]. A hop sets it to the prefix of the record it
+    /// landed in (`seek_positions` / `reset_positions`), and a document whose
+    /// offsets nobody asks for adds its whole term frequency to it
+    /// ([`Self::positions`]) - so this is **not** bounded by one record, and a
+    /// skip costs nothing until an offset is actually needed.
     pos_skip: usize,
     /// Whether `consume_to_end` should advance the position stream across
     /// blocks. Plain BM25/boolean queries never call `positions()` and disable
@@ -1466,13 +1468,20 @@ impl<'a> TermDocCursor<'a> {
 
     /// `GetCurrentPosition`: the current document's token offsets, in order.
     /// Empty when the term carries no position list.
+    ///
+    /// Documents the cursor stepped over without anyone reading their offsets
+    /// are skipped by counting their term frequencies into `pos_skip` instead
+    /// of decoding them into `cur_positions` and throwing the result away - the
+    /// stream is delta-coded and sequential, so the occurrences of a skipped
+    /// document can be dropped just as well when the next read needs them.
     pub fn positions(&mut self) -> &[u32] {
         if !self.ensure() || self.pos_bytes.is_none() || !self.ensure_tfs() {
             return &[];
         }
         while self.consumed < self.at {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
-            self.consume_doc(tf);
+            // Deferred: `next_delta` drops these, so nothing is rebuilt.
+            self.pos_skip += tf as usize;
             self.consumed += 1;
         }
         if self.consumed == self.at {
@@ -1485,6 +1494,12 @@ impl<'a> TermDocCursor<'a> {
 
     /// Positions of every document of the loaded block that was not consumed
     /// yet (the block is about to be replaced).
+    ///
+    /// The occurrences are **not** rebuilt: their term frequencies are counted
+    /// into `pos_skip`, which [`Self::next_delta`] drops when a later document
+    /// actually needs an offset. The position stream is sequential and stays
+    /// where it is, so deferring costs nothing and saves one array rebuild per
+    /// posting of the block.
     fn consume_to_end(&mut self) {
         if !self.track_positions || self.pos_bytes.is_none() || self.consumed >= self.rows.len() {
             return;
@@ -1494,7 +1509,7 @@ impl<'a> TermDocCursor<'a> {
         }
         while self.consumed < self.rows.len() {
             let tf = self.tfs.get(self.consumed).copied().unwrap_or(0);
-            self.consume_doc(tf);
+            self.pos_skip += tf as usize;
             self.consumed += 1;
         }
     }
@@ -1512,8 +1527,13 @@ impl<'a> TermDocCursor<'a> {
     }
 
     /// The next delta-coded offset from the position stream, dropping the
-    /// prefix of the record a seek landed in (`pos_skip`, bounded by one
-    /// record's length).
+    /// occurrences a seek (or a document nobody read the offsets of) skipped.
+    ///
+    /// The skip counter is absolute, so a decoded record whose occurrences are
+    /// all inside the skipped run is dropped in one step. The record still has
+    /// to be decoded - its element count is not stored, only its byte length -
+    /// but its values are never appended to `cur_positions`, which is the work
+    /// this defers.
     fn next_delta(&mut self) -> Option<u32> {
         loop {
             while self.pos_at >= self.pos_buf.len() {
@@ -1532,6 +1552,12 @@ impl<'a> TermDocCursor<'a> {
                 if self.pos_buf.is_empty() {
                     return None;
                 }
+            }
+            let left = self.pos_buf.len() - self.pos_at;
+            if self.pos_skip >= left {
+                self.pos_skip -= left;
+                self.pos_at = self.pos_buf.len();
+                continue;
             }
             let delta = self.pos_buf[self.pos_at];
             self.pos_at += 1;
