@@ -11566,14 +11566,17 @@ mod tests {
         let d = dir.path().to_str().unwrap();
         const DOCS: u64 = 2000;
         let docs: Vec<(u64, u32)> = (0..DOCS).map(|row| (row, 4)).collect();
+        // `c` appears every 200th document, but only the 400th ones have all
+        // three terms consecutive; the 200/600/... candidates carry `c` at
+        // offset 3 so a stale offset read turns them into false matches.
         let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
         postings.insert("a".into(), (0..DOCS).map(|row| (row, 1, vec![0])).collect());
         postings.insert("b".into(), (0..DOCS).map(|row| (row, 1, vec![1])).collect());
         postings.insert(
             "c".into(),
             (0..DOCS)
-                .filter(|row| row % 400 == 0)
-                .map(|row| (row, 1, vec![2]))
+                .filter(|row| row % 200 == 0)
+                .map(|row| (row, 1, vec![if row % 400 == 0 { 2 } else { 3 }]))
                 .collect(),
         );
         let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
@@ -11640,6 +11643,9 @@ mod tests {
         // The phrase sits at a different offset in every document, so a stale
         // or misplaced offset array shows up as a missing match rather than as
         // an unchanged answer.
+        // Even rows match (`b` at `a + 1`); odd rows (including 127, 255, 383,
+        // 511, 639 right before block boundaries) place `b` at `a + 3` so stale
+        // offsets from an adjacent document produce a false match or miss.
         let mut postings: BTreeMap<String, Vec<(u64, u32, Vec<u32>)>> = BTreeMap::new();
         postings.insert(
             "a".into(),
@@ -11650,7 +11656,10 @@ mod tests {
         postings.insert(
             "b".into(),
             (0..DOCS)
-                .map(|row| (row, 1, vec![(row % 4) as u32 + 1]))
+                .map(|row| {
+                    let off = (row % 4) as u32 + if row % 2 == 0 { 1 } else { 3 };
+                    (row, 1, vec![off])
+                })
                 .collect(),
         );
         let seg = storage::invertedindex::format::segment_chunk_dir(d, 0);
@@ -11684,8 +11693,8 @@ mod tests {
             cursor.pending = true;
             cursor.cur = None;
         }
-        let want: Vec<u64> = (0..DOCS).collect();
-        assert_eq!(hits, want, "every document once, in order");
+        let want: Vec<u64> = (0..DOCS).filter(|row| row % 2 == 0).collect();
+        assert_eq!(hits, want, "every matching document once, in order");
         assert!(
             cursor.children.iter().all(|c| c.direct_blocks >= 5),
             "the walk did not cross blocks: {:?}",
@@ -11720,7 +11729,10 @@ mod tests {
             postings.insert(
                 "b".into(),
                 docs.iter()
-                    .map(|(row, _)| (*row, 1, vec![(*row % 5) as u32 + 1]))
+                    .map(|(row, _)| {
+                        let off = (*row % 5) as u32 + if row % 2 == 0 { 1 } else { 3 };
+                        (*row, 1, vec![off])
+                    })
                     .collect(),
             );
             storage::invertedindex::disk_segment_reader::write_segment_index(
@@ -11754,8 +11766,10 @@ mod tests {
         }
         assert_eq!(
             hits,
-            (0..2 * PER_CHUNK).collect::<Vec<u64>>(),
-            "every document once, in order"
+            (0..2 * PER_CHUNK)
+                .filter(|row| row % 2 == 0)
+                .collect::<Vec<u64>>(),
+            "every matching document once, in order"
         );
         assert!(
             cursor.children.iter().all(|c| c.direct_blocks >= 4),
