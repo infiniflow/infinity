@@ -213,9 +213,11 @@ fn sparse_ip(a: &[(u32, f32)], b: &[(u32, f32)]) -> f32 {
 /// increment.
 pub(crate) struct Visited {
     /// One stamp per vertex; a vertex is in the current search when
-    /// `seen[node] == stamp`.
-    seen: Vec<u32>,
-    stamp: u32,
+    /// `seen[node] == stamp`. `u16` halves the per-thread working set
+    /// compared to `u32` (2 MB vs 4 MB at 1M nodes) to reduce L3 pressure
+    /// across concurrent query threads, wrapping once per 65,535 searches.
+    seen: Vec<u16>,
+    stamp: u16,
 }
 
 impl Visited {

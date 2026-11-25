@@ -6691,6 +6691,17 @@ impl Engine {
         if read_ts == u64::MAX {
             return self.tombstone_set(table);
         }
+        let tkey = self.table_key(table);
+        if self
+            .tables
+            .lock()
+            .unwrap()
+            .get(&tkey)
+            .and_then(|entry| entry.deleted_ids.as_ref())
+            .is_some_and(Vec::is_empty)
+        {
+            return Ok(Arc::new(common::RowBitmap::new()));
+        }
         // Both journal halves in one load: each `deleted_ids`/`delete_ts` call
         // clones the whole journal, and this is the read path of every query.
         let (ids, ts) = self.load_deletes(table);

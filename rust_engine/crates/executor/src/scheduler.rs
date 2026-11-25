@@ -40,9 +40,15 @@ pub struct TaskScheduler {
 impl TaskScheduler {
     fn start() -> Self {
         // `TaskScheduler::Init`: `min(hardware_concurrency, CPULimit)` workers.
-        let workers = std::thread::available_parallelism()
-            .map(|n| n.get())
-            .unwrap_or(1);
+        let workers = std::env::var("INFINITY_WORKER_THREADS")
+            .ok()
+            .and_then(|v| v.trim().parse::<usize>().ok())
+            .filter(|n| *n > 0)
+            .unwrap_or_else(|| {
+                std::thread::available_parallelism()
+                    .map(|n| n.get())
+                    .unwrap_or(1)
+            });
         // The blocking pool is left at tokio's default. It is not a concurrency
         // limit for the engine: tasklets are async tasks now, so the pool only
         // holds work that genuinely blocks. A cap of `cores + 4` made the pool

@@ -528,6 +528,69 @@ impl Engine {
         } else {
             self.candidate_budget(q)
         };
+        let plain_scored = |hits: &[(f32, u64)]| -> Vec<(usize, f64, f64)> {
+            hits.iter()
+                .map(|&(d, row)| {
+                    let df = f64::from(d);
+                    let (sim, dist) = match q.metric {
+                        "ip" => (-df, df),
+                        "cosine" => {
+                            let c = -df;
+                            (c, 1.0 - c)
+                        }
+                        _ => (1.0 / (1.0 + df), df),
+                    };
+                    (row as usize, sim, dist)
+                })
+                .collect()
+        };
+        // Fast path for a single sealed plain segment with no in-memory tail:
+        // skip `MergeKnn` and intermediate `hits` allocation.
+        if segments.len() == 1 && mems.is_empty() && all_plain {
+            let seg = &segments[0];
+            if seg.index.dims() != q.query.len() {
+                return None;
+            }
+            labelled = seg.labels.len();
+            let seg_k = k.min(seg.labels.len().max(1));
+            let raw: Vec<(usize, f32)> = match q.allowed {
+                Some(allowed) => {
+                    seg.index
+                        .search_index_filtered(q.query, seg_k, search_option, &|node| {
+                            seg.labels
+                                .get(node)
+                                .is_some_and(|label| allowed.contains(u64::from(*label)))
+                        })
+                }
+                None => seg.index.search_index(q.query, seg_k, search_option),
+            };
+            let candidates: std::collections::HashSet<usize> = raw
+                .iter()
+                .map(|&(node, _)| seg.labels[node] as usize)
+                .collect();
+            if all_covered(q, labelled) {
+                let scored: Vec<(usize, f64, f64)> = raw
+                    .iter()
+                    .map(|&(node, d)| {
+                        let df = f64::from(d);
+                        let (sim, dist) = match q.metric {
+                            "ip" => (-df, df),
+                            "cosine" => {
+                                let c = -df;
+                                (c, 1.0 - c)
+                            }
+                            _ => (1.0 / (1.0 + df), df),
+                        };
+                        (seg.labels[node] as usize, sim, dist)
+                    })
+                    .collect();
+                return answered_scored(candidates, Vec::new(), Some(scored));
+            }
+            let mut covered: HashSet<usize> = HashSet::with_capacity(labelled);
+            covered.extend(seg.labels.iter().map(|label| *label as usize));
+            let uncovered = self.uncovered_rows(q, &covered);
+            return answered(candidates, uncovered);
+        }
         let mut merge = index::merge_knn::MergeKnn::new(1, k, index::merge_knn::Compare::Max, None);
         merge.begin();
         for seg in &segments {
@@ -583,22 +646,6 @@ impl Engine {
             }
         }
         merge.end();
-        let plain_scored = |hits: &[(f32, u64)]| -> Vec<(usize, f64, f64)> {
-            hits.iter()
-                .map(|&(d, row)| {
-                    let df = f64::from(d);
-                    let (sim, dist) = match q.metric {
-                        "ip" => (-df, df),
-                        "cosine" => {
-                            let c = -df;
-                            (c, 1.0 - c)
-                        }
-                        _ => (1.0 / (1.0 + df), df),
-                    };
-                    (row as usize, sim, dist)
-                })
-                .collect()
-        };
         let candidates: std::collections::HashSet<usize> = merge
             .hits_by_idx(0)
             .iter()
