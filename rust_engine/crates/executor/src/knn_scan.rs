@@ -123,6 +123,9 @@ pub(crate) struct KnnCandidateScan<'a> {
     /// The search width the recall monitor wants (§11.3 item 4). `None` keeps
     /// the index's own `base_beam`.
     pub beam: Option<usize>,
+    /// True when the column's element type is `f32` (`FLOAT`), so `encode=plain`
+    /// HNSW distances are exact and do not need a wider `topn * 4` rerank pool.
+    pub elem_is_f32: bool,
 }
 
 /// What the index probe answers with.
@@ -556,10 +559,11 @@ impl Engine {
         // Pre-scored hits are valid only when every graph is plain AND its
         // metric matches the query metric.
         let query_metric = index::vector::Metric::parse(q.metric);
-        let mut can_prescore = segments.iter().all(|seg| {
-            let idx = seg.index.index();
-            idx.encoding() == index::vector::HnswEncoding::Plain && idx.metric() == query_metric
-        });
+        let mut can_prescore = q.elem_is_f32
+            && segments.iter().all(|seg| {
+                let idx = seg.index.index();
+                idx.encoding() == index::vector::HnswEncoding::Plain && idx.metric() == query_metric
+            });
         for mem in &mems {
             if let Ok(mem) = mem.try_lock() {
                 let idx = mem.index();

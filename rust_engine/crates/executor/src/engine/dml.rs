@@ -858,12 +858,10 @@ impl Engine {
                 }
             }
         }
-        // A commit changes visible rows, so cached `SELECT` results must not
-        // survive it. The SQL path clears on the mutating statement; callers
-        // that reach this primitive directly (Thrift insert, import) would
-        // otherwise keep serving a stale `count(*)`. (DML does not alter
-        // schema, so `plan_cache` stays valid.)
+        // A commit changes visible rows, so cached `SELECT` results and
+        // timestamp-keyed `plan_cache` entries must not accumulate stale rows.
         self.result_cache.lock().unwrap().clear();
+        self.plan_cache.clear();
         // The analyzer is the most expensive CPU step of a write and takes no
         // shared state, so it runs **before** the table's write gate: a second
         // writer to the same table then tokenises while the gate's holder is

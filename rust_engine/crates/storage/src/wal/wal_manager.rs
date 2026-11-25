@@ -84,7 +84,11 @@ impl WalManager {
             .open(&path)
             .await
             .map_err(|e| Error::io(&path, e))?;
-        let file_size = file.metadata().await.map(|m| m.len()).unwrap_or(0);
+        let file_size = file
+            .metadata()
+            .await
+            .map_err(|e| Error::io(&path, e))?
+            .len();
         Ok(Self {
             path,
             file,
@@ -106,6 +110,7 @@ impl WalManager {
             .write_all(&buf)
             .await
             .map_err(|e| Error::io(&self.path, e))?;
+        self.file_size += buf.len() as u64;
         // Hand the bytes to the kernel before returning. `write_all` on a
         // `tokio::fs::File` completes the write, but the handle's own buffer is
         // only drained on `flush`, and a reader that opens the path straight
@@ -116,7 +121,6 @@ impl WalManager {
             .flush()
             .await
             .map_err(|e| Error::io(&self.path, e))?;
-        self.file_size += buf.len() as u64;
         self.appended_ts = self.appended_ts.max(entry.commit_ts);
         // The write itself is not synced: `WalManager::NewFlush` owns that
         // decision. Upstream ends every flush batch with

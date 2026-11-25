@@ -11536,6 +11536,8 @@ impl Engine {
             // `candidates ∪ uncovered`: the rows the index can win plus the rows
             // it does not cover (`§9.7`). Both are scored exactly, so a partly
             // covered table costs the uncovered rows instead of every row.
+            let elem_is_f32 = crate::blocks::embedding_shape(&col_type)
+                .is_some_and(|(dim, element_type)| dim == query_f32.len() && element_type == 6);
             let probe = self
                 .knn_candidates(&knn_scan::KnnCandidateScan {
                     table,
@@ -11549,6 +11551,7 @@ impl Engine {
                     options: &knn_opts,
                     allowed: allowed.as_ref(),
                     beam,
+                    elem_is_f32,
                 })
                 .await;
             let read_ts = crate::read_ts();

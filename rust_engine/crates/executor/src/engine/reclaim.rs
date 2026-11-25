@@ -123,17 +123,17 @@ impl Engine {
     /// Reclaims unsealed tables (append buffers + in-memory index tails) under
     /// process RSS pressure, reusing the same RRF ranking and `dump_table` path
     /// until `process_rss_bytes() <= target_rss` or no eligible tables remain.
-    pub(crate) async fn reclaim_unsealed_under_pressure(&self, target_rss: u64) -> usize {
+    pub(crate) async fn reclaim_unsealed_under_pressure(&self, target_usage: u64) -> usize {
         if self.budget_bytes() == 0 {
             return 0;
         }
         let _guard = self.context.unsealed_reclaim_lock.lock().await;
-        if crate::engine::state::process_rss_bytes() <= target_rss {
+        if self.memory_usage() <= target_usage {
             return 0;
         }
         self.reclaim_unsealed_until(true, || {
             storage::trim_allocator();
-            crate::engine::state::process_rss_bytes() <= target_rss || self.budget_bytes() == 0
+            self.memory_usage() <= target_usage || self.budget_bytes() == 0
         })
         .await
     }

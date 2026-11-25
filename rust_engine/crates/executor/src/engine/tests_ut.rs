@@ -17034,6 +17034,7 @@ mod tests {
                 options: &Default::default(),
                 allowed,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("the graph covers the table")
@@ -17109,6 +17110,7 @@ mod tests {
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("the graph still answers; only its tail is uncovered");
@@ -17143,6 +17145,7 @@ mod tests {
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("a delete must not turn the index off");
