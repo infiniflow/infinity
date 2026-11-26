@@ -10744,7 +10744,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE osp (id INT, s SPARSE(FLOAT,10));")
             .await
             .unwrap();
@@ -10864,8 +10864,8 @@ mod tests {
         );
 
         // Any positive quota is crossed by these tails; the drain releases both.
-        e.set_memindex_quota(1);
-        e.enforce_memindex_quota(Some("hp"));
+        e.set_unsealed_memory_quota(1);
+        e.enforce_unsealed_memory_quota(Some("hp"));
         e.reclaim_unsealed().await;
         let (sec, sparse) = tails(&e);
         assert_eq!(
@@ -10882,13 +10882,13 @@ mod tests {
     /// One quota governs every index form: when it is exceeded the tails are
     /// dumped and released, and the results stay correct.
     #[tokio::test]
-    async fn memindex_quota_seals_every_tail() {
+    async fn unsealed_memory_quota_seals_every_tail() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
         // Any positive budget is exceeded by the first row's tails.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         // EMVB is a tensor-column index in the reference
         // (`IndexEMVB::ValidateColumnDataType`), so the multi-vector form here
         // is a `TENSOR(FLOAT,2)`.
@@ -10914,7 +10914,7 @@ mod tests {
         .unwrap();
         // The explicit check raises the flag; the scan releases every tail of
         // the table (one selection drains all of them).
-        e.enforce_memindex_quota(None);
+        e.enforce_unsealed_memory_quota(None);
         e.reclaim_unsealed().await;
 
         let mv = e
@@ -10998,7 +10998,7 @@ mod tests {
 
         // A budget below what is resident, and one scan: the write path only
         // raises a flag (it does not drain), the scan does the work.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.enforce_quota_after_append(&key);
         assert!(
             e.context
@@ -12039,14 +12039,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_memindex_quota_is_global_across_tables() {
+    async fn the_unsealed_memory_quota_is_global_across_tables() {
         let dir = tempdir().unwrap();
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
         // Six four-dimensional rows cost 6 × (4 × 4 + 152) = 1008 bytes, below
         // 1500; two tables together cross it.
-        e.set_memindex_quota(1500);
+        e.set_unsealed_memory_quota(1500);
         for name in ["g1", "g2"] {
             e.execute(&format!(
                 "CREATE TABLE {name} (id INT, v EMBEDDING(FLOAT, 4));"
@@ -12065,7 +12065,7 @@ mod tests {
         // are still the only charge, so nothing crosses the bound and the dump
         // that would have run mid-insert never happens. What this test is
         // about is the check that sees **both** tables, which is the one below.
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         for name in ["g1", "g2"] {
             e.execute(&format!(
                 "INSERT INTO {name} VALUES (1,[0.1,0.2,0.3,-0.2]),(2,[0.1,0.2,0.3,-0.2]),\
@@ -12077,8 +12077,8 @@ mod tests {
         }
         // Both tails are complete now; the quota is the two-tables-cross-it
         // value, and this explicit check is the only one that sees both.
-        e.set_memindex_quota(1500);
-        e.enforce_memindex_quota(None);
+        e.set_unsealed_memory_quota(1500);
+        e.enforce_unsealed_memory_quota(None);
         e.reclaim_unsealed().await;
 
         for name in ["g1", "g2"] {
@@ -12109,7 +12109,7 @@ mod tests {
             .await
             .unwrap();
         // Large enough that nothing dumps, so the charge stays live.
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE hb (id INT, v EMBEDDING(FLOAT, 4));")
             .await
             .unwrap();
@@ -12149,7 +12149,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute(
             "CREATE TABLE fam (id INT, body VARCHAR, s SPARSE(FLOAT, 10), \
              m TENSOR(FLOAT, 2), c INT, v EMBEDDING(FLOAT, 4));",
@@ -12234,7 +12234,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE iv (id INT, v EMBEDDING(FLOAT, 4));")
             .await
             .unwrap();
@@ -12283,7 +12283,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE sf (id INT, body VARCHAR);")
             .await
             .unwrap();
@@ -12344,7 +12344,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         let tables: Vec<String> = (0..8).map(|i| format!("ft{i}")).collect();
         for t in &tables {
             e.execute(&format!(
@@ -12399,7 +12399,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.set_flush_dumps_mem_index(true);
         let tables: Vec<String> = (0..64).map(|i| format!("p{i}")).collect();
         for t in &tables {
@@ -12521,7 +12521,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         let tables: Vec<String> = (0..64).map(|i| format!("w{i}")).collect();
         for t in &tables {
             e.execute(&format!(
@@ -12594,7 +12594,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE fd (id INT, body VARCHAR, v EMBEDDING(FLOAT, 4));")
             .await
             .unwrap();
@@ -17034,6 +17034,7 @@ mod tests {
                 options: &Default::default(),
                 allowed,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("the graph covers the table")
@@ -17109,6 +17110,7 @@ mod tests {
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("the graph still answers; only its tail is uncovered");
@@ -17143,6 +17145,7 @@ mod tests {
                 options: &Default::default(),
                 allowed: None,
                 beam: None,
+                elem_is_f32: true,
             })
             .await
             .expect("a delete must not turn the index off");
@@ -17494,7 +17497,7 @@ mod tests {
         let ids: Vec<String> = got.into_iter().map(|r| r[0].clone()).collect();
         assert_eq!(ids.first().map(String::as_str), Some("40"), "got {ids:?}");
         assert!(
-            !ids.contains(&"41".to_string()),
+            !ids.iter().any(|i| i == "41"),
             "a deleted row must not be answered: {ids:?}"
         );
     }
@@ -19461,7 +19464,7 @@ mod tests {
         // Set the quota only now: the write path drains on its own, and a
         // quota in place before the insert would empty the buffer before the
         // test could observe it.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         let key = e.table_key("default_db.rb");
         assert!(
             e.tables
@@ -19505,7 +19508,7 @@ mod tests {
         // Set the quota only now: the write path drains on its own, and a
         // quota in place before the insert would empty the buffer before the
         // test could observe it.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         let key = e.table_key("default_db.rs");
         let before = e
             .tables
@@ -19539,7 +19542,7 @@ mod tests {
             .unwrap();
         // A quota far above the rows: the target (half of it) is already met,
         // so the round does not start.
-        e.set_memindex_quota(1 << 40);
+        e.set_unsealed_memory_quota(1 << 40);
         e.execute("CREATE TABLE rf (id INT);").await.unwrap();
         e.execute("INSERT INTO rf VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rf");
@@ -19586,7 +19589,7 @@ mod tests {
             // Set the quota only now: the write path drains on its own, and a
             // quota in place before the insert would empty the buffer before the
             // test could observe it.
-            e.set_memindex_quota(1);
+            e.set_unsealed_memory_quota(1);
             (0..3)
                 .filter(|i| {
                     tables
@@ -19642,7 +19645,7 @@ mod tests {
                 .or_default()
                 .bump_unsealed(9_000 + i, 1);
         }
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.set_unsealed_max_tables_per_round(1);
 
         let dumped = e.reclaim_unsealed().await;
@@ -19714,7 +19717,7 @@ mod tests {
         // A round that *did* have candidates but released nothing is the case the
         // backoff exists for: it arms `backoff_until`, and the next call returns
         // before doing any work.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("INSERT INTO rd VALUES (1);").await.unwrap();
         e.context
             .unsealed_backoff_until
@@ -19739,7 +19742,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1 << 30);
+        e.set_unsealed_memory_quota(1 << 30);
         e.execute("CREATE TABLE rw2 (id INT);").await.unwrap();
         e.execute("INSERT INTO rw2 VALUES (1);").await.unwrap();
         let before = e.reclaim_target();
@@ -19749,7 +19752,7 @@ mod tests {
         assert_eq!(before, e.reclaim_target(), "the target is the quota's half");
         assert_eq!(
             e.context
-                .memindex_quota
+                .unsealed_memory_quota
                 .load(std::sync::atomic::Ordering::Relaxed),
             1 << 30,
             "and the quota is untouched"
@@ -19839,7 +19842,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rm (id INT, body VARCHAR);")
             .await
             .unwrap();
@@ -19916,7 +19919,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rt (id INT, v VARCHAR);")
             .await
             .unwrap();
@@ -19949,7 +19952,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rn (id INT);").await.unwrap();
         e.execute("INSERT INTO rn VALUES (1), (2);").await.unwrap();
         let key = e.table_key("default_db.rn");
@@ -19999,14 +20002,14 @@ mod tests {
 
         // The quota is ample, so the target (half of it) is already met and the
         // round never starts.
-        e.set_memindex_quota(1 << 40);
+        e.set_unsealed_memory_quota(1 << 40);
         let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 0, "already under the target: nothing to do");
         assert_eq!(unsealed(), 2);
 
         // With the target under the usage, the round drains - and stops once
         // the ledger is back under it, rather than draining every table.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         let dumped = e.reclaim_unsealed().await;
         assert!(
             dumped >= 1,
@@ -20032,7 +20035,7 @@ mod tests {
         // Set the quota only now: the write path drains on its own, and a
         // quota in place before the insert would empty the buffer before the
         // test could observe it.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         let dumped = e.reclaim_unsealed().await;
         assert_eq!(dumped, 1);
         // And with no interval there is nothing to arm, so the backoff gate
@@ -20058,7 +20061,7 @@ mod tests {
             .await
             .unwrap();
         e.set_unsealed_reclaim_interval(1);
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rx (id INT);").await.unwrap();
         e.execute("INSERT INTO rx VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rx");
@@ -20140,7 +20143,7 @@ mod tests {
                 .await
                 .unwrap(),
         );
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rg (id INT, body VARCHAR);")
             .await
             .unwrap();
@@ -20180,7 +20183,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rq (id INT, a VARCHAR, b VARCHAR);")
             .await
             .unwrap();
@@ -20220,7 +20223,7 @@ mod tests {
         // Set the quota only now: the write path drains on its own, and a
         // quota in place before the insert would empty the buffer before the
         // test could observe it.
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         assert_eq!(e.reclaim_unsealed().await, 1);
         // Any later round finds no candidates.
         assert_eq!(e.reclaim_unsealed().await, 0);
@@ -20236,7 +20239,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         for name in ["wa", "wb"] {
             e.execute(&format!("CREATE TABLE {name} (id INT);"))
                 .await
@@ -20260,7 +20263,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE ra (id INT);").await.unwrap();
         e.execute("CREATE TABLE rbb (id INT);").await.unwrap();
         // rbb is written first, so its append ts is older.
@@ -20285,7 +20288,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         for i in 0..5 {
             e.execute(&format!("CREATE TABLE rl{i} (id INT);"))
                 .await
@@ -20309,8 +20312,8 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE ip (id INT);").await.unwrap();
         e.execute("CREATE TABLE ok_t (id INT);").await.unwrap();
         e.execute("INSERT INTO ip VALUES (1);").await.unwrap();
@@ -20349,16 +20352,16 @@ mod tests {
         e.execute("CREATE TABLE rr2 (id INT);").await.unwrap();
         e.execute("INSERT INTO rr2 VALUES (1);").await.unwrap();
         let key = e.table_key("default_db.rr2");
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         assert_eq!(e.reclaim_unsealed().await, 1);
         assert!(!e.table_has_unsealed(&key));
         // Raise the quota for the next write: the write path runs this same
         // drain, so a quota still under the usage would empty the buffer before
         // the test could observe that the write re-armed it.
-        e.set_memindex_quota(1 << 40);
+        e.set_unsealed_memory_quota(1 << 40);
         e.execute("INSERT INTO rr2 VALUES (2);").await.unwrap();
         assert!(e.table_has_unsealed(&key), "the write re-armed the table");
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         assert_eq!(
             e.reclaim_unsealed().await,
             1,
@@ -20386,7 +20389,7 @@ mod tests {
         );
         assert_eq!(e.reclaim_target(), 0);
 
-        e.set_memindex_quota(1 << 20);
+        e.set_unsealed_memory_quota(1 << 20);
         assert_eq!(e.reclaim_target(), 1 << 19, "half the quota");
         // Half of 1 MiB is far above these rows, so still nothing to do.
         assert_eq!(e.reclaim_unsealed().await, 0);
@@ -20405,7 +20408,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         e.execute("CREATE TABLE rq2 (id INT, body VARCHAR);")
             .await
             .unwrap();
@@ -20442,7 +20445,7 @@ mod tests {
         let e = Engine::open_async(dir.path(), Default::default())
             .await
             .unwrap();
-        e.set_memindex_quota(1);
+        e.set_unsealed_memory_quota(1);
         for i in 0..3 {
             let name = format!("mt{i}");
             e.execute(&format!("CREATE TABLE {name} (id INT, body VARCHAR);"))

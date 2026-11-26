@@ -161,21 +161,11 @@ func (e *Engine) RunQuery(ctx context.Context, spec QuerySpec) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
 	}
-	type queryRes struct {
-		rows int
-		err  error
-	}
-	done := make(chan queryRes, 1)
-	go func() {
-		rows, err := e.runQuerySync(spec)
-		done <- queryRes{rows: rows, err: err}
-	}()
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case res := <-done:
-		return res.rows, res.err
-	}
+	// Do not abandon an in-flight Thrift RPC on ctx.Done(): the connection's
+	// TBufferedTransport/TBinaryProtocol is not safe for concurrent use, so
+	// returning early lets the caller's deferred Disconnect() race with the
+	// still-running query on the same socket.
+	return e.runQuerySync(spec)
 }
 
 func (e *Engine) runQuerySync(spec QuerySpec) (int, error) {
@@ -492,7 +482,6 @@ func RunConcurrent(ctx context.Context, host string, port int, dbName string, m 
 	}
 	return out
 }
-
 
 // allReadLatencies flattens the per-goroutine latency slices.
 func allReadLatencies(m *sync.Map) []time.Duration {

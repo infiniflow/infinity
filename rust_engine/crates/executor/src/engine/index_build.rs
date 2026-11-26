@@ -993,8 +993,8 @@ impl Engine {
         Some(tree)
     }
 
-    /// Reloads the HNSW/IVF chunk readers after new chunks were written, so a
-    /// query in the same process sees what `flush()` just mirrored.
+    /// Reloads the HNSW/SPANN/IVF chunk readers after new chunks were written,
+    /// so a query in the same process sees what `flush()` just mirrored.
     pub(crate) fn reload_vector_indexes(&self) {
         let Ok(indexes) = self.storage.catalog.list_indexes() else {
             return;
@@ -1006,7 +1006,48 @@ impl Engine {
             .filter(|im| im.index_type.eq_ignore_ascii_case("HNSW"))
             .count()
             .max(1);
-        for im in indexes {
+        for im in &indexes {
+            self.reload_vector_index_meta(im, hnsw_count);
+        }
+    }
+
+    /// Reloads the HNSW/SPANN/IVF chunk readers for a single table.
+    pub(crate) fn reload_vector_indexes_for(&self, table: &str) {
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
+            return;
+        };
+        let has_vector = indexes.iter().any(|im| {
+            im.index_type.eq_ignore_ascii_case("HNSW")
+                || im.index_type.eq_ignore_ascii_case("SPANN")
+                || im.index_type.eq_ignore_ascii_case("IVF")
+        });
+        if !has_vector {
+            return;
+        }
+        let hnsw_count = indexes
+            .iter()
+            .filter(|im| im.index_type.eq_ignore_ascii_case("HNSW"))
+            .count()
+            .max(1);
+        for im in &indexes {
+            self.reload_vector_index_meta(im, hnsw_count);
+        }
+    }
+
+    /// Reloads the chunk reader for one vector index (`HNSW`, `SPANN`, or `IVF`).
+    pub(crate) fn reload_vector_index_for(&self, im: &catalog::IndexMeta) {
+        if !(im.index_type.eq_ignore_ascii_case("HNSW")
+            || im.index_type.eq_ignore_ascii_case("SPANN")
+            || im.index_type.eq_ignore_ascii_case("IVF"))
+        {
+            return;
+        }
+        let hnsw_count = self.tables.lock().unwrap().len().max(1);
+        self.reload_vector_index_meta(im, hnsw_count);
+    }
+
+    fn reload_vector_index_meta(&self, im: &catalog::IndexMeta, hnsw_count: usize) {
+        {
             if im.index_type.eq_ignore_ascii_case("HNSW") {
                 // Reconcile with the live chunk set and the buffer budget:
                 // cleanup deletes the chunks a merged graph replaced, a rewrite
@@ -1017,7 +1058,7 @@ impl Engine {
                 // falls back to the exact scan when labels do not cover a row.
                 let stamps = self.hnsw_chunk_stamps(&im.table, &im.name);
                 if stamps.is_empty() {
-                    continue;
+                    return;
                 }
                 let budget = self
                     .context
@@ -1127,9 +1168,9 @@ impl Engine {
         let index_meta = self
             .storage
             .catalog
-            .list_indexes()?
+            .indexes_of_table(&table)?
             .into_iter()
-            .find(|im| self.table_key(&im.table) == table && im.name == index)
+            .find(|im| im.name == index)
             .ok_or_else(|| Error::NotFound(format!("index '{index}' on '{table}'")))?;
         Ok(DumpVersion {
             table: table_meta,
@@ -1485,11 +1526,12 @@ impl Engine {
                     .await;
             }
             // The chunk this dump wrote is what a reader must now map: reload
-            // the HNSW/IVF readers and drop the cached PLAID index so the next
-            // query reads the chunk instead of a stale in-memory build. The
-            // checkpoint used to be the step that did this; it no longer
-            // touches indexes at all (`NewTxn::CheckpointTable`).
-            self.reload_vector_indexes();
+            // the HNSW/IVF/SPANN reader for this index so the next query reads
+            // the chunk instead of a stale in-memory build. Skip eager reload
+            // under memory pressure — `knn_candidates` reloads on demand.
+            if self.memory_pressure() == crate::memory::Pressure::Ok {
+                self.reload_vector_index_for(&version.index);
+            }
         }
         let mut dump_txn = self.txn.begin();
         // `NewTxn::DumpMemIndex`: two dumps never run together (the reference
@@ -1733,7 +1775,7 @@ impl Engine {
         })
         .await;
         // The chunk files are on disk; the readers map them on the next query.
-        self.reload_vector_indexes();
+        self.reload_vector_indexes_for(&qualified);
     }
 
     /// One index of [`Self::populate_import_indexes`].
@@ -2386,42 +2428,41 @@ impl Engine {
         // two indexes on one column hold two tails (`MemIndex` is keyed by
         // `index_id`), so a per-column loop would seal the first and leave the
         // second with nothing to write.
-        let Ok(catalog_indexes) = self.storage.catalog.list_indexes() else {
-            return;
-        };
-        let wanted: Vec<(String, u64)> = match only {
+        let (catalog_indexes, wanted): (Vec<catalog::IndexMeta>, Vec<(String, u64)>) = match only {
             Some((table, index_id)) => {
-                let qualified = self.table_key(table);
-                catalog_indexes
+                let Ok(list) = self.storage.catalog.indexes_of_table(table) else {
+                    return;
+                };
+                let wanted = list
                     .iter()
-                    .filter(|im| self.table_key(&im.table) == qualified && im.id == index_id)
+                    .filter(|im| im.id == index_id)
                     .map(|im| (self.table_key(&im.table), im.id))
-                    .collect()
+                    .collect();
+                (list, wanted)
             }
             None => {
-                let backed: Vec<String> = {
+                let backed: Vec<(String, Vec<u64>)> = {
                     let tables = self.tables.lock().unwrap();
                     tables
                         .iter()
                         .filter(|(_, e)| !e.secondary.indexes.is_empty())
-                        .map(|(t, _)| t.clone())
+                        .map(|(t, e)| (t.clone(), e.secondary.indexes.keys().copied().collect()))
                         .collect()
                 };
-                catalog_indexes
-                    .iter()
-                    .filter(|im| is_secondary_kind(&im.index_type))
-                    .filter(|im| {
-                        let t = self.table_key(&im.table);
-                        backed.contains(&t)
-                            && self
-                                .tables
-                                .lock()
-                                .unwrap()
-                                .get(&t)
-                                .is_some_and(|e| e.secondary.indexes.contains_key(&im.id))
-                    })
-                    .map(|im| (self.table_key(&im.table), im.id))
-                    .collect()
+                let mut list = Vec::new();
+                let mut wanted = Vec::new();
+                for (t, ids) in backed {
+                    let Ok(t_indexes) = self.storage.catalog.indexes_of_table(&t) else {
+                        continue;
+                    };
+                    for im in &t_indexes {
+                        if is_secondary_kind(&im.index_type) && ids.contains(&im.id) {
+                            wanted.push((self.table_key(&im.table), im.id));
+                        }
+                    }
+                    list.extend(t_indexes);
+                }
+                (list, wanted)
             }
         };
         for (tkey, index_id) in wanted {
@@ -2924,15 +2965,11 @@ impl Engine {
         if declared.starts_with("BOOL") || declared.starts_with("JSON") {
             return true;
         }
-        let tkey = self.table_key(table);
         self.storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(table)
             .ok()
-            .and_then(|list| {
-                list.into_iter()
-                    .find(|im| self.table_key(&im.table) == tkey && im.column == column)
-            })
+            .and_then(|list| list.into_iter().find(|im| im.column == column))
             .is_some_and(|im| {
                 im.options.iter().any(|(key, value)| {
                     key.eq_ignore_ascii_case("CARDINALITY") && value.eq_ignore_ascii_case("low")
@@ -4160,18 +4197,11 @@ impl Engine {
                     let indexed = self
                         .storage
                         .catalog
-                        .list_indexes()
+                        .indexes_of_table(table)
                         .unwrap_or_default()
                         .iter()
                         .any(|im| {
-                            // Either side may be qualified: the catalog stores
-                            // `default_db.t` while a statement may say `t`.
-                            let same_table = |a: &str, b: &str| {
-                                a == b || a.rsplit('.').next() == b.rsplit('.').next()
-                            };
-                            same_table(&im.table, table)
-                                && im.column == name
-                                && im.index_type.eq_ignore_ascii_case("FULLTEXT")
+                            im.column == name && im.index_type.eq_ignore_ascii_case("FULLTEXT")
                         });
                     if indexed {
                         let tokenizer = self.index_tokenizer(table, &name);
@@ -4194,13 +4224,11 @@ impl Engine {
     }
 
     pub(crate) fn index_name_pairs(&self, table: &str) -> Result<Vec<(String, String)>> {
-        let short = table.split('.').next_back().unwrap_or(table);
         Ok(self
             .storage
             .catalog
-            .list_indexes()?
+            .indexes_of_table(table)?
             .into_iter()
-            .filter(|i| i.table == short || i.table == table)
             .map(|i| (i.column, i.name))
             .collect())
     }
@@ -4587,10 +4615,10 @@ impl Engine {
         let index_id = self
             .storage
             .catalog
-            .list_indexes()
+            .indexes_of_table(&table)
             .unwrap_or_default()
             .into_iter()
-            .find(|im| im.table == table && im.name == index)
+            .find(|im| im.name == index)
             .map(|im| im.id);
         let Some(index_id) = index_id else {
             return Vec::new();
@@ -4815,13 +4843,7 @@ impl Engine {
             .catalog
             .get_table_by_name(table)?
             .ok_or_else(|| Error::NotFound(format!("table '{table}'")))?;
-        let mut indexes = self
-            .storage
-            .catalog
-            .list_indexes()?
-            .into_iter()
-            .filter(|im| im.table == table || im.table == self.qualified_table(table))
-            .collect::<Vec<_>>();
+        let mut indexes = self.storage.catalog.indexes_of_table(table)?;
         indexes.sort_by_key(|im| im.id);
         let (db_name, table_name) = split_table_name(table);
         let db_id = self.database_id_of(table).to_string();
@@ -4869,14 +4891,15 @@ impl Engine {
     /// transaction per index on every write. Under memory pressure that trade
     /// flips - one transaction per tail is cheaper than being over the hard line.
     pub(crate) async fn dump_every_table_index(&self, only: Option<&str>) {
-        let wanted = only.map(|table| self.table_key(table));
-        let indexes = self.storage.catalog.list_indexes().unwrap_or_default();
+        let indexes = match only {
+            Some(table) => self
+                .storage
+                .catalog
+                .indexes_of_table(table)
+                .unwrap_or_default(),
+            None => self.storage.catalog.list_indexes().unwrap_or_default(),
+        };
         for im in indexes {
-            if let Some(wanted) = &wanted {
-                if &self.table_key(&im.table) != wanted {
-                    continue;
-                }
-            }
             if self.index_has_memory_tail(&im.table, &im) == TailState::Empty {
                 continue;
             }
@@ -5107,18 +5130,12 @@ impl Engine {
         if full.is_empty() {
             return;
         }
-        let Ok(indexes) = self.storage.catalog.list_indexes() else {
+        let Ok(indexes) = self.storage.catalog.indexes_of_table(table) else {
             return;
         };
         let mut dumped = false;
         for im in indexes {
             if !im.index_type.eq_ignore_ascii_case("HNSW") || !full.contains(&im.id) {
-                continue;
-            }
-            let same_table = im.table == table
-                || (im.table.rsplit('.').next() == table.rsplit('.').next()
-                    && (!im.table.contains('.') || !table.contains('.')));
-            if !same_table {
                 continue;
             }
             if self.dump_hnsw_index(&im.table, &im.name).await.is_ok() {

@@ -25,7 +25,7 @@ pub mod meta_cache;
 pub mod value_format;
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use common::{Error, Result};
 use storage::{MetaStore, RocksMetaStore};
@@ -382,7 +382,7 @@ pub struct Catalog {
     /// When a DDL captures its batch ([`Self::capture`]), newly created records
     /// are stamped with [`DDL_TS_SENTINEL`] and the caller substitutes the
     /// transaction's commit timestamp with [`Self::restamp`].
-    capture: Mutex<Option<Capture>>,
+    capture: RwLock<Option<Capture>>,
     /// Decoded table records, keyed by qualified name.
     ///
     /// Resolving a name reads the catalog store and decodes the record, which
@@ -408,6 +408,14 @@ pub struct Catalog {
     /// publish what it read: the record it holds may predate the change that
     /// caused the invalidation.
     ddl_epoch: std::sync::atomic::AtomicU64,
+    /// Monotonic in-memory `next_table_id` per `db_id`, initialized lazily from
+    /// the store so concurrent `CreateTable` calls can allocate IDs under
+    /// `counter_lock` and release `ddl_lock` before `commit_at`.
+    next_table_ids: Mutex<HashMap<String, u64>>,
+    /// Monotonic in-memory `next_index_id` per `(db_id, table_id)`, initialized
+    /// lazily from the store so `CreateIndex` can allocate IDs without waiting
+    /// for prior commits to land.
+    next_index_ids: Mutex<HashMap<(String, u64), u64>>,
 }
 
 /// Ends a DDL call: leaves the depth and drops what was cached while it ran.
@@ -519,11 +527,13 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             catalog_only: false,
-            capture: Mutex::new(None),
+            capture: RwLock::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
+            next_table_ids: Mutex::new(HashMap::new()),
+            next_index_ids: Mutex::new(HashMap::new()),
         }
     }
 
@@ -534,11 +544,13 @@ impl Catalog {
             store,
             counter_lock: Mutex::new(()),
             catalog_only: true,
-            capture: Mutex::new(None),
+            capture: RwLock::new(None),
             table_cache: Mutex::new(std::collections::HashMap::new()),
             index_cache: Mutex::new(std::collections::HashMap::new()),
             ddl_depth: std::sync::atomic::AtomicUsize::new(0),
             ddl_epoch: std::sync::atomic::AtomicU64::new(0),
+            next_table_ids: Mutex::new(HashMap::new()),
+            next_index_ids: Mutex::new(HashMap::new()),
         }
     }
 
@@ -566,6 +578,18 @@ impl Catalog {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         cache.clear();
         self.index_cache.lock().unwrap().clear();
+    }
+
+    /// Invalidates cached table and index metadata for a single table only,
+    /// avoiding a global cache wipe on concurrent per-table DDLs.
+    pub fn invalidate_table(&self, table: &str) {
+        let mut cache = self.table_cache.lock().unwrap();
+        self.ddl_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let bare = table.rsplit('.').next().unwrap_or(table);
+        cache.retain(|k, _| k != table && k != bare && k.rsplit('.').next() != Some(bare));
+        let mut idx_cache = self.index_cache.lock().unwrap();
+        idx_cache.retain(|k, _| k != table && k != bare && k.rsplit('.').next() != Some(bare));
     }
 
     /// Whether this catalog persists only the C++ key space.
@@ -632,7 +656,7 @@ impl Catalog {
     /// Runs `f` against the store as the DDL in flight sees it: either the
     /// store itself, or the store with the captured writes applied.
     fn with_view<T>(&self, f: impl FnOnce(&dyn MetaStore) -> Result<T>) -> Result<T> {
-        let guard = self.capture.lock().unwrap();
+        let guard = self.capture.read().unwrap();
         match guard.as_ref() {
             Some(capture) => f(&Overlay {
                 inner: self.store.as_ref(),
@@ -658,9 +682,20 @@ impl Catalog {
     fn indexes(&self) -> Result<Vec<IndexMeta>> {
         self.with_view(|store| {
             let tables = crate::layout::read_layout(store)?;
+            let table_by_id: HashMap<(String, String), String> = tables
+                .iter()
+                .map(|t| {
+                    (
+                        (t.db_id.to_string(), t.table_id.to_string()),
+                        format!("{}.{}", t.db_name, t.table_name),
+                    )
+                })
+                .collect();
             let mut out = Vec::new();
             for def in crate::layout::read_indexes(store)? {
-                if let Some(meta) = crate::layout::index_meta_of(&def, &tables) {
+                if let Some(meta) =
+                    crate::layout::index_meta_of_with_map(&def, &table_by_id, &tables)
+                {
                     out.push(meta);
                 }
             }
@@ -773,7 +808,7 @@ impl Catalog {
     }
 
     fn indexes_cached(&self, key: &str, qualified: &str) -> Result<Vec<IndexMeta>> {
-        if self.capture.lock().unwrap().is_some()
+        if self.capture.read().unwrap().is_some()
             || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
         {
             return self.indexes_of_table_uncached(qualified);
@@ -909,7 +944,7 @@ impl Catalog {
         // has already written, not from the store: dropping a database rewrites
         // the layout once per table it holds, and each rewrite must see the
         // previous one.
-        let mut slot = self.capture.lock().unwrap();
+        let mut slot = self.capture.write().unwrap();
         let (sweep, layout) = match slot.as_ref() {
             Some(capture) => {
                 let view = Overlay {
@@ -952,7 +987,7 @@ impl Catalog {
     /// error and is reported rather than silently nesting.
     pub fn capture<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<(T, Vec<BatchItem>)> {
         {
-            let mut slot = self.capture.lock().unwrap();
+            let mut slot = self.capture.write().unwrap();
             if slot.is_some() {
                 return Err(Error::Catalog("nested catalog capture".into()));
             }
@@ -973,7 +1008,7 @@ impl Catalog {
         // store to decide the statement was a no-op) on each of them.
         let wrote_nothing = self
             .capture
-            .lock()
+            .read()
             .unwrap()
             .as_ref()
             .is_some_and(|capture| capture.batch.is_empty());
@@ -986,7 +1021,7 @@ impl Catalog {
                 .and_then(|dbs| Ok((dbs, self.list_tables()?, self.list_indexes()?)))
                 .and_then(|(dbs, tables, indexes)| self.rewrite_catalog(&dbs, &tables, &indexes));
         }
-        let capture = self.capture.lock().unwrap().take().unwrap_or_default();
+        let capture = self.capture.write().unwrap().take().unwrap_or_default();
         Ok((out?, last_op_per_key(capture.batch)))
     }
 
@@ -1238,6 +1273,14 @@ impl Catalog {
             // table would inherit its block directory.
             let db_name = table.split('.').next().unwrap_or(table);
             let db_id = self.database_id_of_name(db_name)?.unwrap_or(1).to_string();
+            {
+                let mut ids = self.next_table_ids.lock().unwrap();
+                if let Some(next) = ids.get_mut(&db_id) {
+                    let cur = *next;
+                    *next = cur + 1;
+                    return Ok((cur, cur + 1));
+                }
+            }
             let tag = storage::catalog_format::catalog_db_tag_key(&db_id, "next_table_id");
             let previous = self
                 .with_view(|store| store.get(tag.as_bytes()))?
@@ -1255,6 +1298,7 @@ impl Catalog {
                     .max()
                     .unwrap_or(0),
             };
+            self.next_table_ids.lock().unwrap().insert(db_id, next + 1);
             return Ok((next, next + 1));
         }
         // Table ids start at 0, as the C++ engine's do; the counter holds the
@@ -1772,7 +1816,7 @@ impl Catalog {
         // transaction's own uncommitted DDL, so a cached record would answer
         // from before that DDL. Captures are DDL-only and short, so they simply
         // bypass the cache.
-        if self.capture.lock().unwrap().is_some()
+        if self.capture.read().unwrap().is_some()
             || self.ddl_depth.load(std::sync::atomic::Ordering::SeqCst) > 0
         {
             return self.get_table_by_name_uncached(name);
@@ -2062,7 +2106,7 @@ impl Catalog {
     /// `next_database_id` before its layout rewrite) must see its own write,
     /// not the value the store had when the statement started.
     pub(crate) fn stage(&self, items: &[BatchItem]) -> Result<()> {
-        let mut slot = self.capture.lock().unwrap();
+        let mut slot = self.capture.write().unwrap();
         match slot.as_mut() {
             Some(capture) => {
                 for (key, value) in items {
@@ -2339,14 +2383,24 @@ impl Catalog {
             &table_id.to_string(),
             "next_index_id",
         );
-        let previous = self
-            .with_view(|store| store.get(tag.as_bytes()))?
-            .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
-            .unwrap_or(0);
-        // The counter is the authority, but a catalog that has records and no
-        // tag yet (one written before the tag existed) still has to start past
-        // the live ids.
-        let id = previous.max(live_max(self)) + 1;
+        let id = {
+            let mut ids = self.next_index_ids.lock().unwrap();
+            if let Some(cached) = ids.get_mut(&(db_id.clone(), table_id)) {
+                *cached += 1;
+                *cached
+            } else {
+                let previous = self
+                    .with_view(|store| store.get(tag.as_bytes()))?
+                    .and_then(|v| String::from_utf8_lossy(&v).parse::<u64>().ok())
+                    .unwrap_or(0);
+                // The counter is the authority, but a catalog that has records and no
+                // tag yet (one written before the tag existed) still has to start past
+                // the live ids.
+                let next_id = previous.max(live_max(self)) + 1;
+                ids.insert((db_id, table_id), next_id);
+                next_id
+            }
+        };
         // The layout rewrite below re-reads this tag and keeps the larger value,
         // so staging it is what makes the counter survive the rewrite.
         self.stage(&[(tag.into_bytes(), Some(id.to_string().into_bytes()))])?;
@@ -2387,8 +2441,17 @@ impl Catalog {
             let db_name = table.split('.').next().unwrap_or(table);
             let bare = table.rsplit('.').next().unwrap_or(table);
             let (db_str, _) = self.db_and_bare_name(table)?;
-            let Some(layout) = crate::layout::read_table(self.store.as_ref(), db_name, bare)?
-            else {
+            let needs_columns = !meta.column.is_empty()
+                && !matches!(
+                    meta.index_type.as_str(),
+                    "HNSW" | "SPANN" | "FULLTEXT" | "BMP" | "SMVE" | "PLAID" | "EMVB" | "DISKANN"
+                );
+            let layout = if needs_columns {
+                crate::layout::read_table(self.store.as_ref(), db_name, bare)?
+            } else {
+                crate::layout::read_table_header_only(self.store.as_ref(), db_name, bare)?
+            };
+            let Some(layout) = layout else {
                 return Err(Error::Catalog(format!("table '{table}' does not exist")));
             };
             let table_id = layout.table_id.to_string();
@@ -3258,7 +3321,7 @@ mod tests {
         assert_eq!(counts.get("puts"), 0);
         assert_eq!(counts.get("deletes"), 0);
         assert!(c.get_table_by_name("db2.t").unwrap().is_none());
-        assert!(c.list_databases().unwrap().contains(&"db2".to_string()));
+        assert!(c.list_databases().unwrap().iter().any(|i| i == "db2"));
     }
 
     /// The batched writer must produce byte-identical records to the direct

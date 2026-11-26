@@ -123,6 +123,9 @@ pub(crate) struct KnnCandidateScan<'a> {
     /// The search width the recall monitor wants (§11.3 item 4). `None` keeps
     /// the index's own `base_beam`.
     pub beam: Option<usize>,
+    /// True when the column's element type is `f32` (`FLOAT`), so `encode=plain`
+    /// HNSW distances are exact and do not need a wider `topn * 4` rerank pool.
+    pub elem_is_f32: bool,
 }
 
 /// What the index probe answers with.
@@ -140,6 +143,9 @@ pub(crate) struct KnnProbe {
     /// every row - and they may still be in the append buffer, so the caller
     /// reads them by id (block *and* buffer), not through a block pass.
     pub uncovered: Vec<usize>,
+    /// Pre-scored `(row_id, sim, dist)` hits when an `encode=plain` HNSW
+    /// already computed exact `f32` distances and no rows are uncovered.
+    pub scored: Option<Vec<(usize, f64, f64)>>,
 }
 
 impl KnnProbe {
@@ -161,12 +167,21 @@ impl KnnProbe {
 /// the one failure a caller cannot notice or repair, so the empty answer is
 /// handed back as "the index cannot help" and the rows are scored directly.
 fn answered(candidates: HashSet<usize>, uncovered: Vec<usize>) -> Option<KnnProbe> {
-    if candidates.is_empty() && uncovered.is_empty() {
+    answered_scored(candidates, uncovered, None)
+}
+
+fn answered_scored(
+    candidates: HashSet<usize>,
+    uncovered: Vec<usize>,
+    scored: Option<Vec<(usize, f64, f64)>>,
+) -> Option<KnnProbe> {
+    if candidates.is_empty() && uncovered.is_empty() && scored.as_ref().is_none_or(Vec::is_empty) {
         return None;
     }
     Some(KnnProbe {
         candidates,
         uncovered,
+        scored,
     })
 }
 
@@ -414,7 +429,7 @@ impl Engine {
             let uncovered = self.uncovered_rows(q, &covered);
             return answered(candidates, uncovered);
         }
-        let ivf = {
+        let mut ivf = {
             let tables = self.tables.lock().unwrap();
             tables.get(&tkey).and_then(|e| {
                 (e.ivf.contains_key(&index_id) || e.ivf_mem.contains_key(&index_id)).then(|| {
@@ -425,6 +440,39 @@ impl Engine {
                 })
             })
         };
+        if ivf.as_ref().is_none_or(|(segs, _)| segs.is_empty()) {
+            let has_loaded_hnsw = {
+                let tables = self.tables.lock().unwrap();
+                tables
+                    .get(&tkey)
+                    .and_then(|e| e.vector.get(&index_id))
+                    .is_some_and(|v| !v.is_empty())
+            };
+            if !has_loaded_hnsw {
+                if let Ok(indexes) = self.storage.catalog.indexes_of_table(q.table) {
+                    if let Some(im) = indexes.into_iter().find(|im| im.id == index_id) {
+                        if im.index_type.eq_ignore_ascii_case("IVF")
+                            || im.index_type.eq_ignore_ascii_case("HNSW")
+                        {
+                            self.reload_vector_index_for(&im);
+                            if im.index_type.eq_ignore_ascii_case("IVF") {
+                                let tables = self.tables.lock().unwrap();
+                                ivf = tables.get(&tkey).and_then(|e| {
+                                    (e.ivf.contains_key(&index_id)
+                                        || e.ivf_mem.contains_key(&index_id))
+                                    .then(|| {
+                                        (
+                                            e.ivf.get(&index_id).cloned().unwrap_or_default(),
+                                            e.ivf_mem.get(&index_id).cloned().unwrap_or_default(),
+                                        )
+                                    })
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if let Some((segments, mem)) = ivf {
             if segments.is_empty() && mem.is_empty() {
                 return None;
@@ -505,7 +553,92 @@ impl Engine {
         // `KnnSearchOption.ef_`: the candidate list size for the bottom
         // layer (`WITH (ef = ...)`).
         let search_option = index::hnsw_handler::KnnSearchOption { ef: q.options.ef };
-        let k = self.candidate_budget(q);
+        // `encode=plain` HNSW already computes exact `f32` distances inside the
+        // graph, so it does not need a `topn * 4` rerank pool (which would
+        // also silently inflate `ef.max(k)` above the user's `WITH (ef = ...)`).
+        // Pre-scored hits are valid only when every graph is plain AND its
+        // metric matches the query metric.
+        let query_metric = index::vector::Metric::parse(q.metric);
+        let mut can_prescore = q.elem_is_f32
+            && segments.iter().all(|seg| {
+                let idx = seg.index.index();
+                idx.encoding() == index::vector::HnswEncoding::Plain && idx.metric() == query_metric
+            });
+        for mem in &mems {
+            if let Ok(mem) = mem.try_lock() {
+                let idx = mem.index();
+                can_prescore &= idx.encoding() == index::vector::HnswEncoding::Plain
+                    && idx.metric() == query_metric;
+            }
+        }
+        let k = if can_prescore {
+            q.topn.max(1)
+        } else {
+            self.candidate_budget(q)
+        };
+        let plain_scored = |hits: &[(f32, u64)]| -> Vec<(usize, f64, f64)> {
+            hits.iter()
+                .map(|&(d, row)| {
+                    let df = f64::from(d);
+                    let (sim, dist) = match query_metric {
+                        index::vector::Metric::Ip => (-df, df),
+                        index::vector::Metric::Cos => {
+                            let c = -df;
+                            (c, 1.0 - c)
+                        }
+                        index::vector::Metric::L2 => (1.0 / (1.0 + df), df),
+                    };
+                    (row as usize, sim, dist)
+                })
+                .collect()
+        };
+        // Fast path for a single sealed plain segment with no in-memory tail:
+        // skip `MergeKnn` and intermediate `hits` allocation.
+        if segments.len() == 1 && mems.is_empty() && can_prescore {
+            let seg = &segments[0];
+            if seg.index.dims() != q.query.len() {
+                return None;
+            }
+            labelled = seg.labels.len();
+            let seg_k = k.min(seg.labels.len().max(1));
+            let raw: Vec<(usize, f32)> = match q.allowed {
+                Some(allowed) => {
+                    seg.index
+                        .search_index_filtered(q.query, seg_k, search_option, &|node| {
+                            seg.labels
+                                .get(node)
+                                .is_some_and(|label| allowed.contains(u64::from(*label)))
+                        })
+                }
+                None => seg.index.search_index(q.query, seg_k, search_option),
+            };
+            let candidates: std::collections::HashSet<usize> = raw
+                .iter()
+                .map(|&(node, _)| seg.labels[node] as usize)
+                .collect();
+            if all_covered(q, labelled) {
+                let scored: Vec<(usize, f64, f64)> = raw
+                    .iter()
+                    .map(|&(node, d)| {
+                        let df = f64::from(d);
+                        let (sim, dist) = match query_metric {
+                            index::vector::Metric::Ip => (-df, df),
+                            index::vector::Metric::Cos => {
+                                let c = -df;
+                                (c, 1.0 - c)
+                            }
+                            index::vector::Metric::L2 => (1.0 / (1.0 + df), df),
+                        };
+                        (seg.labels[node] as usize, sim, dist)
+                    })
+                    .collect();
+                return answered_scored(candidates, Vec::new(), Some(scored));
+            }
+            let mut covered: HashSet<usize> = HashSet::with_capacity(labelled);
+            covered.extend(seg.labels.iter().map(|label| *label as usize));
+            let uncovered = self.uncovered_rows(q, &covered);
+            return answered(candidates, uncovered);
+        }
         let mut merge = index::merge_knn::MergeKnn::new(1, k, index::merge_knn::Compare::Max, None);
         merge.begin();
         for seg in &segments {
@@ -541,6 +674,9 @@ impl Engine {
                 if mem.dims != q.query.len() {
                     return None;
                 }
+                let idx = mem.index();
+                can_prescore &= idx.encoding() == index::vector::HnswEncoding::Plain
+                    && idx.metric() == query_metric;
                 // Coverage is what the segment *holds*, not what it returned: a
                 // `topn * 4` result set can never cover a table, so adding only
                 // the hits made every indexed query declare itself incomplete and
@@ -561,12 +697,13 @@ impl Engine {
         }
         merge.end();
         let candidates: std::collections::HashSet<usize> = merge
-            .ids_by_idx(0)
-            .into_iter()
-            .map(|r| r as usize)
+            .hits_by_idx(0)
+            .iter()
+            .map(|&(_, r)| r as usize)
             .collect();
         if all_covered(q, labelled) {
-            return answered(candidates, Vec::new());
+            let scored = can_prescore.then(|| plain_scored(merge.hits_by_idx(0)));
+            return answered_scored(candidates, Vec::new(), scored);
         }
         // The counts disagree, so which rows are missing has to be answered with
         // the labels themselves: a delete leaves its row in the graph (the

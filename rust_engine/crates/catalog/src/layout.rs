@@ -1325,8 +1325,17 @@ impl Catalog {
             imported += 1;
         }
         // Index records, resolved against the tables just imported.
+        let table_by_id: std::collections::HashMap<(String, String), String> = tables
+            .iter()
+            .map(|t| {
+                (
+                    (t.db_id.to_string(), t.table_id.to_string()),
+                    format!("{}.{}", t.db_name, t.table_name),
+                )
+            })
+            .collect();
         for def in read_indexes(store)? {
-            let Some(meta) = index_meta_of(&def, &tables) else {
+            let Some(meta) = index_meta_of_with_map(&def, &table_by_id, &tables) else {
                 continue;
             };
             // Keep the reference's id: it names the index's directory
@@ -1603,6 +1612,26 @@ pub fn read_table(
     db_name: &str,
     table_name: &str,
 ) -> Result<Option<TableLayout>> {
+    read_table_impl(store, db_name, table_name, true)
+}
+
+/// Like [`read_table`], but skips reading and decoding column records.
+/// Used by `CreateIndex` for non-secondary index types that only need
+/// `db_id`/`table_id`/`table_name`.
+pub fn read_table_header_only(
+    store: &dyn MetaStore,
+    db_name: &str,
+    table_name: &str,
+) -> Result<Option<TableLayout>> {
+    read_table_impl(store, db_name, table_name, false)
+}
+
+fn read_table_impl(
+    store: &dyn MetaStore,
+    db_name: &str,
+    table_name: &str,
+    with_columns: bool,
+) -> Result<Option<TableLayout>> {
     let Some((db_id, db_ts)) = db_record(store, db_name)? else {
         return Ok(None);
     };
@@ -1635,7 +1664,11 @@ pub fn read_table(
     )? {
         return Ok(None);
     }
-    let (columns, next_column_id) = read_columns(store, db_id, table_id)?;
+    let (columns, next_column_id) = if with_columns {
+        read_columns(store, db_id, table_id)?
+    } else {
+        (Vec::new(), 0)
+    };
     Ok(Some(TableLayout {
         db_name: db_name.to_string(),
         db_id,
@@ -3175,6 +3208,30 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
                 .map(|t| format!("{}.{}", t.db_name, t.table_name))
         }),
     }?;
+    Some(index_meta_with_table(def, table))
+}
+
+/// Like [`index_meta_of`], but resolves `(db_id, table_id)` via a pre-built
+/// `O(1)` lookup map so enumerating all indexes in a catalog with many tables
+/// stays `O(indexes + tables)` instead of `O(indexes * tables)`.
+pub fn index_meta_of_with_map(
+    def: &IndexDefValue,
+    table_by_id: &std::collections::HashMap<(String, String), String>,
+    tables: &[TableLayout],
+) -> Option<IndexMeta> {
+    let table = match &def.owner {
+        Some((db_id, table_id)) => table_by_id.get(&(db_id.clone(), table_id.clone())).cloned(),
+        None => def.base.column_names.first().and_then(|c| {
+            tables
+                .iter()
+                .find(|t| t.columns.iter().any(|col| &col.column_name == c))
+                .map(|t| format!("{}.{}", t.db_name, t.table_name))
+        }),
+    }?;
+    Some(index_meta_with_table(def, table))
+}
+
+fn index_meta_with_table(def: &IndexDefValue, table: String) -> IndexMeta {
     let column = def.base.column_names.first().cloned().unwrap_or_default();
     // Carry the options the engine tracks on `IndexMeta`.
     let opt = |k: &str| {
@@ -3350,7 +3407,7 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
             .collect();
         options.sort_by(|a, b| a.0.cmp(&b.0));
     }
-    Some(IndexMeta {
+    IndexMeta {
         name: def.base.index_name.clone(),
         table,
         column,
@@ -3365,7 +3422,7 @@ pub fn index_meta_of(def: &IndexDefValue, tables: &[TableLayout]) -> Option<Inde
         // The id the reference's record carries; `Catalog::indexes` fills
         // in a fallback for a record that has none.
         id: def.index_id.unwrap_or(0),
-    })
+    }
 }
 
 /// Rebuilds `TableMeta`s from a C++-layout catalog (for comparison with the
@@ -3738,7 +3795,8 @@ mod tests {
         assert!(imported
             .list_databases()
             .unwrap()
-            .contains(&"default_db".to_string()));
+            .iter()
+            .any(|i| i == "default_db"));
         let t = imported.get_table_by_name("default_db.t").unwrap().unwrap();
         assert_eq!(t.columns, columns);
         // Types round-trip through the reverse mapping.

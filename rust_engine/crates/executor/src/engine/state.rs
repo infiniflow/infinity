@@ -6779,9 +6779,12 @@ pub(crate) struct Context {
     pub(crate) block_map_misses: std::sync::atomic::AtomicU64,
     /// session/global configuration set via `SET CONFIG …`
     pub(crate) config: Mutex<HashMap<String, String>>,
-    /// `[buffer] memindex_memory_quota`, in bytes. `0` disables the dump
-    /// trigger (the reference only dumps when a quota is configured).
-    pub(crate) memindex_quota: std::sync::atomic::AtomicU64,
+    /// `[buffer] unsealed_memory_quota`, in bytes. `0` disables the periodic
+    /// quota trigger.
+    pub(crate) unsealed_memory_quota: std::sync::atomic::AtomicU64,
+    /// Serialises `reclaim_unsealed` rounds (both periodic and RSS-pressure
+    /// triggered) so concurrent writers do not dump the same tables twice.
+    pub(crate) unsealed_reclaim_lock: tokio::sync::Mutex<()>,
     /// Process RSS ceiling (`0` = unset). The cleanup pass reads it and, when
     /// the process is over it, gives the mapped pages back instead of waiting
     /// for an index to go idle - the difference between a slow query and an OOM
@@ -6985,6 +6988,10 @@ pub struct Engine {
     /// check (`ddl_commit_with_effects`), so those commit phases are ordered by
     /// the transaction manager's conflict matrix instead of this lock.
     pub(crate) ddl_lock: tokio::sync::Mutex<()>,
+    /// Per-table DDL lock held across `commit_at` for index DDLs (`CreateIndex`,
+    /// `DropIndex`) so same-table index mutations serialize without blocking
+    /// unrelated tables from coalescing in `sync_wal_grouped`.
+    pub(crate) table_ddl_locks: Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     /// Optional background task processor (`BGTaskProcessor`). When attached,
     /// the memindex quota queues a real `DumpMemIndexTask`; otherwise the
     /// quota is enforced synchronously.
