@@ -59,6 +59,36 @@ fn parse_cpu_list(_path: &str) -> Option<Vec<usize>> {
     None
 }
 
+/// The P-cores to bind the async query workers to, or `None` when the process
+/// should use every CPU.
+///
+/// On a hybrid CPU (Intel P/E-core) the two core kinds differ by ~2.4x on an
+/// HNSW query here (measured: 7462 QPS on `0-7` vs 3061 QPS on `8-15` for the
+/// same binary and load, at the same total CPU usage). Tokio's work-stealing
+/// hands a query to whichever worker is free, so without pinning a single query
+/// that lands on an E-core stretches the client's wait and pulls the whole
+/// 8-client throughput down - more logical cores in use, less work done.
+///
+/// Hence pinning is the **default**, not an opt-in: `INFINITY_PIN_PCORES=0`
+/// turns it off, and a machine with one core class is unaffected because
+/// `cpu_core` either does not exist or covers every CPU.
+///
+/// Only the workers are pinned (see `start`); `spawn_blocking` and the
+/// background loops keep every core, since index builds and compaction are
+/// pure throughput and benefit from the E-cores.
+fn p_cores_to_pin(total_cpus: usize) -> Option<Vec<usize>> {
+    let enabled = std::env::var("INFINITY_PIN_PCORES")
+        .map(|v| v.trim() != "0")
+        .unwrap_or(true);
+    if !enabled {
+        return None;
+    }
+    // `cpu_core` is the P-core set on a hybrid CPU and absent elsewhere. A set
+    // covering every CPU means there is no second class to avoid, so there is
+    // nothing to pin.
+    parse_cpu_list("/sys/devices/cpu_core/cpus").filter(|cpus| cpus.len() < total_cpus)
+}
+
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 pub struct TaskScheduler {
@@ -70,14 +100,7 @@ impl TaskScheduler {
         let total_cpus = std::thread::available_parallelism()
             .map(|n| n.get())
             .unwrap_or(1);
-        let pin_enabled = std::env::var("INFINITY_PIN_PCORES")
-            .map(|v| v.trim() != "0")
-            .unwrap_or(true);
-        let p_cores = if pin_enabled {
-            parse_cpu_list("/sys/devices/cpu_core/cpus").filter(|cpus| cpus.len() < total_cpus)
-        } else {
-            None
-        };
+        let p_cores = p_cores_to_pin(total_cpus);
         // `TaskScheduler::Init`: `min(hardware_concurrency, CPULimit)` workers.
         // On hybrid P/E-core CPUs, default worker count to the P-core count so
         // async query workers stay on P-cores instead of spilling to E-cores.
@@ -359,6 +382,57 @@ mod tests {
         let first = scheduler() as *const TaskScheduler;
         let second = scheduler() as *const TaskScheduler;
         assert_eq!(first, second);
+    }
+
+    /// `parse_cpu_list` reads both the kernel's forms and rejects garbage.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn cpu_list_parses_ranges_and_singletons() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpus");
+        std::fs::write(&path, "0-7\n").unwrap();
+        assert_eq!(
+            parse_cpu_list(path.to_str().unwrap()),
+            Some((0..=7).collect())
+        );
+        std::fs::write(&path, "0-3,8,10-11\n").unwrap();
+        assert_eq!(
+            parse_cpu_list(path.to_str().unwrap()),
+            Some(vec![0, 1, 2, 3, 8, 10, 11])
+        );
+        std::fs::write(&path, "\n").unwrap();
+        assert_eq!(parse_cpu_list(path.to_str().unwrap()), None);
+        assert_eq!(parse_cpu_list("/nonexistent/cpus"), None);
+    }
+
+    /// Pinning the async workers to the P-cores is the default. A hybrid CPU
+    /// exposes `cpu_core` as a proper subset; without pinning, one query that
+    /// lands on an E-core stretches the client's wait and drops the throughput.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn p_cores_are_pinned_by_default() {
+        let hybrid = std::path::Path::new("/sys/devices/cpu_core/cpus").exists()
+            && parse_cpu_list("/sys/devices/cpu_core/cpus").is_some_and(|cpus| {
+                cpus.len() < std::thread::available_parallelism().unwrap().get()
+            });
+        if !hybrid {
+            // A uniform machine has nothing to pin; the function must say so
+            // rather than inventing a subset.
+            assert_eq!(p_cores_to_pin(8), None);
+            return;
+        }
+        // The environment is unset here on purpose: `INFINITY_PIN_PCORES` is
+        // documented as an off switch, so its absence must mean "pin".
+        assert!(
+            std::env::var("INFINITY_PIN_PCORES").is_err(),
+            "this test asserts the unset default"
+        );
+        let pinned = p_cores_to_pin(std::thread::available_parallelism().unwrap().get());
+        assert!(pinned.is_some(), "P-core pinning must be on by default");
+        assert!(
+            pinned.unwrap().len() < std::thread::available_parallelism().unwrap().get(),
+            "only the P-core subset is pinned"
+        );
     }
 
     /// `block_on_runtime` must not be reachable from inside the runtime.

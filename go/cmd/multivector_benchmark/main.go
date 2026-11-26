@@ -167,6 +167,15 @@ func main() {
 		}
 		fmt.Printf("INDEX %s build %.4f\n", idx.kind, time.Since(start).Seconds())
 
+		// Seal the index before timing queries. Intent: both engines must be
+		// measured on the sealed shape - the reference writes the chunk inside
+		// `CREATE INDEX`, this engine only in a `DumpMemIndex` transaction
+		// (`FLUSH DATA` is a checkpoint). Skipping it would time this engine's
+		// memory tail, where a lock gates every query.
+		if _, err := tbl.DumpIndex("idx_" + idx.kind); err != nil {
+			log.Fatalf("dump index %s: %v", idx.kind, err)
+		}
+
 		if _, err := tbl.Output([]string{"id"}).MatchTensor("mv", query, "float", 10, nil).ToResult(); err != nil {
 			log.Fatalf("warmup query %s: %v", idx.kind, err)
 		}

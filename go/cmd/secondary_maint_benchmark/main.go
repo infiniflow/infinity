@@ -121,6 +121,14 @@ func main() {
 			if _, err := tbl.CreateIndex(s.idx, infinity.NewIndexInfo(s.column, infinity.IndexTypeSecondary, nil), infinity.ConflictTypeError, ""); err != nil {
 				log.Fatalf("create index %s: %v", s.idx, err)
 			}
+			// Seal the index before the DML. Intent: both engines must be
+			// measured on the sealed shape - the reference writes the chunk
+			// inside `CREATE INDEX`, this engine only in a `DumpMemIndex`
+			// transaction (`FLUSH DATA` is a checkpoint). Measured on a tail,
+			// the maintenance cost would include this engine's lock instead.
+			if _, err := tbl.DumpIndex(s.idx); err != nil {
+				log.Fatalf("dump index %s: %v", s.idx, err)
+			}
 		}
 		lo := step * rowsPerStep
 		hi := lo + rowsPerStep

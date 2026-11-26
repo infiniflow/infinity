@@ -159,6 +159,17 @@ func main() {
 		return err
 	})
 
+	// Seal the three indexes before timing lookups. Intent: both engines must
+	// be measured on the sealed shape - the reference writes the chunk inside
+	// `CREATE INDEX`, this engine only in a `DumpMemIndex` transaction
+	// (`FLUSH DATA` is a checkpoint). Skipping it would time this engine's
+	// memory tails, where a lock gates every lookup.
+	for _, name := range []string{"idx_score", "idx_name", "idx_id"} {
+		if _, err := tbl.DumpIndex(name); err != nil {
+			log.Fatalf("dump index %s: %v", name, err)
+		}
+	}
+
 	uniquePoint := func() error {
 		for i := 0; i < points; i++ {
 			if _, err := tbl.Output([]string{"id", "name"}).Filter(fmt.Sprintf("id = %d", i*499)).ToResult(); err != nil {

@@ -14,6 +14,8 @@ import (
 	infinity "github.com/infiniflow/infinity-go-sdk"
 )
 
+const hnswIndexName = "idx_hnsw"
+
 func readFvecs(path string, maxN int) ([][]float64, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -126,6 +128,7 @@ func main() {
 	queryPath := flag.String("query-path", "", "override query fvecs path")
 	gtPath := flag.String("gt-path", "", "override groundtruth ivecs path")
 	ciOut := flag.Bool("ci", false, "emit 'Total cost : <sec> s' lines for CI regression checks")
+	dumpIndex := flag.Bool("dump-index", true, "seal the index into a chunk before querying (both engines then measure the sealed path)")
 	flag.Parse()
 
 	dim := *dimFlag
@@ -237,7 +240,7 @@ func main() {
 				"encode":          *encode,
 			},
 		)
-		if _, err := tbl.CreateIndex("idx_hnsw", idxInfo, infinity.ConflictTypeError, ""); err != nil {
+		if _, err := tbl.CreateIndex(hnswIndexName, idxInfo, infinity.ConflictTypeError, ""); err != nil {
 			log.Fatalf("create_index: %v", err)
 		}
 		buildSec := time.Since(t0).Seconds()
@@ -249,6 +252,22 @@ func main() {
 		tbl, err = db.GetTable(tableName)
 		if err != nil {
 			log.Fatalf("get table: %v", err)
+		}
+	}
+
+	// Seal the index before timing anything. Intent: every engine under this
+	// benchmark must be measured in the *same* shape, and that shape is the
+	// sealed one. The reference writes the chunk inside `CREATE INDEX`
+	// (`PopulateHnswIndexInner` ends with `memory_hnsw_index->Dump`); this
+	// engine keeps the rows as a memory tail and publishes it only in a
+	// `DumpMemIndex` transaction (`FLUSH DATA` is just a checkpoint). Without
+	// this call the two engines would be timed on different paths: this one on
+	// the tail, where every query takes a `tokio::sync::Mutex` and the numbers
+	// measure that lock instead of the graph. So the dump is part of "the index
+	// is built" here, not an optional extra.
+	if *dumpIndex && !*skipImport {
+		if _, err := tbl.DumpIndex(hnswIndexName); err != nil {
+			log.Fatalf("dump index: %v", err)
 		}
 	}
 
