@@ -247,6 +247,10 @@ impl MappedFile {
         let Some(map) = &self.map else {
             return 0;
         };
+        // The mapping is only touched by the Unix branch below: Windows has no
+        // page-release primitive here, and the accounting below still applies.
+        #[cfg(not(unix))]
+        let _ = map;
         #[cfg(unix)]
         {
             // SAFETY: every mapping this process makes is read-only over an
