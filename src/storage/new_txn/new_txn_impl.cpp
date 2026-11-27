@@ -4093,7 +4093,15 @@ bool NewTxn::CheckConflictTxnStore(const DumpMemIndexTxnStore &txn_store, NewTxn
     bool conflict = false;
     switch (previous_txn->base_txn_store_->type_) {
         case TransactionType::kDumpMemIndex: {
-            UnrecoverableError("There should be no concurrent dump txns.");
+            // Concurrent dump transactions are a legal (if rare) race, e.g. a capacity-triggered
+            // background dump overlapping with an explicit DUMP INDEX on another index. Treat it
+            // as a retryable conflict instead of aborting the whole process: the background dump
+            // loop retries on kTxnConflict, and interactive callers get a retryable error.
+            LOG_WARN(fmt::format("Concurrent dump txns detected ({} vs in-flight {}), reported as retryable conflict.",
+                                 txn_store.ToString(),
+                                 previous_txn->base_txn_store_->ToString()));
+            retry_query = true;
+            conflict = true;
             break;
         }
         case TransactionType::kDropIndex: {
@@ -4884,9 +4892,15 @@ Status NewTxn::PostRollback(TxnTimeStamp abort_ts) {
                 }
             }
 
+            // CleanupInner is not idempotent (a partial success followed by a full retry would
+            // double-release), so do a single attempt: log loudly and survive. Leftover chunk
+            // metadata is reconciled on the next startup by RecoverMemIndex — the same safety
+            // net used by the "mem index already replaced" branch above.
             status = CleanupInner(metas);
             if (!status.ok()) {
-                UnrecoverableError("During PostRollback, cleanup failed.");
+                LOG_ERROR(fmt::format("DumpMemIndex rollback cleanup failed: {}. "
+                                      "Leftover chunk metadata will be reconciled on next startup.",
+                                      status.message()));
             }
             dump_index_txn_store->dumped_mem_indexes_.clear();
             break;

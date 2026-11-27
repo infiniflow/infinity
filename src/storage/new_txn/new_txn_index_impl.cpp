@@ -367,6 +367,12 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
         base_rowid = RowID(segment_id, 0);
         RowID last_rowid = base_rowid;
         ChunkIndexMetaInfo *chunk_info_ptr = nullptr;
+        // Degrade on a non-contiguous chunk catalog instead of aborting the process:
+        // merge only the contiguous prefix (the same policy the fulltext path below uses
+        // for gaps). A non-contiguous catalog can be left behind by an interrupted dump
+        // rollback; since optimize runs periodically, a fatal error here turns into a
+        // crash loop. The abnormal tail is left for startup reconciliation (RecoverMemIndex).
+        size_t merge_upto = 0;
         for (ChunkID old_chunk_id : *old_chunk_ids_ptr) {
             ChunkIndexMeta old_chunk_meta(old_chunk_id, segment_index_meta);
             status = old_chunk_meta.GetChunkInfo(chunk_info_ptr);
@@ -374,13 +380,25 @@ Status NewTxn::OptimizeIndexInner(SegmentIndexMeta &segment_index_meta,
                 return status;
             }
             if (last_rowid != chunk_info_ptr->base_row_id_) {
-                UnrecoverableError("OptimizeIndex: base_row_id is not continuous");
+                LOG_ERROR(fmt::format("OptimizeIndex: base_row_id is not continuous at chunk {} (expect {:016x}, got {:016x}), "
+                                      "merging contiguous prefix only. segment_id={}",
+                                      old_chunk_id,
+                                      last_rowid.ToUint64(),
+                                      chunk_info_ptr->base_row_id_.ToUint64(),
+                                      segment_id));
+                break;
             }
             last_rowid.segment_offset_ += chunk_info_ptr->row_cnt_;
             row_cnt += chunk_info_ptr->row_cnt_;
             row_cnts.push_back(chunk_info_ptr->row_cnt_);
+            ++merge_upto;
         }
-        deprecate_ids = *old_chunk_ids_ptr;
+        if (merge_upto <= 1) {
+            // Fewer than two contiguous chunks — skip this merge round rather than
+            // operating on a known-abnormal catalog.
+            return Status::OK();
+        }
+        deprecate_ids.assign(old_chunk_ids_ptr->begin(), old_chunk_ids_ptr->begin() + merge_upto);
     }
     ChunkID chunk_id = 0;
     std::tie(chunk_id, status) = segment_index_meta.GetAndSetNextChunkID();
@@ -2226,12 +2244,17 @@ Status NewTxn::OptimizeFtIndex(std::shared_ptr<IndexBase> index_base,
             chunk_ids.erase(iter, chunk_ids.end());
             break;
         } else if (chunk_info_ptr->base_row_id_ < expect_base_row_id) {
+            // A backwards base_row_id (overlap) can be left by an interrupted dump rollback
+            // followed by a later dump re-taking the same base. Degrade exactly like the gap
+            // branch above: truncate to the contiguous prefix and continue, instead of
+            // aborting the process (optimize is periodic; a fatal here is a crash loop).
             msg += fmt::format(" found overlap to chunk {}, expect_base_row_id: {:016x}, base_row_id: {:016x}",
                                chunk_info_ptr->base_name_,
                                expect_base_row_id.ToUint64(),
                                chunk_info_ptr->base_row_id_.ToUint64());
-            UnrecoverableError(msg);
-            return Status::OK();
+            LOG_ERROR(msg);
+            chunk_ids.erase(iter, chunk_ids.end());
+            break;
         }
         msg += " " + chunk_info_ptr->base_name_;
         base_names.push_back(chunk_info_ptr->base_name_);
