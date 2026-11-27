@@ -43,11 +43,25 @@ private:
     void Process();
 
 private:
+    // Waits out a backoff delay in small slices, checking stopping_ between
+    // slices: the stop task sits in the queue behind a sleeping DoDump and
+    // cannot preempt it, so only the sleeper itself can keep Stop() prompt.
+    void WaitBackoff(i64 delay_ms);
+
+private:
     BlockingQueue<std::shared_ptr<BGTask>> task_queue_{"DumpIndexProcessor", 1024 * 1024};
 
     std::thread processor_thread_{};
 
     std::atomic<u64> task_count_{};
+
+    std::atomic<bool> stopping_{false};
 };
+
+// Exponential backoff between dump attempts, in milliseconds: 0.5s doubling
+// per failure, capped at 30s. failed_attempts is the number of attempts
+// already made, so the delay before the first retry is 500ms; values <= 0
+// yield 0. Extracted as a function so the schedule is unit-testable.
+export i64 DumpBackoffDelayMs(i64 failed_attempts);
 
 } // namespace infinity
