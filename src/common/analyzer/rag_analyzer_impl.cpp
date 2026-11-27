@@ -20,6 +20,9 @@ module;
 #include <openccxx.h>
 #include <pcre2.h>
 
+// Standard headers go before string_utils.h, which imports std.
+#include "unicode_nfc.h"
+
 #include "string_utils.h"
 
 module infinity_core:rag_analyzer.impl;
@@ -1905,12 +1908,18 @@ std::string PCRE2GlobalReplace(const std::string &text, const std::string &patte
 }
 
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
+    // Compose decomposed (NFD) text first, as rag_tokenizer.py does, so the
+    // tokens match Python's; FoldDiacritics and the Latin lowercase table also
+    // only know composed letters.
+    const std::optional<std::string> nfc_line = NormalizeNFC(line);
+    const std::string &source = nfc_line ? *nfc_line : line;
+
     // Fold diacritics to ASCII before any other processing when the
     // language asks for it (Slovak, Czech).
     std::string folded_line;
-    const std::string *input = &line;
+    const std::string *input = &source;
     if (fold_diacritics_) {
-        folded_line = FoldDiacritics(line);
+        folded_line = FoldDiacritics(source);
         input = &folded_line;
     }
 
@@ -1987,6 +1996,13 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
 }
 
 std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> RAGAnalyzer::TokenizeWithPosition(const std::string &line) {
+    // Compose decomposed (NFD) text first, as rag_tokenizer.py does. NFC can
+    // shorten or lengthen line; nfc_pos_mapping recovers offsets on line, and
+    // is only filled when NFC changed the text.
+    std::vector<unsigned> nfc_pos_mapping;
+    const std::optional<std::string> nfc_line = NormalizeNFC(line, &nfc_pos_mapping);
+    const std::string &source = nfc_line ? *nfc_line : line;
+
     // Fold diacritics to ASCII before any other processing when the
     // language asks for it (Slovak, Czech). Folding shrinks 2-byte UTF-8
     // letters to 1-byte ASCII, so byte offsets shift; like the StrQ2B and
@@ -1994,10 +2010,10 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     // original input.
     std::string folded_line;
     std::vector<unsigned> fold_pos_mapping;
-    const std::string *input = &line;
+    const std::string *input = &source;
     if (fold_diacritics_) {
-        folded_line = FoldDiacritics(line);
-        BuildPositionMapping(line, folded_line, fold_pos_mapping);
+        folded_line = FoldDiacritics(source);
+        BuildPositionMapping(source, folded_line, fold_pos_mapping);
         input = &folded_line;
     }
 
@@ -2046,10 +2062,15 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         final_pos_mapping[strline.size()] = static_cast<unsigned>(input->size());
     }
 
-    // Remap folded-line offsets back to the original input.
+    // Remap folded-line offsets back to the NFC form, then to the original input.
     if (fold_diacritics_) {
         for (auto &pos : final_pos_mapping) {
-            pos = pos < fold_pos_mapping.size() ? fold_pos_mapping[pos] : static_cast<unsigned>(line.size());
+            pos = pos < fold_pos_mapping.size() ? fold_pos_mapping[pos] : static_cast<unsigned>(source.size());
+        }
+    }
+    if (nfc_line) {
+        for (auto &pos : final_pos_mapping) {
+            pos = pos < nfc_pos_mapping.size() ? nfc_pos_mapping[pos] : static_cast<unsigned>(line.size());
         }
     }
 
@@ -2480,6 +2501,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             std::istringstream iss(token);
             std::string sub_token;
             unsigned sub_start = start_pos;
+            const std::size_t first = fine_positions.size();
 
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
@@ -2488,6 +2510,13 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                     fine_positions.emplace_back(sub_start, sub_end);
                     sub_start = sub_end + 1;
                 }
+            }
+            // The token can be shorter than its input (NFC, folding, stemming,
+            // lemmatization), so its last part ends where the coarse token
+            // does, and never before it starts.
+            if (fine_positions.size() > first) {
+                auto &last = fine_positions.back();
+                last.second = std::max(end_pos, last.first);
             }
         }
 

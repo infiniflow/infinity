@@ -14,6 +14,7 @@
 
 module;
 
+#include "common/analyzer/unicode_nfc.h"
 #include "unit_test/gtest_expand.h"
 
 module infinity_core:ut.rag_analyzer;
@@ -639,6 +640,233 @@ TEST_F(RAGAnalyzerTest, test_slovak_tokenize_with_position) {
     // "daňové" spans bytes [7, 15) of the original input.
     EXPECT_EQ(positions[1].first, 7u);
     EXPECT_EQ(positions[1].second, 15u);
+}
+
+TEST_F(RAGAnalyzerTest, test_nfd_input_parity_with_python) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // Decomposed (NFD) input tokenizes like its NFC form, as in
+    // rag_tokenizer.py. Without NFC the tokens would keep their combining
+    // marks apart from the letters, unlike Python's, and FoldDiacritics and
+    // the Latin lowercase table only know composed letters.
+    const std::pair<std::string, std::string> cases[] = {
+        {"to\u0302i đang ho\u0323c tie\u0302\u0301ng Vie\u0323\u0302t", "tôi đang học tiếng việt"},
+        {"Hoa\u0300 gia\u0309i đa\u0303 đu\u031Bo\u031B\u0323c", "hoà giải đã được"},
+        // The marks come in either order.
+        {"a\u0302\u0323", "ậ"},
+        {"a\u0323\u0302", "ậ"},
+        {"ĐU\u031BO\u031B\u0300NG PHO\u0302\u0301", "đường phố"},
+        // A tone mark after an already composed letter.
+        {"ê\u0323 ơ\u0323 Ư\u0300", "ệ ợ ừ"},
+        // Hangul conjoining jamo.
+        {"\u1112\u1161\u11AB\u1100\u1173\u11AF", "한글"},
+        // A CJK compatibility ideograph and the Kelvin sign have singleton
+        // decompositions: U+F900 becomes U+8C48, U+212A becomes K.
+        {"中国\uF900人", "中国 岂 人"},
+        {"\u212Am", "km"},
+    };
+    for (const auto &[input, expected] : cases) {
+        std::string cxx_result = analyzer_->Tokenize(input);
+        EXPECT_EQ(cxx_result, expected);
+        EXPECT_EQ(cxx_result, PythonTokenize(input));
+    }
+
+    // NFC runs before the Slovak/Czech folding, which only knows composed
+    // letters.
+    analyzer_->SetLanguage("slovak");
+    std::string cxx_result = analyzer_->Tokenize("s\u030Ckola");
+    EXPECT_EQ(cxx_result, "skola");
+    EXPECT_EQ(cxx_result, PythonTokenize("s\u030Ckola", "-l slovak"));
+}
+
+TEST_F(RAGAnalyzerTest, test_nfd_tokenize_with_position) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // The tokens of the NFC form, with byte offsets in the original input,
+    // which is longer than its NFC form ("Vie" U+0323 U+0302 "t" is 8 bytes,
+    // "Việt" 6). Stray marks that NFC cannot compose are left out: PCRE2
+    // counts them as word characters, while Python splits at them, and the
+    // Rust port at all but Other_Alphabetic marks.
+    struct Case {
+        std::string input;
+        std::vector<std::string> tokens;
+        std::vector<std::pair<unsigned, unsigned>> positions;
+    };
+    const Case cases[] = {
+        {"Vie\u0323\u0302t Nam", {"việt", "nam"}, {{0, 8}, {9, 12}}},
+        {"ĐU\u031BO\u031B\u0300NG PHO\u0302\u0301", {"đường", "phố"}, {{0, 12}, {13, 20}}},
+        {"中国\uF900人", {"中国", "岂", "人"}, {{0, 6}, {6, 9}, {9, 12}}},
+        // U+212A is 3 bytes, K is 1.
+        {"a \u212Am", {"a", "km"}, {{0, 1}, {2, 6}}},
+    };
+    for (const auto &[input, tokens, positions] : cases) {
+        auto [actual_tokens, actual_positions] = analyzer_->TokenizeWithPosition(input);
+        EXPECT_EQ(actual_tokens, tokens);
+        EXPECT_EQ(actual_positions, positions);
+    }
+
+    // Composition, then folding: two position mappings chained.
+    analyzer_->SetLanguage("slovak");
+    auto [tokens, positions] = analyzer_->TokenizeWithPosition("s\u030Ckola");
+    ASSERT_EQ(tokens.size(), 1u);
+    EXPECT_EQ(tokens[0], "skola");
+    ASSERT_EQ(positions.size(), 1u);
+    EXPECT_EQ(positions[0].first, 0u);
+    EXPECT_EQ(positions[0].second, 7u);
+}
+
+TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // A fine-grained token that is shorter than its input keeps the span of
+    // its coarse token: NFC ("Vie" U+0323 U+0302 "t" is 8 bytes, "việt" 6),
+    // stemming and lemmatization ("running" is 7 bytes, "run" 3).
+    struct Case {
+        std::string input;
+        std::vector<std::string> tokens;
+        std::vector<std::pair<unsigned, unsigned>> positions;
+    };
+    const Case cases[] = {
+        {"Vie\u0323\u0302t Nam", {"việt", "nam"}, {{0, 8}, {9, 12}}},
+        {"The running dogs are barking loudly",
+         {"the", "run", "dog", "are", "bark", "loud"},
+         {{0, 3}, {4, 11}, {12, 16}, {17, 20}, {21, 28}, {29, 35}}},
+    };
+    for (const auto &[input, tokens, positions] : cases) {
+        auto [coarse_tokens, coarse_positions] = analyzer_->TokenizeWithPosition(input);
+        std::string coarse;
+        for (const auto &token : coarse_tokens) {
+            coarse += (coarse.empty() ? "" : " ") + token;
+        }
+        std::vector<std::string> fine_tokens;
+        std::vector<std::pair<unsigned, unsigned>> fine_positions;
+        analyzer_->FineGrainedTokenizeWithPosition(coarse, coarse_positions, fine_tokens, fine_positions);
+        EXPECT_EQ(fine_tokens, tokens);
+        EXPECT_EQ(fine_positions, positions);
+    }
+
+    // A last part that starts past the coarse end gets an empty span, not an
+    // inverted one.
+    const std::vector<std::pair<unsigned, unsigned>> ab_cd_positions = {{0, 2}};
+    std::vector<std::string> fine_tokens;
+    std::vector<std::pair<unsigned, unsigned>> fine_positions;
+    analyzer_->FineGrainedTokenizeWithPosition("ab/cd", ab_cd_positions, fine_tokens, fine_positions);
+    EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"}));
+    EXPECT_EQ(fine_positions, (std::vector<std::pair<unsigned, unsigned>>{{0, 2}, {3, 3}}));
+}
+
+TEST_F(RAGAnalyzerTest, test_nfd_large_token_tokenize) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // 7 000 NFD "é" (21 000 bytes, 14 000 once composed, more than the
+    // 12 288-byte lowercase buffer) stay one token.
+    std::string input;
+    std::string expected;
+    for (int i = 0; i < 7000; ++i) {
+        input += "e\u0301";
+        expected += "é";
+    }
+    EXPECT_EQ(analyzer_->Tokenize(input), expected);
+    EXPECT_EQ(PythonTokenize(input), expected);
+    auto [tokens, positions] = analyzer_->TokenizeWithPosition(input);
+    ASSERT_EQ(tokens.size(), 1u);
+    EXPECT_EQ(tokens[0], expected);
+    ASSERT_EQ(positions.size(), 1u);
+    EXPECT_EQ(positions[0].first, 0u);
+    EXPECT_EQ(positions[0].second, static_cast<unsigned>(input.size()));
+    std::vector<std::string> fine;
+    analyzer_->FineGrainedTokenize(analyzer_->Tokenize(input), fine);
+    ASSERT_EQ(fine.size(), 1u);
+    EXPECT_EQ(fine[0], expected);
+    EXPECT_EQ(PythonTokenize(input, "--fine-grained"), expected);
+}
+
+TEST_F(RAGAnalyzerTest, test_nfc_position_map) {
+    // Every byte of the NFC form maps back to the input byte it comes from,
+    // and a code point that NFC expands or moves maps past the input bytes
+    // taken in before it.
+    struct Case {
+        std::string input;
+        std::string expected;
+        std::vector<unsigned> pos_map;
+    };
+    const Case cases[] = {
+        // U+1EC7 (3 bytes) comes from e U+0323 U+0302 (5 bytes).
+        {"Vie\u0323\u0302t", "Việt", {0, 1, 2, 2, 2, 7, 8}},
+        // U+212A (3 bytes) becomes K (1 byte).
+        {"a \u212Am", "a Km", {0, 1, 2, 5, 6}},
+        // U+0958 expands to U+0915 U+093C; the U+093C maps past the U+0958.
+        {"\u0958x", "\u0915\u093Cx", {0, 0, 0, 3, 3, 3, 3, 4}},
+        // The Hindi word for film, U+095E first.
+        {"\u095E\u093F\u0932\u094D\u092E", "\u092B\u093C\u093F\u0932\u094D\u092E", {0, 0, 0, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}},
+        // Marks typed out of canonical order: U+1EB9 takes in the U+0323 at
+        // bytes [3, 5), so the U+0301 after it maps to 5.
+        {"e\u0301\u0323", "ẹ\u0301", {0, 0, 0, 5, 5, 5}},
+        // A byte that is not UTF-8 is copied as it is, between two segments.
+        {"e\u0301\xFF"
+         "e\u0301",
+         "é\xFFé",
+         {0, 0, 3, 4, 4, 7}},
+        // A truncated sequence at the end.
+        {"e\u0301\xCC", "é\xCC", {0, 0, 3, 4}},
+    };
+    for (const auto &[input, expected, expected_map] : cases) {
+        std::vector<unsigned> pos_map;
+        const std::optional<std::string> actual = NormalizeNFC(input, &pos_map);
+        ASSERT_TRUE(actual.has_value()) << input;
+        EXPECT_EQ(*actual, expected) << input;
+        EXPECT_EQ(pos_map, expected_map) << input;
+    }
+}
+
+TEST_F(RAGAnalyzerTest, test_nfc_matches_python) {
+    // NormalizeNFC against unicodedata.normalize("NFC") of Python 3.13, whose
+    // Unicode version (15.1.0) is the one of the generated tables, on the
+    // cases generate_unicode_nfc.py --cases prints: one "input;NFC" line per
+    // case, code points in hex. The Rust port checks the same cases.
+    FILE *pipe = popen("uv run --no-project --python 3.13 tools/generate_unicode_nfc.py --cases", "r");
+    ASSERT_NE(pipe, nullptr);
+    std::string output;
+    char buffer[4096];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        output += buffer;
+    }
+    pclose(pipe);
+
+    const auto chars_from_hex = [](const std::string &field) {
+        std::string text;
+        std::istringstream hex_values(field);
+        std::string hex;
+        while (hex_values >> hex) {
+            nfc_detail::EncodeUTF8(static_cast<char32_t>(std::stoul(hex, nullptr, 16)), text);
+        }
+        return text;
+    };
+    std::istringstream lines(output);
+    std::string line;
+    std::size_t count = 0;
+    while (std::getline(lines, line)) {
+        const std::size_t semicolon = line.find(';');
+        ASSERT_NE(semicolon, std::string::npos) << line;
+        const std::string input = chars_from_hex(line.substr(0, semicolon));
+        const std::string expected = chars_from_hex(line.substr(semicolon + 1));
+        std::vector<unsigned> pos_map;
+        const std::optional<std::string> actual = NormalizeNFC(input, &pos_map);
+        EXPECT_EQ(actual.value_or(input), expected) << line;
+        // NFC text comes back as nothing, not as a copy.
+        EXPECT_EQ(actual.has_value(), input != expected) << line;
+        if (actual) {
+            EXPECT_EQ(pos_map.size(), actual->size() + 1) << line;
+            EXPECT_EQ(pos_map.back(), static_cast<unsigned>(input.size())) << line;
+            EXPECT_TRUE(std::is_sorted(pos_map.begin(), pos_map.end())) << line;
+        }
+        ++count;
+    }
+    EXPECT_GT(count, 4000u);
 }
 
 TEST_F(RAGAnalyzerTest, test_chinese_stopword_filter) {

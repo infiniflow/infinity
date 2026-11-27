@@ -44,6 +44,8 @@ pub mod sparsegram;
 pub mod standard;
 pub mod tokenizer;
 pub mod traditional;
+mod unicode_nfc;
+mod unicode_nfc_data;
 pub mod whitespace;
 
 pub use chinese::*;

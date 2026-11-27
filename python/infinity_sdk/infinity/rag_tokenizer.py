@@ -492,6 +492,11 @@ class RagTokenizer:
         return txt_lang_pairs
 
     def tokenize(self, line: str) -> str:
+        # Compose decomposed (NFD) text first: combining marks are \W, so the
+        # NFD of 'tiếng' would be cut into 'tie ng'. The C++ analyzer and its
+        # Rust port do the same with tables generated from unicodedata by
+        # tools/generate_unicode_nfc.py.
+        line = unicodedata.normalize("NFC", line)
         if self._fold_diacritics:
             line = fold_diacritics(line)
         line = re.sub(r"\W+", " ", line)

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::*;
+use crate::unicode_nfc::normalize_nfc;
 
 /// C++: `DartsTrie` (`darts_trie_impl.cpp`) over a Darts-clone unit array.
 ///
@@ -207,6 +208,10 @@ impl RAGAnalyzer {
 
     /// C++: `RAGAnalyzer::Tokenize` — returns the space-joined token stream.
     pub fn tokenize(&self, line: &str) -> String {
+        // Compose decomposed (NFD) text first, as rag_tokenizer.py does: the
+        // \W+ replacement would cut the combining marks out of their words.
+        let nfc = normalize_nfc(line, None);
+        let line = nfc.as_deref().unwrap_or(line);
         let folded = self.fold_diacritics.then(|| fold_diacritics(line));
         let input = folded.as_deref().unwrap_or(line);
 
@@ -298,17 +303,25 @@ impl RAGAnalyzer {
     /// C++: `RAGAnalyzer::TokenizeWithPosition` — the coarse token stream plus
     /// each token's byte span in the original input.
     ///
-    /// Positions survive diacritics folding, `\W+` replacement, `StrQ2B` and
-    /// OpenCC (identity here) through the same mapping chain as the reference.
+    /// Positions survive NFC, diacritics folding, `\W+` replacement, `StrQ2B`
+    /// and OpenCC (identity here) through the same mapping chain as the
+    /// reference.
     pub fn tokenize_with_position(&self, line: &str) -> (Vec<String>, Vec<(u32, u32)>) {
+        // Compose decomposed (NFD) text first, as rag_tokenizer.py does.
+        // `nfc_map` takes NFC offsets back to `line`; it is only filled when
+        // NFC changed the text.
+        let mut nfc_map = Vec::new();
+        let nfc = normalize_nfc(line, Some(&mut nfc_map));
+        let source = nfc.as_deref().unwrap_or(line);
+
         let folded;
         let mut fold_map: Option<Vec<u32>> = None;
         let input = if self.fold_diacritics {
-            folded = fold_diacritics(line);
-            fold_map = Some(build_position_mapping(line, &folded));
+            folded = fold_diacritics(source);
+            fold_map = Some(build_position_mapping(source, &folded));
             folded.as_str()
         } else {
-            line
+            source
         };
 
         let (processed, pcre2_map) = strip_non_word_with_position(input);
@@ -319,7 +332,8 @@ impl RAGAnalyzer {
         let opencc_map = build_position_mapping(&str1, &strline);
 
         // strline byte -> original input byte, through OpenCC -> StrQ2B ->
-        // the \W+ replacement -> diacritics folding, the reference's chain.
+        // the \W+ replacement -> diacritics folding -> NFC, the reference's
+        // chain.
         let mut final_map = Vec::with_capacity(strline.len() + 1);
         for i in 0..strline.len() {
             let str1_pos = opencc_map.get(i).copied().unwrap_or(str1.len() as u32) as usize;
@@ -337,6 +351,14 @@ impl RAGAnalyzer {
         if let Some(fold_map) = &fold_map {
             for pos in &mut final_map {
                 *pos = fold_map
+                    .get(*pos as usize)
+                    .copied()
+                    .unwrap_or(source.len() as u32);
+            }
+        }
+        if nfc.is_some() {
+            for pos in &mut final_map {
+                *pos = nfc_map
                     .get(*pos as usize)
                     .copied()
                     .unwrap_or(line.len() as u32);
@@ -475,13 +497,21 @@ impl RAGAnalyzer {
 
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
             for (i, token) in tks.iter().enumerate() {
-                let (start_pos, _) = positions[i];
+                let (start_pos, end_pos) = positions[i];
+                let first = fine_positions.len();
                 let mut sub_start = start_pos;
                 for sub_token in token.split('/').filter(|part| !part.is_empty()) {
                     let sub_end = sub_start + sub_token.len() as u32;
                     fine_tokens.push(sub_token.to_string());
                     fine_positions.push((sub_start, sub_end));
                     sub_start = sub_end + 1;
+                }
+                // The token can be shorter than its input (NFC, folding,
+                // stemming, lemmatization), so its last part ends where the
+                // coarse token does, and never before it starts.
+                if fine_positions.len() > first {
+                    let last = fine_positions.last_mut().expect("a part");
+                    last.1 = end_pos.max(last.0);
                 }
             }
             return (fine_tokens, fine_positions);
