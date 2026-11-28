@@ -827,6 +827,26 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
     EXPECT_EQ(fine_positions, (Spans{{0, 3}, {4, 4}}));
 }
 
+TEST_F(RAGAnalyzerTest, test_fine_grained_span_cuts_character) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // A span that cuts a character counts as changed only when NFC changes the
+    // input. The span (0, 2) ends inside U+00E9.
+    using Spans = std::vector<std::pair<unsigned, unsigned>>;
+    const std::pair<std::string, Spans> cases[] = {
+        {"x\u00e9", {{0, 2}, {3, 5}}},
+        {"x\u00e9 e\u0301", {{0, 2}, {3, 3}}},
+    };
+    for (const auto &[text, positions] : cases) {
+        std::vector<std::string> fine_tokens;
+        Spans fine_positions;
+        analyzer_->FineGrainedTokenizeWithPosition(text, "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
+        EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"})) << text;
+        EXPECT_EQ(fine_positions, positions) << text;
+    }
+}
+
 TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
     if (!analyzer_) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";

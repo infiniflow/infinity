@@ -2513,14 +2513,20 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
     }
 
     // NFC changed a token only if it changes the input bytes of its span; every
-    // other token gets the spans it had before NFC. A span outside the input
-    // counts as changed, as in the Rust port.
-    const bool text_composed = NormalizeNFC(text).has_value();
-    const auto composed = [&text, text_composed](unsigned start, unsigned end) {
-        if (!text_composed) {
-            return false;
+    // other token gets the spans it had before NFC. That needs no check of the
+    // whole input: NFC leaves every substring of an input it leaves unchanged as
+    // it is. A span that is inverted, out of range or cuts a character counts as
+    // changed when NFC changes the input, as in the Rust port.
+    std::optional<bool> text_composed;
+    const auto composed = [&text, &text_composed](unsigned start, unsigned end) {
+        const auto boundary = [&text](unsigned at) { return at == text.size() || (static_cast<unsigned char>(text[at]) & 0xC0) != 0x80; };
+        if (start <= end && end <= text.size() && boundary(start) && boundary(end)) {
+            return NormalizeNFC(std::string_view(text).substr(start, end - start)).has_value();
         }
-        return start > end || end > text.size() || NormalizeNFC(std::string_view(text).substr(start, end - start)).has_value();
+        if (!text_composed.has_value()) {
+            text_composed = NormalizeNFC(text).has_value();
+        }
+        return *text_composed;
     };
 
     if (zh_num < tks.size() * 0.2) {

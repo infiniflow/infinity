@@ -3597,6 +3597,24 @@ mod rag_analyzer_tests {
         assert_eq!(fine_positions, [(0, 3), (4, 4)]);
     }
 
+    /// C++: `test_fine_grained_span_cuts_character` — a span that cuts a
+    /// character counts as changed only when NFC changes the input. The span
+    /// (0, 2) ends inside U+00E9.
+    #[test]
+    fn test_fine_grained_span_cuts_character() {
+        let analyzer = load_analyzer();
+        let cases: [(&str, &[(u32, u32)]); 2] = [
+            ("x\u{e9}", &[(0, 2), (3, 5)]),
+            ("x\u{e9} e\u{301}", &[(0, 2), (3, 3)]),
+        ];
+        for (text, positions) in cases {
+            let (fine_tokens, fine_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, "ab/cd", &[(0, 2)]);
+            assert_eq!(fine_tokens, ["ab", "cd"], "text '{text}'");
+            assert_eq!(fine_positions, positions, "text '{text}'");
+        }
+    }
+
     /// C++: `test_fine_grained_chinese_split_span` — the parts of a Chinese
     /// token add up their lengths from the start of the coarse span, as before
     /// NFC, unless NFC changed the token. Then they do only when the token is

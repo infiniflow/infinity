@@ -502,14 +502,14 @@ impl RAGAnalyzer {
         let mut fine_tokens = Vec::new();
         let mut fine_positions = Vec::new();
         // NFC changed a token only if it changes the input bytes of its span;
-        // every other token gets the spans it had before NFC. A span that is
-        // out of range or cuts a character counts as changed.
-        let text_composed = normalize_nfc(text, None).is_some();
-        let composed = |(start, end): (u32, u32)| {
-            text_composed
-                && text
-                    .get(start as usize..end as usize)
-                    .is_none_or(|span| normalize_nfc(span, None).is_some())
+        // every other token gets the spans it had before NFC. That needs no check
+        // of the whole input: NFC leaves every substring of an input it leaves
+        // unchanged as it is. A span that is inverted, out of range or cuts a
+        // character counts as changed when NFC changes the input.
+        let text_composed = std::cell::OnceCell::new();
+        let composed = |(start, end): (u32, u32)| match text.get(start as usize..end as usize) {
+            Some(span) => normalize_nfc(span, None).is_some(),
+            None => *text_composed.get_or_init(|| normalize_nfc(text, None).is_some()),
         };
 
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
