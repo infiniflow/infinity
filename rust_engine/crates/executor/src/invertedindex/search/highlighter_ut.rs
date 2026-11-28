@@ -97,3 +97,54 @@ fn test4() {
         "{output}"
     );
 }
+
+/// A document stored decomposed (NFD) is highlighted over its own bytes when
+/// the query term is NFC, which is what the analyzer emits for any query.
+#[test]
+fn nfd_document_highlights_nfc_query() {
+    let raw_text = "tie\u{302}\u{301}ng vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng", raw_text, &analyzer());
+    assert_eq!(output, "<em>tie\u{302}\u{301}ng</em> vie\u{323}\u{302}t");
+}
+
+/// An NFD query goes through the analyzer first, so it reaches the highlighter
+/// as NFC and still finds the NFD document.
+#[test]
+fn nfd_document_highlights_nfd_query() {
+    let raw_text = "tie\u{302}\u{301}ng vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("vie\u{323}\u{302}t", raw_text, &analyzer());
+    assert_eq!(output, "tie\u{302}\u{301}ng <em>vie\u{323}\u{302}t</em>");
+}
+
+/// Two decomposed words with an ASCII-only run between them are both
+/// highlighted over their own bytes.
+#[test]
+fn nfd_document_highlights_two_words() {
+    let raw_text = "tie\u{302}\u{301}ng and vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng vi\u{1ec7}t", raw_text, &analyzer());
+    assert_eq!(
+        output,
+        "<em>tie\u{302}\u{301}ng</em> and <em>vie\u{323}\u{302}t</em>"
+    );
+}
+
+/// A document that is already NFC highlights exactly as before.
+#[test]
+fn nfc_document_highlight_unchanged() {
+    let raw_text = "ti\u{1ebf}ng vi\u{1ec7}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng", raw_text, &analyzer());
+    assert_eq!(output, "<em>ti\u{1ebf}ng</em> vi\u{1ec7}t");
+}
+
+/// Only the RAG analyzer composes its query terms, so another analyzer
+/// highlights a decomposed (NFD) document as before NFC: its NFC query terms
+/// do not occur in the document's bytes.
+#[test]
+fn nfd_document_with_other_analyzer_unchanged() {
+    let analyzer = AnalyzerPool::instance()
+        .get_analyzer("ngram-3")
+        .expect("NGramAnalyzer");
+    let raw_text = "tie\u{302}\u{301}ng vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng", raw_text, &analyzer);
+    assert_eq!(output, raw_text);
+}

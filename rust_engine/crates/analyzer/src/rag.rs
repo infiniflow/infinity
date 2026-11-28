@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use super::*;
+use crate::unicode_nfc::{normalize_nfc, NfcPositionMap};
 
 /// C++: `DartsTrie` (`darts_trie_impl.cpp`) over a Darts-clone unit array.
 ///
@@ -207,6 +208,10 @@ impl RAGAnalyzer {
 
     /// C++: `RAGAnalyzer::Tokenize` — returns the space-joined token stream.
     pub fn tokenize(&self, line: &str) -> String {
+        // Compose decomposed (NFD) text first, as rag_tokenizer.py does: the
+        // \W+ replacement would cut the combining marks out of their words.
+        let nfc = normalize_nfc(line, None);
+        let line = nfc.as_deref().unwrap_or(line);
         let folded = self.fold_diacritics.then(|| fold_diacritics(line));
         let input = folded.as_deref().unwrap_or(line);
 
@@ -244,10 +249,14 @@ impl RAGAnalyzer {
     pub fn analyze(&self, text: &str) -> Vec<Term> {
         let mut terms = Vec::new();
         if self.enable_position {
-            let (mut tokens, mut positions) = self.tokenize_with_position(text);
+            let (mut tokens, mut positions, composed) = self.tokenize_with_position_composed(text);
             if self.fine_grained {
-                let (fine_tokens, fine_positions) =
-                    self.fine_grained_tokenize_with_position(&tokens.join(" "), &positions);
+                let (fine_tokens, fine_positions) = self.fine_grained_tokenize_with_position(
+                    text,
+                    composed,
+                    &tokens.join(" "),
+                    &positions,
+                );
                 tokens = fine_tokens;
                 positions = fine_positions;
             }
@@ -298,17 +307,35 @@ impl RAGAnalyzer {
     /// C++: `RAGAnalyzer::TokenizeWithPosition` — the coarse token stream plus
     /// each token's byte span in the original input.
     ///
-    /// Positions survive diacritics folding, `\W+` replacement, `StrQ2B` and
-    /// OpenCC (identity here) through the same mapping chain as the reference.
+    /// Positions survive NFC, diacritics folding, `\W+` replacement, `StrQ2B`
+    /// and OpenCC (identity here) through the same mapping chain as the
+    /// reference.
     pub fn tokenize_with_position(&self, line: &str) -> (Vec<String>, Vec<(u32, u32)>) {
+        let (tokens, positions, _) = self.tokenize_with_position_composed(line);
+        (tokens, positions)
+    }
+
+    /// `tokenize_with_position`, plus whether NFC changed `line` (C++: the
+    /// `composed` argument of `TokenizeWithPosition`).
+    pub fn tokenize_with_position_composed(
+        &self,
+        line: &str,
+    ) -> (Vec<String>, Vec<(u32, u32)>, bool) {
+        // Compose decomposed (NFD) text first, as rag_tokenizer.py does. The
+        // offsets below are on `source`; `nfc_map` takes the spans back to
+        // `line` at the end, and is only filled when NFC changed the text.
+        let mut nfc_map = NfcPositionMap::default();
+        let nfc = normalize_nfc(line, Some(&mut nfc_map));
+        let source = nfc.as_deref().unwrap_or(line);
+
         let folded;
         let mut fold_map: Option<Vec<u32>> = None;
         let input = if self.fold_diacritics {
-            folded = fold_diacritics(line);
-            fold_map = Some(build_position_mapping(line, &folded));
+            folded = fold_diacritics(source);
+            fold_map = Some(build_position_mapping(source, &folded));
             folded.as_str()
         } else {
-            line
+            source
         };
 
         let (processed, pcre2_map) = strip_non_word_with_position(input);
@@ -318,8 +345,8 @@ impl RAGAnalyzer {
         let strline = self.opencc.convert(&str1);
         let opencc_map = build_position_mapping(&str1, &strline);
 
-        // strline byte -> original input byte, through OpenCC -> StrQ2B ->
-        // the \W+ replacement -> diacritics folding, the reference's chain.
+        // strline byte -> NFC input byte, through OpenCC -> StrQ2B -> the \W+
+        // replacement -> diacritics folding, the reference's chain.
         let mut final_map = Vec::with_capacity(strline.len() + 1);
         for i in 0..strline.len() {
             let str1_pos = opencc_map.get(i).copied().unwrap_or(str1.len() as u32) as usize;
@@ -339,11 +366,11 @@ impl RAGAnalyzer {
                 *pos = fold_map
                     .get(*pos as usize)
                     .copied()
-                    .unwrap_or(line.len() as u32);
+                    .unwrap_or(source.len() as u32);
             }
         }
         let map_pos =
-            |pos: usize| -> u32 { final_map.get(pos).copied().unwrap_or(line.len() as u32) };
+            |pos: usize| -> u32 { final_map.get(pos).copied().unwrap_or(source.len() as u32) };
 
         let mut tokens = Vec::new();
         let mut positions = Vec::new();
@@ -389,7 +416,21 @@ impl RAGAnalyzer {
             );
         }
 
-        merge_with_position(self, &tokens, &positions)
+        let (tokens, mut positions) = merge_with_position(self, &tokens, &positions);
+        if nfc.is_some() {
+            // A token's span reaches from the lowest to the highest input byte
+            // its characters come from.
+            let input_len = line.len() as u32;
+            for (start, end) in &mut positions {
+                *start = nfc_map
+                    .start
+                    .get(*start as usize)
+                    .copied()
+                    .unwrap_or(input_len);
+                *end = nfc_map.end.get(*end as usize).copied().unwrap_or(input_len);
+            }
+        }
+        (tokens, positions, nfc.is_some())
     }
 
     /// C++: `RAGAnalyzer::FineGrainedTokenize`.
@@ -455,9 +496,12 @@ impl RAGAnalyzer {
         self.english_normalize(&res)
     }
 
-    /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`.
+    /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`. `text` is the
+    /// input that `positions` index into; `composed` is whether NFC changed it.
     pub fn fine_grained_tokenize_with_position(
         &self,
+        text: &str,
+        composed: bool,
         tokens_str: &str,
         positions: &[(u32, u32)],
     ) -> (Vec<String>, Vec<(u32, u32)>) {
@@ -472,15 +516,36 @@ impl RAGAnalyzer {
             .count();
         let mut fine_tokens = Vec::new();
         let mut fine_positions = Vec::new();
+        // NFC changed a token only if it changes the input bytes of its span;
+        // every other token gets the spans it had before NFC. NFC leaves every
+        // substring of an input it leaves unchanged as it is, so nothing is
+        // normalized when `composed` is false. A span that is inverted, out of
+        // range or cuts a character counts as changed when NFC changed the input.
+        let token_composed = |(start, end): (u32, u32)| {
+            composed
+                && match text.get(start as usize..end as usize) {
+                    Some(span) => normalize_nfc(span, None).is_some(),
+                    None => true,
+                }
+        };
 
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
             for (i, token) in tks.iter().enumerate() {
-                let (start_pos, _) = positions[i];
+                let (start_pos, end_pos) = positions[i];
+                // In every branch, each part of a token NFC changed gets the span
+                // of the whole token, which never ends before it starts. NFC can
+                // change lengths and move combining marks, so offsets inside such
+                // a token do not map to input bytes.
+                let changed = token_composed((start_pos, end_pos));
                 let mut sub_start = start_pos;
                 for sub_token in token.split('/').filter(|part| !part.is_empty()) {
                     let sub_end = sub_start + sub_token.len() as u32;
                     fine_tokens.push(sub_token.to_string());
-                    fine_positions.push((sub_start, sub_end));
+                    fine_positions.push(if changed {
+                        (start_pos, end_pos.max(start_pos))
+                    } else {
+                        (sub_start, sub_end)
+                    });
                     sub_start = sub_end + 1;
                 }
             }
@@ -516,6 +581,18 @@ impl RAGAnalyzer {
                 .collect();
             sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
             let stk = &sorted[1].1;
+            // In every branch, each part of a token NFC changed gets the span of
+            // the whole token, which never ends before it starts. NFC can change
+            // lengths and move combining marks, so offsets inside such a token do
+            // not map to input bytes.
+            let changed = token_composed((start_pos, end_pos));
+            let part_span = |sub_pos, sub_end| {
+                if changed {
+                    (start_pos, end_pos.max(start_pos))
+                } else {
+                    (sub_pos, sub_end)
+                }
+            };
             if stk.len() == token_len {
                 fine_tokens.push((*token).to_string());
                 fine_positions.push((start_pos, end_pos));
@@ -531,7 +608,7 @@ impl RAGAnalyzer {
                     for part in stk {
                         let sub_end = sub_pos + char_len(part) as u32;
                         fine_tokens.push(part.clone());
-                        fine_positions.push((sub_pos, sub_end));
+                        fine_positions.push(part_span(sub_pos, sub_end));
                         sub_pos = sub_end;
                     }
                 }
@@ -540,7 +617,7 @@ impl RAGAnalyzer {
                 for part in stk {
                     let sub_end = sub_pos + part.len() as u32;
                     fine_tokens.push(part.clone());
-                    fine_positions.push((sub_pos, sub_end));
+                    fine_positions.push(part_span(sub_pos, sub_end));
                     sub_pos = sub_end;
                 }
             }

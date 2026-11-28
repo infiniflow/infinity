@@ -68,8 +68,9 @@ RAGAnalyzerHandle fine = RAGAnalyzer_Open("rag-fine", "/usr/share/infinity/resou
 | `GetTermFreq` / `GetTermTag` | 相同 |
 | `RAGAnalyzer_Copy` 之后的行为 | 相同 |
 | `SetLanguage` 为荷兰语/德语/斯洛伐克语/捷克语，且文本含非 ASCII token | **不同** |
+| 文本含 NFC 会改变的字符（如 NFD 分解形式） | **不同**，设计如此：本 crate 先把输入组合成 NFC，那份 C++ 不做 |
 
-差异只出现在非英语语言上，原因在于 RAGFlow 仓库里那份 `rag_analyzer.cpp` 与本仓库参考版（`src/common/analyzer/`）不是同一版本：
+除 NFC 一行外，差异只出现在非英语语言上，原因在于 RAGFlow 仓库里那份 `rag_analyzer.cpp` 与本仓库参考版（`src/common/analyzer/`）不是同一版本：
 
 - 参考版只在 `slovak`/`czech` 上折叠变音（`fold_diacritics_`）并关闭词干；那份副本没有这个开关，却对德语/荷兰语的非 ASCII token 做折叠与词干（`h ä user` 对 `h a user`）。
 - 参考版的词干入口用 `[a-zA-Z_-]+$` 判断词尾，非 ASCII 结尾的 token 原样保留；本 crate 用同一判据。

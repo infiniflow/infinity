@@ -20,6 +20,9 @@ module;
 #include <openccxx.h>
 #include <pcre2.h>
 
+// Standard headers go before string_utils.h, which imports std.
+#include "unicode_nfc.h"
+
 #include "string_utils.h"
 
 module infinity_core:rag_analyzer.impl;
@@ -1905,12 +1908,18 @@ std::string PCRE2GlobalReplace(const std::string &text, const std::string &patte
 }
 
 std::string RAGAnalyzer::Tokenize(const std::string &line) {
+    // Compose decomposed (NFD) text first, as rag_tokenizer.py does, so the
+    // tokens match Python's; FoldDiacritics and the Latin lowercase table also
+    // only know composed letters.
+    const std::optional<std::string> nfc_line = NormalizeNFC(line);
+    const std::string &source = nfc_line ? *nfc_line : line;
+
     // Fold diacritics to ASCII before any other processing when the
     // language asks for it (Slovak, Czech).
     std::string folded_line;
-    const std::string *input = &line;
+    const std::string *input = &source;
     if (fold_diacritics_) {
-        folded_line = FoldDiacritics(line);
+        folded_line = FoldDiacritics(source);
         input = &folded_line;
     }
 
@@ -1986,7 +1995,18 @@ std::string RAGAnalyzer::Tokenize(const std::string &line) {
     return ret;
 }
 
-std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> RAGAnalyzer::TokenizeWithPosition(const std::string &line) {
+std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> RAGAnalyzer::TokenizeWithPosition(const std::string &line,
+                                                                                                                  bool *composed) {
+    // Compose decomposed (NFD) text first, as rag_tokenizer.py does. The
+    // offsets below are on source; nfc_map takes the spans back to line at the
+    // end, and is only filled when NFC changed the text.
+    NFCPositionMap nfc_map;
+    const std::optional<std::string> nfc_line = NormalizeNFC(line, &nfc_map);
+    const std::string &source = nfc_line ? *nfc_line : line;
+    if (composed != nullptr) {
+        *composed = nfc_line.has_value();
+    }
+
     // Fold diacritics to ASCII before any other processing when the
     // language asks for it (Slovak, Czech). Folding shrinks 2-byte UTF-8
     // letters to 1-byte ASCII, so byte offsets shift; like the StrQ2B and
@@ -1994,10 +2014,10 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     // original input.
     std::string folded_line;
     std::vector<unsigned> fold_pos_mapping;
-    const std::string *input = &line;
+    const std::string *input = &source;
     if (fold_diacritics_) {
-        folded_line = FoldDiacritics(line);
-        BuildPositionMapping(line, folded_line, fold_pos_mapping);
+        folded_line = FoldDiacritics(source);
+        BuildPositionMapping(source, folded_line, fold_pos_mapping);
         input = &folded_line;
     }
 
@@ -2019,7 +2039,8 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<unsigned> opencc_pos_mapping;
     BuildPositionMapping(str1, strline, opencc_pos_mapping);
 
-    // Combine all position mappings: strline -> str1 -> processed_line -> (folded_)line
+    // Combine all position mappings: strline -> str1 -> processed_line -> (folded_)line,
+    // then, below, folded line -> NFC line (source) when fold_diacritics_ is on
     std::vector<unsigned> final_pos_mapping;
     final_pos_mapping.resize(strline.size() + 1);
 
@@ -2046,10 +2067,10 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
         final_pos_mapping[strline.size()] = static_cast<unsigned>(input->size());
     }
 
-    // Remap folded-line offsets back to the original input.
+    // Remap folded-line offsets back to the NFC form.
     if (fold_diacritics_) {
         for (auto &pos : final_pos_mapping) {
-            pos = pos < fold_pos_mapping.size() ? fold_pos_mapping[pos] : static_cast<unsigned>(line.size());
+            pos = pos < fold_pos_mapping.size() ? fold_pos_mapping[pos] : static_cast<unsigned>(source.size());
         }
     }
 
@@ -2115,7 +2136,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
                         if (start_pos < final_pos_mapping.size()) {
                             positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
                         } else {
-                            positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                            positions.emplace_back(static_cast<unsigned>(source.size()), static_cast<unsigned>(source.size()));
                         }
 
                         current_search_pos = pos_in_sentence + term.size();
@@ -2136,7 +2157,7 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
             if (start_pos < final_pos_mapping.size() && end_pos < final_pos_mapping.size()) {
                 positions.emplace_back(final_pos_mapping[start_pos], final_pos_mapping[end_pos]);
             } else {
-                positions.emplace_back(static_cast<unsigned>(line.size()), static_cast<unsigned>(line.size()));
+                positions.emplace_back(static_cast<unsigned>(source.size()), static_cast<unsigned>(source.size()));
             }
             continue;
         }
@@ -2167,6 +2188,15 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
 
     tokens = std::move(merged_tokens);
     positions = std::move(merged_positions);
+
+    if (nfc_line) {
+        // A token's span reaches from the lowest to the highest input byte its characters come from.
+        const auto input_size = static_cast<unsigned>(line.size());
+        for (auto &[start, end] : positions) {
+            start = start < nfc_map.start.size() ? nfc_map.start[start] : input_size;
+            end = end < nfc_map.end.size() ? nfc_map.end[end] : input_size;
+        }
+    }
 
     return {std::move(tokens), std::move(positions)};
 }
@@ -2452,7 +2482,9 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
     }
 }
 
-void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
+void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
+                                                  bool composed,
+                                                  const std::string &tokens_str,
                                                   const std::vector<std::pair<unsigned, unsigned>> &positions,
                                                   std::vector<std::string> &fine_tokens,
                                                   std::vector<std::pair<unsigned, unsigned>> &fine_positions) {
@@ -2470,6 +2502,22 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
         }
     }
 
+    // NFC changed a token only if it changes the input bytes of its span; every
+    // other token gets the spans it had before NFC. NFC leaves every substring of
+    // an input it leaves unchanged as it is, so nothing is normalized when
+    // composed is false. A span that is inverted, out of range or cuts a
+    // character counts as changed when NFC changed the input, as in the Rust port.
+    const auto token_composed = [&text, composed](unsigned start, unsigned end) {
+        if (!composed) {
+            return false;
+        }
+        const auto boundary = [&text](unsigned at) { return at == text.size() || (static_cast<unsigned char>(text[at]) & 0xC0) != 0x80; };
+        if (start <= end && end <= text.size() && boundary(start) && boundary(end)) {
+            return NormalizeNFC(std::string_view(text).substr(start, end - start)).has_value();
+        }
+        return true;
+    };
+
     if (zh_num < tks.size() * 0.2) {
         // English text processing - apply normalization
         std::vector<std::string> temp_tokens;
@@ -2480,12 +2528,16 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             std::istringstream iss(token);
             std::string sub_token;
             unsigned sub_start = start_pos;
+            // In every branch, each part of a token NFC changed gets the span of the whole
+            // token, which never ends before it starts. NFC can change lengths and move
+            // combining marks, so offsets inside such a token do not map to input bytes.
+            const bool changed = token_composed(start_pos, end_pos);
 
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
                     unsigned sub_end = sub_start + sub_token.size();
                     fine_tokens.push_back(sub_token);
-                    fine_positions.emplace_back(sub_start, sub_end);
+                    fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_start, sub_end});
                     sub_start = sub_end + 1;
                 }
             }
@@ -2528,6 +2580,10 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
             SortTokens(token_list, sorted_tokens);
             const auto &stk = sorted_tokens[1].first;
+            // In every branch, each part of a token NFC changed gets the span of the whole
+            // token, which never ends before it starts. NFC can change lengths and move
+            // combining marks, so offsets inside such a token do not map to input bytes.
+            const bool changed = token_composed(start_pos, end_pos);
 
             if (stk.size() == token_len) {
                 fine_tokens.push_back(token);
@@ -2547,7 +2603,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                     for (auto &t : stk) {
                         unsigned sub_end = sub_pos + UTF8Length(t);
                         fine_tokens.push_back(t);
-                        fine_positions.emplace_back(sub_pos, sub_end);
+                        fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_pos, sub_end});
                         sub_pos = sub_end;
                     }
                 }
@@ -2556,7 +2612,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                 for (auto &t : stk) {
                     unsigned sub_end = sub_pos + static_cast<unsigned>(t.size());
                     fine_tokens.push_back(t);
-                    fine_positions.emplace_back(sub_pos, sub_end);
+                    fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_pos, sub_end});
                     sub_pos = sub_end;
                 }
             }
@@ -2659,12 +2715,13 @@ void RAGAnalyzer::FineGrainedTokenize(const std::string &tokens, std::vector<std
 
 int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
     if (enable_position_) {
-        auto [tokens, positions] = TokenizeWithPosition(input.text_);
+        bool composed = false;
+        auto [tokens, positions] = TokenizeWithPosition(input.text_, &composed);
 
         if (fine_grained_) {
             std::vector<std::string> fine_tokens;
             std::vector<std::pair<unsigned, unsigned>> fine_positions;
-            FineGrainedTokenizeWithPosition(Join(tokens, 0), positions, fine_tokens, fine_positions);
+            FineGrainedTokenizeWithPosition(input.text_, composed, Join(tokens, 0), positions, fine_tokens, fine_positions);
             tokens = std::move(fine_tokens);
             positions = std::move(fine_positions);
         }

@@ -88,7 +88,14 @@ typedef struct {
 } RAGTokenList;
 
 /* Tokens with byte offsets. When fine-grained mode is on the tokens are
- * already split finer. Returns a malloc'd list, or NULL. */
+ * already split finer. Returns a malloc'd list, or NULL.
+ *
+ * The rag analyzer composes its input to NFC first; the offsets stay in the
+ * input as given. Where NFC changed the input, a token's span covers every
+ * input byte its characters come from, and can overlap the next token's span,
+ * or contain it, when NFC reordered combining marks across them. In
+ * fine-grained mode, the parts of a token NFC changed all carry that token's
+ * span. */
 RAGTokenList *RAGAnalyzer_TokenizeWithPosition(RAGAnalyzerHandle handle, const char *text);
 
 void RAGAnalyzer_FreeTokenList(RAGTokenList *token_list);

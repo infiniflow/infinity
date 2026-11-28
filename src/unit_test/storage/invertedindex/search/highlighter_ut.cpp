@@ -125,3 +125,53 @@ TEST_F(HighlighterTest, test4) {
     Highlighter::instance().GetHighlight(query, raw_text, output, analyzer_);
     std::cout << "Output: " << output << std::endl << std::endl;
 }
+
+// A document stored decomposed (NFD) is highlighted over its own bytes when the query
+// term is NFC, which is what the analyzer emits for any query.
+TEST_F(HighlighterTest, nfd_document_nfc_query) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng", "tie\u0302\u0301ng vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "<em>tie\u0302\u0301ng</em> vie\u0323\u0302t");
+}
+
+// An NFD query goes through the analyzer first, so it reaches the highlighter as NFC and
+// still finds the NFD document.
+TEST_F(HighlighterTest, nfd_document_nfd_query) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("vie\u0323\u0302t", "tie\u0302\u0301ng vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "tie\u0302\u0301ng <em>vie\u0323\u0302t</em>");
+}
+
+// Two decomposed words with an ASCII-only run between them are both highlighted over
+// their own bytes.
+TEST_F(HighlighterTest, nfd_document_two_words) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng vi\u1ec7t", "tie\u0302\u0301ng and vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "<em>tie\u0302\u0301ng</em> and <em>vie\u0323\u0302t</em>");
+}
+
+// A document that is already NFC highlights exactly as before.
+TEST_F(HighlighterTest, nfc_document_unchanged) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng", "ti\u1ebfng vi\u1ec7t", output, analyzer_);
+    EXPECT_EQ(output, "<em>ti\u1ebfng</em> vi\u1ec7t");
+}
+
+// Only the RAG analyzer composes its query terms, so another analyzer highlights a decomposed (NFD)
+// document as before NFC: its NFC query terms do not occur in the document's bytes.
+TEST_F(HighlighterTest, nfd_document_with_other_analyzer_unchanged) {
+    auto [analyzer, status] = AnalyzerPool::instance().GetAnalyzer("ngram-3");
+    ASSERT_TRUE(status.ok()) << status.message();
+    const std::string raw_text = "tie\u0302\u0301ng vie\u0323\u0302t";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng", raw_text, output, analyzer.get());
+    EXPECT_EQ(output, raw_text);
+}

@@ -10514,12 +10514,35 @@ pub fn highlight_with_analyzer(
             }
         }
     }
+    // Only the RAG analyzer composes its query terms to NFC.
+    let mut nfc_map = analyzer::NfcPositionMap::default();
+    let nfc_text = if unicode.is_empty() || !matches!(analyzer, analyzer::Analyzer::Rag(_)) {
+        None
+    } else {
+        analyzer::normalize_nfc(raw_text, Some(&mut nfc_map))
+    };
     for term in unicode {
         let mut from = 0usize;
         while let Some(offset) = raw_text[from..].find(term.as_str()) {
             let start = from + offset;
             matches.push((start, start + term.len()));
             from = next_char_boundary(raw_text, start);
+        }
+        // Query terms are NFC; a decomposed document only matches once
+        // composed. Hits map back to raw bytes; the merge folds duplicates.
+        if let Some(nfc_text) = nfc_text.as_deref() {
+            let mut from = 0usize;
+            while let Some(offset) = nfc_text[from..].find(term.as_str()) {
+                let start = from + offset;
+                let (a, b) = (
+                    nfc_map.start[start] as usize,
+                    nfc_map.end[start + term.len()] as usize,
+                );
+                if a < b {
+                    matches.push((a, b));
+                }
+                from = next_char_boundary(nfc_text, start);
+            }
         }
     }
     apply_highlight_matches(raw_text, matches)

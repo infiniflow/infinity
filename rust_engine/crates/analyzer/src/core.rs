@@ -3349,6 +3349,494 @@ mod rag_analyzer_tests {
         assert_eq!(positions[1], (7, 15));
     }
 
+    /// C++: `test_nfd_input_parity_with_python` — decomposed (NFD) input
+    /// tokenizes like its NFC form, as in rag_tokenizer.py. Without NFC the
+    /// combining marks split the words ("tie\u{302}\u{301}ng" -> "tie ng").
+    #[test]
+    fn test_nfd_input_parity_with_python() {
+        let analyzer = load_analyzer();
+        let cases = [
+            (
+                "to\u{302}i đang ho\u{323}c tie\u{302}\u{301}ng Vie\u{323}\u{302}t",
+                "tôi đang học tiếng việt",
+            ),
+            (
+                "Hoa\u{300} gia\u{309}i đa\u{303} đu\u{31B}o\u{31B}\u{323}c",
+                "hoà giải đã được",
+            ),
+            // The marks come in either order.
+            ("a\u{302}\u{323}", "ậ"),
+            ("a\u{323}\u{302}", "ậ"),
+            ("ĐU\u{31B}O\u{31B}\u{300}NG PHO\u{302}\u{301}", "đường phố"),
+            // A tone mark after an already composed letter.
+            ("ê\u{323} ơ\u{323} Ư\u{300}", "ệ ợ ừ"),
+            // Hangul conjoining jamo.
+            ("\u{1112}\u{1161}\u{11AB}\u{1100}\u{1173}\u{11AF}", "한글"),
+        ];
+        for (input, expected) in cases {
+            let cxx_result = analyzer.tokenize(input);
+            assert_eq!(cxx_result, expected, "input '{input}'");
+            assert_eq!(
+                cxx_result,
+                python_tokenize_text(&[input]),
+                "input '{input}'"
+            );
+        }
+
+        // NFC runs before the Slovak/Czech folding, which only knows composed
+        // letters.
+        let mut slovak = load_analyzer();
+        slovak.set_language("slovak");
+        let cxx_result = slovak.tokenize("s\u{30C}kola");
+        assert_eq!(cxx_result, "skola");
+        assert_eq!(
+            cxx_result,
+            python_tokenize_text(&["-l", "slovak", "s\u{30C}kola"])
+        );
+    }
+
+    /// C++: `test_protected_code_points_tokenize_as_before` — NFC leaves the
+    /// precomposed code points it would replace (Full_Composition_Exclusion)
+    /// as they are, as rag_tokenizer.py does, so they tokenize as they did
+    /// before NFC: U+FB2A (shin with shin dot) and U+0958 (qa) are not split
+    /// into a letter and a mark, and the singletons U+F984, U+F900 and U+212A
+    /// KELVIN SIGN keep their code points. The tokens match Python's, but for
+    /// U+212A, which Python lowercases to k and this port, like C++, does not.
+    #[test]
+    fn test_protected_code_points_tokenize_as_before() {
+        let analyzer = load_analyzer();
+        let cases: [PositionCase; 5] = [
+            (
+                "\u{FB2A}\u{5DC}\u{5D5}\u{5DD}",
+                &["\u{FB2A}\u{5DC}\u{5D5}\u{5DD}"],
+                &[(0, 9)],
+            ),
+            ("\u{958}x", &["\u{958}", "x"], &[(0, 3), (3, 4)]),
+            ("\u{F984}", &["\u{F984}"], &[(0, 3)]),
+            (
+                "中国\u{F900}人",
+                &["中国", "\u{F900}", "人"],
+                &[(0, 6), (6, 9), (9, 12)],
+            ),
+            ("a \u{212A}m", &["a", "\u{212A}m"], &[(0, 1), (2, 6)]),
+        ];
+        for (input, tokens, positions) in cases {
+            assert_eq!(
+                crate::unicode_nfc::normalize_nfc(input, None),
+                None,
+                "input '{input}'"
+            );
+            let cxx_result = analyzer.tokenize(input);
+            assert_eq!(cxx_result, tokens.join(" "), "input '{input}'");
+            if !input.contains('\u{212A}') {
+                assert_eq!(
+                    cxx_result,
+                    python_tokenize_text(&[input]),
+                    "input '{input}'"
+                );
+            }
+            let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
+            assert_eq!(actual_tokens, tokens, "input '{input}'");
+            assert_eq!(actual_positions, positions, "input '{input}'");
+        }
+    }
+
+    /// C++: `test_decomposed_dotted_capital_i_tokenizes_as_before` — I + U+0307
+    /// does not compose to U+0130, which Python lowercases to i + U+0307 and
+    /// this analyzer keeps: the engines give main's tokens, as they did for
+    /// this text before NFC.
+    #[test]
+    fn test_decomposed_dotted_capital_i_tokenizes_as_before() {
+        let analyzer = load_analyzer();
+        let input = "abI\u{307}cd I\u{307} xI\u{307}";
+        let expected = "abi cd i xi";
+        assert_eq!(analyzer.tokenize(input), expected);
+        assert_eq!(python_tokenize_text(&[input]), expected);
+        let (tokens, positions) = analyzer.tokenize_with_position(input);
+        assert_eq!(tokens.join(" "), expected);
+        assert_eq!(positions.len(), tokens.len());
+    }
+
+    /// An input, its tokens and their byte spans in the input.
+    type PositionCase = (&'static str, &'static [&'static str], &'static [(u32, u32)]);
+
+    /// C++: `test_nfd_tokenize_with_position` — the tokens of the NFC form,
+    /// with byte offsets in the original input, which is longer than its NFC
+    /// form ("Vie\u{323}\u{302}t" is 8 bytes, "Việt" 6).
+    #[test]
+    fn test_nfd_tokenize_with_position() {
+        let analyzer = load_analyzer();
+        let cases: [PositionCase; 2] = [
+            (
+                "Vie\u{323}\u{302}t Nam",
+                &["việt", "nam"],
+                &[(0, 8), (9, 12)],
+            ),
+            (
+                "ĐU\u{31B}O\u{31B}\u{300}NG PHO\u{302}\u{301}",
+                &["đường", "phố"],
+                &[(0, 12), (13, 20)],
+            ),
+        ];
+        for (input, tokens, positions) in cases {
+            let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
+            assert_eq!(actual_tokens, tokens, "input '{input}'");
+            assert_eq!(actual_positions, positions, "input '{input}'");
+        }
+
+        // Composition, then folding: two position maps chained.
+        let mut slovak = load_analyzer();
+        slovak.set_language("slovak");
+        let (tokens, positions) = slovak.tokenize_with_position("s\u{30C}kola");
+        assert_eq!(tokens, vec!["skola".to_string()]);
+        assert_eq!(positions, vec![(0, 7)]);
+    }
+
+    /// Combining marks that NFC leaves alone or reorders. Rust only: PCRE2
+    /// (10.43+) counts combining marks as word characters, so C++ keeps them
+    /// inside its tokens; rag_tokenizer.py splits at them, and so does this
+    /// port at the marks below (not at Other_Alphabetic ones, such as U+05C1,
+    /// U+0345 or Indic vowel signs). A token's span still reaches the end of
+    /// every input code point its characters come from.
+    #[test]
+    fn test_stray_marks_tokenize_with_position() {
+        let analyzer = load_analyzer();
+        let cases: [PositionCase; 4] = [
+            // Already NFC: the same tokens and offsets as before NFC was added.
+            (
+                "\u{1EB9}\u{301}k\u{1ECD}\u{301}",
+                &["ẹ", "kọ"],
+                &[(0, 3), (5, 9)],
+            ),
+            // NFD: ẹ and ọ have no precomposed form with U+0301 on top.
+            (
+                "e\u{323}\u{301}ko\u{323}\u{301} ba\u{301}",
+                &["ẹ", "kọ", "bá"],
+                &[(0, 3), (5, 9), (12, 16)],
+            ),
+            // The marks typed out of canonical order: ẹ takes in the U+0323 at
+            // bytes [3, 5), so its span ends there, past the U+0301.
+            (
+                "e\u{301}\u{323}ko\u{301}\u{323} ba\u{301}",
+                &["ẹ", "kọ", "bá"],
+                &[(0, 5), (5, 11), (12, 16)],
+            ),
+            // A protected code point (U+0958, a composition exclusion) with
+            // a mark after it: neither changes.
+            ("\u{958}\u{301}x", &["\u{958}", "x"], &[(0, 3), (5, 6)]),
+        ];
+        for (input, tokens, positions) in cases {
+            let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
+            assert_eq!(actual_tokens, tokens, "input '{input}'");
+            assert_eq!(actual_positions, positions, "input '{input}'");
+            assert_eq!(
+                tokens.join(" "),
+                python_tokenize_text(&[input]),
+                "input '{input}'"
+            );
+        }
+    }
+
+    /// C++: `test_reordered_marks_tokenize_with_position` — marks typed out of
+    /// canonical order that NFC reorders and that make a token of their own
+    /// (C++ keeps every Mn in its tokens, this port Other_Alphabetic marks such
+    /// as the Arabic harakat; rag_tokenizer.py drops them). The token's span
+    /// covers the input bytes of all of its marks.
+    #[test]
+    fn test_reordered_marks_tokenize_with_position() {
+        let analyzer = load_analyzer();
+        // U+0651 SHADDA (ccc 33) U+064E FATHA (ccc 30) become U+064E U+0651.
+        let (tokens, positions) = analyzer.tokenize_with_position("+\u{651}\u{64E} x");
+        assert_eq!(tokens, ["\u{64E}\u{651}", "x"]);
+        assert_eq!(positions, [(1, 5), (6, 7)]);
+    }
+
+    /// C++: `test_fine_grained_tokenize_with_position` — a fine-grained token
+    /// NFC changed keeps the span of its coarse token ("Vie\u{323}\u{302}t" is
+    /// 8 bytes, "việt" 6). Every other token gets the spans it had before NFC,
+    /// stemmed or not ("running" is 7 bytes, "run" 3).
+    #[test]
+    fn test_fine_grained_tokenize_with_position() {
+        let analyzer = load_analyzer();
+        let cases: [PositionCase; 2] = [
+            (
+                "Vie\u{323}\u{302}t Nam",
+                &["việt", "nam"],
+                &[(0, 8), (9, 12)],
+            ),
+            (
+                "The running dogs are barking loudly",
+                &["the", "run", "dog", "are", "bark", "loud"],
+                &[(0, 3), (4, 7), (12, 15), (17, 20), (21, 25), (29, 33)],
+            ),
+        ];
+        for (input, tokens, positions) in cases {
+            let (coarse_tokens, coarse_positions, composed) =
+                analyzer.tokenize_with_position_composed(input);
+            assert_eq!(
+                composed,
+                crate::unicode_nfc::normalize_nfc(input, None).is_some(),
+                "input '{input}'"
+            );
+            let (fine_tokens, fine_positions) = analyzer.fine_grained_tokenize_with_position(
+                input,
+                composed,
+                &coarse_tokens.join(" "),
+                &coarse_positions,
+            );
+            assert_eq!(fine_tokens, tokens, "input '{input}'");
+            assert_eq!(fine_positions, positions, "input '{input}'");
+        }
+
+        // The parts of a token NFC left as it is add up from the start of its
+        // span, also when NFC changed the rest of the input.
+        for text in ["ab/cd", "ab/cd e\u{301}"] {
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
+            let (fine_tokens, fine_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, composed, "ab/cd", &[(0, 2)]);
+            assert_eq!(fine_tokens, ["ab", "cd"]);
+            assert_eq!(fine_positions, [(0, 2), (3, 5)], "text '{text}'");
+        }
+        // Every part of a token NFC changed gets the span of the whole token.
+        let (fine_tokens, fine_positions) =
+            analyzer.fine_grained_tokenize_with_position("e\u{301}", true, "abc/de", &[(0, 3)]);
+        assert_eq!(fine_tokens, ["abc", "de"]);
+        assert_eq!(fine_positions, [(0, 3), (0, 3)]);
+    }
+
+    /// C++: `test_fine_grained_span_cuts_character` — a span that cuts a
+    /// character counts as changed only when NFC changes the input; then every
+    /// part gets that span. The span (0, 2) ends inside U+00E9.
+    #[test]
+    fn test_fine_grained_span_cuts_character() {
+        let analyzer = load_analyzer();
+        let cases: [(&str, &[(u32, u32)]); 2] = [
+            ("x\u{e9}", &[(0, 2), (3, 5)]),
+            ("x\u{e9} e\u{301}", &[(0, 2), (0, 2)]),
+        ];
+        for (text, positions) in cases {
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
+            let (fine_tokens, fine_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, composed, "ab/cd", &[(0, 2)]);
+            assert_eq!(fine_tokens, ["ab", "cd"], "text '{text}'");
+            assert_eq!(fine_positions, positions, "text '{text}'");
+        }
+    }
+
+    /// C++: `test_fine_grained_chinese_split_span` — the parts of a Chinese
+    /// token add up their lengths from the start of the coarse span, as before
+    /// NFC, unless NFC changed the token; then every part gets the coarse span.
+    #[test]
+    fn test_fine_grained_chinese_split_span() {
+        let analyzer = load_analyzer();
+        // The token is the first word of the input; NFC leaves it as it is,
+        // marks or not. In the last input NFC changes another word.
+        let cases: [PositionCase; 5] = [
+            ("矩阵多元", &["矩阵", "多元"], &[(0, 6), (6, 12)]),
+            (
+                "矩阵\u{301}多元",
+                &["矩阵", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 14)],
+            ),
+            (
+                "矩阵\u{1e00}\u{301}多元",
+                &["矩阵", "\u{1e00}", "\u{301}", "多元"],
+                &[(0, 6), (6, 9), (9, 11), (11, 17)],
+            ),
+            (
+                "矩阵\u{316}\u{301}多元",
+                &["矩阵", "\u{316}", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 10), (10, 16)],
+            ),
+            (
+                "矩阵\u{301}多元 e\u{301}",
+                &["矩阵", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 14)],
+            ),
+        ];
+        for (text, tokens, positions) in cases {
+            let token = text.split(' ').next().expect("a word");
+            let span = [(0, token.len() as u32)];
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
+            let (actual_tokens, actual_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, composed, token, &span);
+            assert_eq!(actual_tokens, tokens, "text '{text}'");
+            assert_eq!(actual_positions, positions, "text '{text}'");
+        }
+
+        // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0325
+        // becomes U+1E00 with no mark left, and A U+0301 U+0325 becomes U+1E00
+        // U+0301, the same length either way; U+0301 U+0316 swap.
+        for (text, token) in [
+            ("矩阵e\u{301}多元", "矩阵é多元"),
+            ("矩阵A\u{325}多元", "矩阵\u{1e00}多元"),
+            ("矩阵A\u{301}\u{325}多元", "矩阵\u{1e00}\u{301}多元"),
+            ("矩阵\u{301}\u{316}多元", "矩阵\u{316}\u{301}多元"),
+        ] {
+            let end = text.len() as u32;
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
+            let (tokens, positions) =
+                analyzer.fine_grained_tokenize_with_position(text, composed, token, &[(0, end)]);
+            assert!(tokens.len() > 1, "text '{text}': {tokens:?}");
+            assert_eq!(positions, vec![(0, end); tokens.len()], "text '{text}'");
+        }
+    }
+
+    /// Fine-grained spans through `analyze`: the words NFC left as they are
+    /// keep the spans they had before NFC, also in an input NFC changed.
+    #[test]
+    fn test_analyze_fine_grained_positions() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_enable_position(true);
+        analyzer.set_fine_grained(true);
+        let cases: [(&str, &[(u32, u32)]); 3] = [
+            (
+                "The running dogs are barking loudly",
+                &[(0, 3), (4, 7), (12, 15), (17, 20), (21, 25), (29, 33)],
+            ),
+            (
+                "The running dogs Vie\u{323}\u{302}t",
+                &[(0, 3), (4, 7), (12, 15), (17, 25)],
+            ),
+            (
+                "The running dogs +\u{301}\u{316}",
+                &[(0, 3), (4, 7), (12, 15)],
+            ),
+        ];
+        for (input, positions) in cases {
+            let actual: Vec<(u32, u32)> = analyzer
+                .analyze(input)
+                .iter()
+                .map(|term| (term.word_offset, term.end_offset))
+                .collect();
+            assert_eq!(actual, positions, "input '{input}'");
+        }
+    }
+
+    /// C++: `test_nfd_large_token_tokenize` — 7 000 NFD "é" (21 000 bytes, 14 000
+    /// once composed) stay one token.
+    #[test]
+    fn test_nfd_large_token_tokenize() {
+        let analyzer = load_analyzer();
+        let input = "e\u{301}".repeat(7000);
+        let expected = "é".repeat(7000);
+        assert_eq!(analyzer.tokenize(&input), expected);
+        assert_eq!(python_tokenize_text(&[&input]), expected);
+        let (tokens, positions) = analyzer.tokenize_with_position(&input);
+        assert_eq!(tokens, vec![expected.clone()]);
+        assert_eq!(positions, vec![(0, input.len() as u32)]);
+        let fine = analyzer.fine_grained_tokenize(&analyzer.tokenize(&input));
+        assert_eq!(fine.join(" "), expected);
+        assert_eq!(python_tokenize_text(&["--fine-grained", &input]), expected);
+    }
+
+    fn chars_from_hex(field: &str) -> String {
+        field
+            .split_whitespace()
+            .map(|hex| {
+                char::from_u32(u32::from_str_radix(hex, 16).expect("hex code point"))
+                    .expect("code point")
+            })
+            .collect()
+    }
+
+    /// C++: `test_nfc_matches_python` — `normalize_nfc` against `_compose()`
+    /// of rag_tokenizer.py on Python 3.13, whose Unicode version (15.1.0) is
+    /// the one of the generated tables, on the cases
+    /// `generate_unicode_nfc.py --cases` prints; and the invariants of its
+    /// position maps.
+    #[test]
+    fn test_nfc_matches_python() {
+        let output = Command::new("uv")
+            .current_dir(std::env::temp_dir())
+            .args(["run", "--no-project", "--python", "3.13"])
+            .arg(repo_root().join("tools/generate_unicode_nfc.py"))
+            .arg("--cases")
+            .output()
+            .expect("run uv for Python's unicodedata");
+        assert!(
+            output.status.success(),
+            "Python NFC cases failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let text = String::from_utf8(output.stdout).expect("UTF-8 output");
+        let mut count = 0;
+        for line in text.lines() {
+            let (input, expected) = line.split_once(';').expect("input;expected");
+            let (input, expected) = (chars_from_hex(input), chars_from_hex(expected));
+            let mut map = NfcPositionMap::default();
+            let actual = crate::unicode_nfc::normalize_nfc(&input, Some(&mut map));
+            assert_eq!(actual.as_deref().unwrap_or(&input), expected, "{line}");
+            // NFC text comes back as None, not as a copy.
+            assert_eq!(actual.is_some(), input != expected, "{line}");
+            if let Some(actual) = actual {
+                for entries in [&map.start, &map.end] {
+                    assert_eq!(entries.len(), actual.len() + 1, "{line}");
+                    assert_eq!(entries.last(), Some(&(input.len() as u32)), "{line}");
+                    assert!(entries.windows(2).all(|w| w[0] <= w[1]), "{line}");
+                }
+            }
+            count += 1;
+        }
+        assert!(count > 4000, "only {count} cases from Python");
+    }
+
+    /// C++: `test_nfc_position_map`, less its bytes that are not UTF-8, which
+    /// a `&str` cannot hold — a token at NFC bytes `[a, b)` comes from input
+    /// bytes `[start[a], end[b])`, which covers every code point it took in,
+    /// and bytes NFC did not change map to themselves.
+    #[test]
+    fn test_nfc_position_map() {
+        #[allow(clippy::type_complexity)]
+        let cases: [(&str, &str, &[u32], &[u32]); 5] = [
+            // ệ (3 bytes) comes from e U+0323 U+0302 (5 bytes).
+            (
+                "Vie\u{323}\u{302}t",
+                "Vi\u{1EC7}t",
+                &[0, 1, 2, 2, 2, 7, 8],
+                &[0, 1, 2, 7, 7, 7, 8],
+            ),
+            // Marks typed out of canonical order: ẹ takes in the U+0323 at
+            // bytes [3, 5), the U+0301 after it comes from bytes [1, 3).
+            (
+                "e\u{301}\u{323}",
+                "\u{1EB9}\u{301}",
+                &[0, 0, 0, 1, 1, 5],
+                &[0, 5, 5, 5, 5, 5],
+            ),
+            // No starter to compose with: U+0316 moves before U+0301, and a
+            // token of either mark spans both.
+            (
+                "+\u{301}\u{316}",
+                "+\u{316}\u{301}",
+                &[0, 1, 1, 1, 1, 5],
+                &[0, 1, 5, 5, 5, 5],
+            ),
+            // Hangul conjoining jamo (9 bytes) compose to one syllable.
+            (
+                "\u{1100}\u{1161}\u{11A8}",
+                "\u{AC01}",
+                &[0, 0, 0, 9],
+                &[0, 9, 9, 9],
+            ),
+            // A protected code point (U+0958) and its mark are copied as they
+            // are; the é after them is composed.
+            (
+                "\u{958}\u{301}e\u{301}",
+                "\u{958}\u{301}\u{E9}",
+                &[0, 1, 2, 3, 4, 5, 5, 8],
+                &[0, 1, 2, 3, 4, 5, 8, 8],
+            ),
+        ];
+        for (input, expected, start, end) in cases {
+            let mut map = NfcPositionMap::default();
+            let actual = crate::unicode_nfc::normalize_nfc(input, Some(&mut map));
+            assert_eq!(actual.as_deref(), Some(expected), "input '{input}'");
+            assert_eq!(map.start, start, "input '{input}'");
+            assert_eq!(map.end, end, "input '{input}'");
+        }
+    }
+
     /// C++: `test_chinese_stopword_filter`.
     #[test]
     fn test_chinese_stopword_filter() {
