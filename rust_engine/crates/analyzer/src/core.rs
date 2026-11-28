@@ -3372,10 +3372,6 @@ mod rag_analyzer_tests {
             ("ê\u{323} ơ\u{323} Ư\u{300}", "ệ ợ ừ"),
             // Hangul conjoining jamo.
             ("\u{1112}\u{1161}\u{11AB}\u{1100}\u{1173}\u{11AF}", "한글"),
-            // A CJK compatibility ideograph and the Kelvin sign have singleton
-            // decompositions: U+F900 becomes U+8C48, U+212A becomes K.
-            ("中国\u{F900}人", "中国 岂 人"),
-            ("\u{212A}m", "km"),
         ];
         for (input, expected) in cases {
             let cxx_result = analyzer.tokenize(input);
@@ -3399,6 +3395,68 @@ mod rag_analyzer_tests {
         );
     }
 
+    /// C++: `test_protected_code_points_tokenize_as_before` — NFC leaves the
+    /// precomposed code points it would replace (Full_Composition_Exclusion)
+    /// as they are, as rag_tokenizer.py does, so they tokenize as they did
+    /// before NFC: U+FB2A (shin with shin dot) and U+0958 (qa) are not split
+    /// into a letter and a mark, and the singletons U+F984, U+F900 and U+212A
+    /// KELVIN SIGN keep their code points. The tokens match Python's, but for
+    /// U+212A, which Python lowercases to k and this port, like C++, does not.
+    #[test]
+    fn test_protected_code_points_tokenize_as_before() {
+        let analyzer = load_analyzer();
+        let cases: [PositionCase; 5] = [
+            (
+                "\u{FB2A}\u{5DC}\u{5D5}\u{5DD}",
+                &["\u{FB2A}\u{5DC}\u{5D5}\u{5DD}"],
+                &[(0, 9)],
+            ),
+            ("\u{958}x", &["\u{958}", "x"], &[(0, 3), (3, 4)]),
+            ("\u{F984}", &["\u{F984}"], &[(0, 3)]),
+            (
+                "中国\u{F900}人",
+                &["中国", "\u{F900}", "人"],
+                &[(0, 6), (6, 9), (9, 12)],
+            ),
+            ("a \u{212A}m", &["a", "\u{212A}m"], &[(0, 1), (2, 6)]),
+        ];
+        for (input, tokens, positions) in cases {
+            assert_eq!(
+                crate::unicode_nfc::normalize_nfc(input, None),
+                None,
+                "input '{input}'"
+            );
+            let cxx_result = analyzer.tokenize(input);
+            assert_eq!(cxx_result, tokens.join(" "), "input '{input}'");
+            if !input.contains('\u{212A}') {
+                assert_eq!(
+                    cxx_result,
+                    python_tokenize_text(&[input]),
+                    "input '{input}'"
+                );
+            }
+            let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
+            assert_eq!(actual_tokens, tokens, "input '{input}'");
+            assert_eq!(actual_positions, positions, "input '{input}'");
+        }
+    }
+
+    /// C++: `test_decomposed_dotted_capital_i_tokenizes_as_before` — I + U+0307
+    /// does not compose to U+0130, which Python lowercases to i + U+0307 and
+    /// this analyzer keeps: the engines give main's tokens, as they did for
+    /// this text before NFC.
+    #[test]
+    fn test_decomposed_dotted_capital_i_tokenizes_as_before() {
+        let analyzer = load_analyzer();
+        let input = "abI\u{307}cd I\u{307} xI\u{307}";
+        let expected = "abi cd i xi";
+        assert_eq!(analyzer.tokenize(input), expected);
+        assert_eq!(python_tokenize_text(&[input]), expected);
+        let (tokens, positions) = analyzer.tokenize_with_position(input);
+        assert_eq!(tokens.join(" "), expected);
+        assert_eq!(positions.len(), tokens.len());
+    }
+
     /// An input, its tokens and their byte spans in the input.
     type PositionCase = (&'static str, &'static [&'static str], &'static [(u32, u32)]);
 
@@ -3408,7 +3466,7 @@ mod rag_analyzer_tests {
     #[test]
     fn test_nfd_tokenize_with_position() {
         let analyzer = load_analyzer();
-        let cases: [PositionCase; 4] = [
+        let cases: [PositionCase; 2] = [
             (
                 "Vie\u{323}\u{302}t Nam",
                 &["việt", "nam"],
@@ -3419,13 +3477,6 @@ mod rag_analyzer_tests {
                 &["đường", "phố"],
                 &[(0, 12), (13, 20)],
             ),
-            (
-                "中国\u{F900}人",
-                &["中国", "岂", "人"],
-                &[(0, 6), (6, 9), (9, 12)],
-            ),
-            // U+212A is 3 bytes, K is 1.
-            ("a \u{212A}m", &["a", "km"], &[(0, 1), (2, 6)]),
         ];
         for (input, tokens, positions) in cases {
             let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
@@ -3441,7 +3492,7 @@ mod rag_analyzer_tests {
         assert_eq!(positions, vec![(0, 7)]);
     }
 
-    /// Combining marks that NFC leaves alone or splits off. Rust only: PCRE2
+    /// Combining marks that NFC leaves alone or reorders. Rust only: PCRE2
     /// (10.43+) counts combining marks as word characters, so C++ keeps them
     /// inside its tokens; rag_tokenizer.py splits at them, and so does this
     /// port at the marks below (not at Other_Alphabetic ones, such as U+05C1,
@@ -3470,9 +3521,9 @@ mod rag_analyzer_tests {
                 &["ẹ", "kọ", "bá"],
                 &[(0, 5), (5, 11), (12, 16)],
             ),
-            // U+0958 decomposes to क + nukta and stays so (a composition
-            // exclusion); क spans all of U+0958.
-            ("\u{958}x", &["क", "x"], &[(0, 3), (3, 4)]),
+            // A protected code point (U+0958, a composition exclusion) with
+            // a mark after it: neither changes.
+            ("\u{958}\u{301}x", &["\u{958}", "x"], &[(0, 3), (5, 6)]),
         ];
         for (input, tokens, positions) in cases {
             let (actual_tokens, actual_positions) = analyzer.tokenize_with_position(input);
@@ -3484,6 +3535,20 @@ mod rag_analyzer_tests {
                 "input '{input}'"
             );
         }
+    }
+
+    /// C++: `test_reordered_marks_tokenize_with_position` — marks typed out of
+    /// canonical order that NFC reorders and that make a token of their own
+    /// (C++ keeps every Mn in its tokens, this port Other_Alphabetic marks such
+    /// as the Arabic harakat; rag_tokenizer.py drops them). The token's span
+    /// covers the input bytes of all of its marks.
+    #[test]
+    fn test_reordered_marks_tokenize_with_position() {
+        let analyzer = load_analyzer();
+        // U+0651 SHADDA (ccc 33) U+064E FATHA (ccc 30) become U+064E U+0651.
+        let (tokens, positions) = analyzer.tokenize_with_position("+\u{651}\u{64E} x");
+        assert_eq!(tokens, ["\u{64E}\u{651}", "x"]);
+        assert_eq!(positions, [(1, 5), (6, 7)]);
     }
 
     /// C++: `test_fine_grained_tokenize_with_position` — a fine-grained token
@@ -3521,38 +3586,37 @@ mod rag_analyzer_tests {
         assert_eq!(fine_positions, [(0, 2), (3, 3)]);
     }
 
-    /// C++: `test_fine_grained_chinese_split_with_nfc_shortened_token` - a
-    /// Chinese token goes through the stk split and holds a CJK Compatibility
-    /// Ideograph (U+2F85D, 4 bytes) that NFC turns into a 3-byte one. The
-    /// parts stay inside the coarse span `[0, 13)`, never go backwards, and
-    /// the last one ends where the coarse token does.
+    /// C++: `test_fine_grained_chinese_split_span` — the parts of a Chinese
+    /// token add up their lengths from the start of the coarse span, as before
+    /// NFC, when the token is as long as that span and NFC cannot have
+    /// reordered its marks. Otherwise (NFC, StrQ2B, OpenCC or folding changed
+    /// its length, or NFC moved a mark) every part gets the coarse span.
     #[test]
-    fn test_fine_grained_chinese_split_with_nfc_shortened_token() {
+    fn test_fine_grained_chinese_split_span() {
         let analyzer = load_analyzer();
-        #[allow(clippy::type_complexity)]
-        let cases: [(&str, &[&str], &[(u32, u32)]); 1] = [(
-            "\u{77e9}\u{9635}\u{2f85d}\u{5143}",
-            &["矩阵", "多元"],
-            &[(0, 6), (6, 13)],
-        )];
-        for (input, tokens, positions) in cases {
-            let (coarse_tokens, coarse_positions) = analyzer.tokenize_with_position(input);
-            assert_eq!(coarse_positions, [(0, 13)], "input {input:?}");
-            let (fine_tokens, fine_positions) = analyzer
-                .fine_grained_tokenize_with_position(&coarse_tokens.join(" "), &coarse_positions);
-            assert_eq!(fine_tokens, tokens, "input {input:?}");
-            assert_eq!(fine_positions, positions, "input {input:?}");
-            let (_, coarse_end) = coarse_positions[0];
-            let mut prev_end = 0;
-            for &(a, b) in &fine_positions {
-                assert!(
-                    prev_end <= a && a <= b && b <= coarse_end,
-                    "{fine_positions:?}"
-                );
-                prev_end = b;
-            }
-            assert_eq!(prev_end, coarse_end);
-        }
+        let (tokens, positions) =
+            analyzer.fine_grained_tokenize_with_position("矩阵多元", &[(0, 12)]);
+        assert_eq!(tokens, ["矩阵", "多元"]);
+        assert_eq!(positions, [(0, 6), (6, 12)]);
+        let (tokens, positions) =
+            analyzer.fine_grained_tokenize_with_position("矩阵多元", &[(0, 13)]);
+        assert_eq!(tokens, ["矩阵", "多元"]);
+        assert_eq!(positions, [(0, 13), (0, 13)]);
+        // NFC may have reordered the marks around a combining mark, even at the
+        // same length (A U+0301 U+0325 becomes U+1E00 U+0301, 5 bytes either
+        // way): every part gets the coarse span.
+        let (tokens, positions) =
+            analyzer.fine_grained_tokenize_with_position("矩阵\u{301}多元", &[(0, 14)]);
+        assert_eq!(tokens, ["矩阵", "\u{301}", "多元"]);
+        assert_eq!(positions, [(0, 14); 3]);
+        let (tokens, positions) =
+            analyzer.fine_grained_tokenize_with_position("矩阵\u{1e00}\u{301}多元", &[(0, 17)]);
+        assert!(tokens.len() > 1, "{tokens:?}");
+        assert_eq!(positions, vec![(0, 17); tokens.len()]);
+        let (tokens, positions) =
+            analyzer.fine_grained_tokenize_with_position("矩阵\u{316}\u{301}多元", &[(0, 16)]);
+        assert_eq!(tokens, ["矩阵", "\u{316}", "\u{301}", "多元"]);
+        assert_eq!(positions, [(0, 16); 4]);
     }
 
     /// C++: `test_nfd_large_token_tokenize` — 7 000 NFD "é" (21 000 bytes, 14 000
@@ -3582,11 +3646,11 @@ mod rag_analyzer_tests {
             .collect()
     }
 
-    /// C++: `test_nfc_matches_python` — `normalize_nfc` against
-    /// `unicodedata.normalize("NFC")` of Python 3.13, whose Unicode version
-    /// (15.1.0) is the one of the generated tables, on the cases
+    /// C++: `test_nfc_matches_python` — `normalize_nfc` against `_compose()`
+    /// of rag_tokenizer.py on Python 3.13, whose Unicode version (15.1.0) is
+    /// the one of the generated tables, on the cases
     /// `generate_unicode_nfc.py --cases` prints; and the invariants of its
-    /// position map.
+    /// position maps.
     #[test]
     fn test_nfc_matches_python() {
         let output = Command::new("uv")
@@ -3604,17 +3668,19 @@ mod rag_analyzer_tests {
         let text = String::from_utf8(output.stdout).expect("UTF-8 output");
         let mut count = 0;
         for line in text.lines() {
-            let (input, expected) = line.split_once(';').expect("input;NFC");
+            let (input, expected) = line.split_once(';').expect("input;expected");
             let (input, expected) = (chars_from_hex(input), chars_from_hex(expected));
-            let mut pos_map = Vec::new();
-            let actual = crate::unicode_nfc::normalize_nfc(&input, Some(&mut pos_map));
+            let mut map = NfcPositionMap::default();
+            let actual = crate::unicode_nfc::normalize_nfc(&input, Some(&mut map));
             assert_eq!(actual.as_deref().unwrap_or(&input), expected, "{line}");
             // NFC text comes back as None, not as a copy.
             assert_eq!(actual.is_some(), input != expected, "{line}");
             if let Some(actual) = actual {
-                assert_eq!(pos_map.len(), actual.len() + 1, "{line}");
-                assert_eq!(pos_map.last(), Some(&(input.len() as u32)), "{line}");
-                assert!(pos_map.windows(2).all(|w| w[0] <= w[1]), "{line}");
+                for entries in [&map.start, &map.end] {
+                    assert_eq!(entries.len(), actual.len() + 1, "{line}");
+                    assert_eq!(entries.last(), Some(&(input.len() as u32)), "{line}");
+                    assert!(entries.windows(2).all(|w| w[0] <= w[1]), "{line}");
+                }
             }
             count += 1;
         }
@@ -3622,35 +3688,58 @@ mod rag_analyzer_tests {
     }
 
     /// C++: `test_nfc_position_map`, less its bytes that are not UTF-8, which
-    /// a `&str` cannot hold — every byte of the NFC form maps back to the
-    /// input byte it comes from, and a code point that NFC expands or moves
-    /// maps past the input bytes taken in before it.
+    /// a `&str` cannot hold — a token at NFC bytes `[a, b)` comes from input
+    /// bytes `[start[a], end[b])`, which covers every code point it took in,
+    /// and bytes NFC did not change map to themselves.
     #[test]
     fn test_nfc_position_map() {
-        let cases: [(&str, &str, &[u32]); 5] = [
+        #[allow(clippy::type_complexity)]
+        let cases: [(&str, &str, &[u32], &[u32]); 5] = [
             // ệ (3 bytes) comes from e U+0323 U+0302 (5 bytes).
-            ("Vie\u{323}\u{302}t", "Vi\u{1EC7}t", &[0, 1, 2, 2, 2, 7, 8]),
-            // U+212A (3 bytes) becomes K (1 byte).
-            ("a \u{212A}m", "a Km", &[0, 1, 2, 5, 6]),
-            // U+0958 expands to क + nukta; the nukta maps past the U+0958.
-            ("\u{958}x", "\u{915}\u{93C}x", &[0, 0, 0, 3, 3, 3, 3, 4]),
-            // The Hindi word for film, U+095E first.
             (
-                "\u{95E}\u{93F}\u{932}\u{94D}\u{92E}",
-                "\u{92B}\u{93C}\u{93F}\u{932}\u{94D}\u{92E}",
-                &[
-                    0, 0, 0, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-                ],
+                "Vie\u{323}\u{302}t",
+                "Vi\u{1EC7}t",
+                &[0, 1, 2, 2, 2, 7, 8],
+                &[0, 1, 2, 7, 7, 7, 8],
             ),
             // Marks typed out of canonical order: ẹ takes in the U+0323 at
-            // bytes [3, 5), so the U+0301 after it maps to 5.
-            ("e\u{301}\u{323}", "\u{1EB9}\u{301}", &[0, 0, 0, 5, 5, 5]),
+            // bytes [3, 5), the U+0301 after it comes from bytes [1, 3).
+            (
+                "e\u{301}\u{323}",
+                "\u{1EB9}\u{301}",
+                &[0, 0, 0, 1, 1, 5],
+                &[0, 5, 5, 5, 5, 5],
+            ),
+            // No starter to compose with: U+0316 moves before U+0301, and a
+            // token of either mark spans both.
+            (
+                "+\u{301}\u{316}",
+                "+\u{316}\u{301}",
+                &[0, 1, 1, 1, 1, 5],
+                &[0, 1, 5, 5, 5, 5],
+            ),
+            // Hangul conjoining jamo (9 bytes) compose to one syllable.
+            (
+                "\u{1100}\u{1161}\u{11A8}",
+                "\u{AC01}",
+                &[0, 0, 0, 9],
+                &[0, 9, 9, 9],
+            ),
+            // A protected code point (U+0958) and its mark are copied as they
+            // are; the é after them is composed.
+            (
+                "\u{958}\u{301}e\u{301}",
+                "\u{958}\u{301}\u{E9}",
+                &[0, 1, 2, 3, 4, 5, 5, 8],
+                &[0, 1, 2, 3, 4, 5, 8, 8],
+            ),
         ];
-        for (input, expected, expected_map) in cases {
-            let mut pos_map = Vec::new();
-            let actual = crate::unicode_nfc::normalize_nfc(input, Some(&mut pos_map));
+        for (input, expected, start, end) in cases {
+            let mut map = NfcPositionMap::default();
+            let actual = crate::unicode_nfc::normalize_nfc(input, Some(&mut map));
             assert_eq!(actual.as_deref(), Some(expected), "input '{input}'");
-            assert_eq!(pos_map, expected_map, "input '{input}'");
+            assert_eq!(map.start, start, "input '{input}'");
+            assert_eq!(map.end, end, "input '{input}'");
         }
     }
 

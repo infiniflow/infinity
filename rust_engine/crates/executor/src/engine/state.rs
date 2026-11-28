@@ -10514,7 +10514,7 @@ pub fn highlight_with_analyzer(
             }
         }
     }
-    let mut nfc_map: Vec<u32> = Vec::new();
+    let mut nfc_map = analyzer::NfcPositionMap::default();
     let nfc_text = if unicode.is_empty() {
         None
     } else {
@@ -10534,8 +10534,8 @@ pub fn highlight_with_analyzer(
             while let Some(offset) = nfc_text[from..].find(term.as_str()) {
                 let start = from + offset;
                 let (a, b) = (
-                    nfc_map[start] as usize,
-                    nfc_map[start + term.len()] as usize,
+                    nfc_map.start[start] as usize,
+                    nfc_map.end[start + term.len()] as usize,
                 );
                 if a < b {
                     matches.push((a, b));

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::unicode_nfc::normalize_nfc;
+use crate::unicode_nfc::{canonical_combining_class, normalize_nfc, NfcPositionMap};
 
 /// C++: `DartsTrie` (`darts_trie_impl.cpp`) over a Darts-clone unit array.
 ///
@@ -307,10 +307,10 @@ impl RAGAnalyzer {
     /// and OpenCC (identity here) through the same mapping chain as the
     /// reference.
     pub fn tokenize_with_position(&self, line: &str) -> (Vec<String>, Vec<(u32, u32)>) {
-        // Compose decomposed (NFD) text first, as rag_tokenizer.py does.
-        // `nfc_map` takes NFC offsets back to `line`; it is only filled when
-        // NFC changed the text.
-        let mut nfc_map = Vec::new();
+        // Compose decomposed (NFD) text first, as rag_tokenizer.py does. The
+        // offsets below are on `source`; `nfc_map` takes the spans back to
+        // `line` at the end, and is only filled when NFC changed the text.
+        let mut nfc_map = NfcPositionMap::default();
         let nfc = normalize_nfc(line, Some(&mut nfc_map));
         let source = nfc.as_deref().unwrap_or(line);
 
@@ -331,9 +331,8 @@ impl RAGAnalyzer {
         let strline = self.opencc.convert(&str1);
         let opencc_map = build_position_mapping(&str1, &strline);
 
-        // strline byte -> original input byte, through OpenCC -> StrQ2B ->
-        // the \W+ replacement -> diacritics folding -> NFC, the reference's
-        // chain.
+        // strline byte -> NFC input byte, through OpenCC -> StrQ2B -> the \W+
+        // replacement -> diacritics folding, the reference's chain.
         let mut final_map = Vec::with_capacity(strline.len() + 1);
         for i in 0..strline.len() {
             let str1_pos = opencc_map.get(i).copied().unwrap_or(str1.len() as u32) as usize;
@@ -356,16 +355,8 @@ impl RAGAnalyzer {
                     .unwrap_or(source.len() as u32);
             }
         }
-        if nfc.is_some() {
-            for pos in &mut final_map {
-                *pos = nfc_map
-                    .get(*pos as usize)
-                    .copied()
-                    .unwrap_or(line.len() as u32);
-            }
-        }
         let map_pos =
-            |pos: usize| -> u32 { final_map.get(pos).copied().unwrap_or(line.len() as u32) };
+            |pos: usize| -> u32 { final_map.get(pos).copied().unwrap_or(source.len() as u32) };
 
         let mut tokens = Vec::new();
         let mut positions = Vec::new();
@@ -411,7 +402,21 @@ impl RAGAnalyzer {
             );
         }
 
-        merge_with_position(self, &tokens, &positions)
+        let (tokens, mut positions) = merge_with_position(self, &tokens, &positions);
+        if nfc.is_some() {
+            // A token's span reaches from the lowest to the highest input byte
+            // its characters come from.
+            let input_len = line.len() as u32;
+            for (start, end) in &mut positions {
+                *start = nfc_map
+                    .start
+                    .get(*start as usize)
+                    .copied()
+                    .unwrap_or(input_len);
+                *end = nfc_map.end.get(*end as usize).copied().unwrap_or(input_len);
+            }
+        }
+        (tokens, positions)
     }
 
     /// C++: `RAGAnalyzer::FineGrainedTokenize`.
@@ -546,6 +551,19 @@ impl RAGAnalyzer {
                 .collect();
             sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
             let stk = &sorted[1].1;
+            // The offsets of the parts add up only while the token is its input
+            // bytes. NFC, StrQ2B, OpenCC or folding can change its length, and
+            // NFC can reorder the combining marks; then every part gets the
+            // span of the whole token.
+            let exact =
+                start_pos as usize + token.len() == end_pos as usize && !has_combining_marks(token);
+            let part_span = |sub_pos, sub_end| {
+                if exact {
+                    (sub_pos, sub_end)
+                } else {
+                    (start_pos, end_pos)
+                }
+            };
             if stk.len() == token_len {
                 fine_tokens.push((*token).to_string());
                 fine_positions.push((start_pos, end_pos));
@@ -561,13 +579,8 @@ impl RAGAnalyzer {
                     for part in stk {
                         let sub_end = sub_pos + char_len(part) as u32;
                         fine_tokens.push(part.clone());
-                        fine_positions.push((sub_pos.min(end_pos), sub_end.min(end_pos)));
+                        fine_positions.push(part_span(sub_pos, sub_end));
                         sub_pos = sub_end;
-                    }
-                    // NFC can change the token's byte length; the last part
-                    // ends where the coarse token does.
-                    if !stk.is_empty() {
-                        fine_positions.last_mut().expect("a part").1 = end_pos;
                     }
                 }
             } else {
@@ -575,11 +588,8 @@ impl RAGAnalyzer {
                 for part in stk {
                     let sub_end = sub_pos + part.len() as u32;
                     fine_tokens.push(part.clone());
-                    fine_positions.push((sub_pos.min(end_pos), sub_end.min(end_pos)));
+                    fine_positions.push(part_span(sub_pos, sub_end));
                     sub_pos = sub_end;
-                }
-                if !stk.is_empty() {
-                    fine_positions.last_mut().expect("a part").1 = end_pos;
                 }
             }
         }
@@ -1475,6 +1485,14 @@ pub(crate) fn merge_with_position(
         start = end;
     }
     (merged_tokens, merged_positions)
+}
+
+/// C++: `HasCombiningMarks` — whether `text` holds a combining mark
+/// (ccc != 0). NFC may have reordered the marks around it, even when the
+/// length stayed the same: A U+0301 U+0325 becomes U+1E00 U+0301, 5 bytes
+/// either way.
+fn has_combining_marks(text: &str) -> bool {
+    text.chars().any(|c| canonical_combining_class(c) != 0)
 }
 
 /// C++: `IsChinese` — a 3-byte sequence with a 0xE4..=0xE9 lead byte, i.e.

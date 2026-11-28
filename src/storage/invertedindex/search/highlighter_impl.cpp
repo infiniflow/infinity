@@ -96,8 +96,8 @@ void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_
 
     // The analyzer emits NFC query terms; a document stored decomposed (NFD) only matches
     // after composing it. Hits are mapped back to raw bytes; MergeMatches folds duplicates.
-    std::vector<unsigned> pos_map;
-    std::optional<std::string> nfc_text = NormalizeNFC(raw_text, &pos_map);
+    NFCPositionMap nfc_map;
+    std::optional<std::string> nfc_text = NormalizeNFC(raw_text, &nfc_map);
     if (!nfc_text.has_value()) {
         return;
     }
@@ -108,8 +108,8 @@ void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_
             if (pos == std::string::npos) {
                 break;
             }
-            size_t raw_start = pos_map[pos];
-            size_t raw_end = pos_map[pos + query_text.length()];
+            size_t raw_start = nfc_map.start[pos];
+            size_t raw_end = nfc_map.end[pos + query_text.length()];
             if (raw_start < raw_end) {
                 matches.emplace_back(raw_start, raw_end);
             }

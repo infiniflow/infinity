@@ -14,16 +14,19 @@
 
 #pragma once
 
-// Unicode NFC normalization, the unicodedata.normalize("NFC", ...) step of
-// rag_tokenizer.py. The tables come from Python's unicodedata through
-// tools/generate_unicode_nfc.py, so both sides compose the same text; the
-// Rust port (unicode_nfc.rs) uses the same tables and algorithm.
+// Unicode NFC normalization, the _compose() step of rag_tokenizer.py: NFC,
+// except that the protected code points (Full_Composition_Exclusion and the
+// code points not assigned in Unicode 13.0) stay as they are and nothing
+// composes across them. The tables come from Python's unicodedata through
+// tools/generate_unicode_nfc.py, which leaves the protected code points out of
+// them, so both sides compose the same text; the Rust port (unicode_nfc.rs)
+// uses the same tables and algorithm.
 //
-// The input is split into segments, each starting at a code point with
-// ccc 0 and NFC_Quick_Check=Yes. A segment that passes the quick check is
-// already NFC; any other one is decomposed, put in canonical order and
-// composed again (UAX #15). Segments normalize independently, so text that is
-// already NFC is never copied.
+// The input is split into segments, each starting at a boundary: a code point
+// with ccc 0 and NFC_Quick_Check=Yes, or a protected one. A segment that
+// passes the quick check is already NFC; any other one is decomposed, put in
+// canonical order and composed again (UAX #15). Segments normalize
+// independently, so text that is already NFC is never copied.
 
 #include "unicode_nfc_data.h"
 
@@ -37,6 +40,12 @@
 #include <vector>
 
 namespace infinity {
+
+// Where the bytes of an NFC form come from in its input; see NormalizeNFC.
+struct NFCPositionMap {
+    std::vector<unsigned> start;
+    std::vector<unsigned> end;
+};
 
 namespace nfc_detail {
 
@@ -120,7 +129,8 @@ inline void EncodeUTF8(char32_t cp, std::string &out) {
 }
 
 // The NFC_NON_BOUNDARY range holding cp, or nullptr when cp is a boundary
-// (ccc 0 and NFC_Quick_Check=Yes), as every code point below U+0300 is.
+// (ccc 0 and NFC_Quick_Check=Yes, or protected), as every code point below
+// U+0300 is.
 inline const NFCRange *FindNonBoundary(char32_t cp) {
     if (cp < NFC_NON_BOUNDARY[0].first) {
         return nullptr;
@@ -154,9 +164,7 @@ inline void Decompose(char32_t cp, unsigned offset, unsigned end, std::vector<NF
         });
     if (it != std::end(NFC_DECOMPOSITIONS) && it->cp == cp) {
         Decompose(it->first, offset, end, buf);
-        if (it->second != 0) {
-            Decompose(it->second, offset, end, buf);
-        }
+        Decompose(it->second, offset, end, buf);
         return;
     }
     buf.push_back({cp, CanonicalCombiningClass(cp), offset, end});
@@ -246,19 +254,16 @@ inline bool NormalizeSegment(std::string_view in, std::size_t start, std::size_t
     return i != end;
 }
 
-// Appends a normalized segment. A code point maps no lower than the end of
-// the input taken in by the code points before it, so pos_map never decreases,
-// and a token that ends inside an expansion or a reordered run of marks still
-// spans its whole source.
-inline void AppendSegment(const std::vector<NFCUnit> &buf, std::string &out, std::vector<unsigned> *pos_map) {
-    unsigned covered = 0;
+// Appends a normalized segment; each byte of a code point records the input
+// bytes [offset, end) it comes from, in map->start and map->end.
+inline void AppendSegment(const std::vector<NFCUnit> &buf, std::string &out, NFCPositionMap *map) {
     for (const NFCUnit &unit : buf) {
         const std::size_t before = out.size();
         EncodeUTF8(unit.cp, out);
-        if (pos_map) {
-            pos_map->insert(pos_map->end(), out.size() - before, std::max(unit.offset, covered));
+        if (map) {
+            map->start.insert(map->start.end(), out.size() - before, unit.offset);
+            map->end.insert(map->end.end(), out.size() - before, unit.end);
         }
-        covered = std::max(covered, unit.end);
     }
 }
 
@@ -267,27 +272,25 @@ inline void AppendSegment(const std::vector<NFCUnit> &buf, std::string &out, std
 // Returns the NFC form of in, or nothing when in is already NFC. Bytes that
 // are not well-formed UTF-8 are copied as they are and split segments.
 //
-// When a string is returned and pos_map is set, pos_map gets out.size() + 1
-// entries: (*pos_map)[i] is the byte of in that output byte i comes from, the
-// last entry is in.size(), and the entries never decrease. An unchanged byte
-// maps to itself. Every byte of a rewritten code point maps to the input
-// offset of its source code point (a composite: its starter's), raised to the
-// end of the input taken in by the code points before it in the segment, so a
-// span [(*pos_map)[a], (*pos_map)[b]) reaches the end of every input code
-// point that output bytes [a, b) come from. Known limit: a mark that canonical
-// reordering moved after marks from later in the input maps past its own
-// bytes, so a token of that mark alone gets an empty span; only the C++ and
-// Rust tokenizers emit such tokens (PCRE2 counts every Mn as \w, Rust keeps
-// Other_Alphabetic marks such as U+05C1), rag_tokenizer.py never does.
-inline std::optional<std::string> NormalizeNFC(std::string_view in, std::vector<unsigned> *pos_map = nullptr) {
+// When a string is returned and map is set, map->start and map->end get
+// out.size() + 1 entries each, which never decrease and are the identity on
+// bytes NFC did not change. A token at output bytes [a, b) comes from input
+// bytes [map->start[a], map->end[b]): start[a] is the lowest input offset of
+// the code points from output byte a on, end[b] the highest input end of the
+// code points before output byte b (a composite comes from everything it took
+// in). The span is never empty for a non-empty token and covers the input of
+// every code point in it; when canonical reordering moved a mark, it also
+// covers the marks it moved past, so it can overlap the next token.
+inline std::optional<std::string> NormalizeNFC(std::string_view in, NFCPositionMap *map = nullptr) {
     using namespace nfc_detail;
     std::optional<std::string> out;
     std::size_t copied = 0; // in[0, copied) is already in *out
     std::vector<NFCUnit> buf;
     const auto copy_until = [&](std::size_t end) {
         out->append(in.substr(copied, end - copied));
-        for (std::size_t i = copied; pos_map && i < end; ++i) {
-            pos_map->push_back(static_cast<unsigned>(i));
+        for (std::size_t i = copied; map && i < end; ++i) {
+            map->start.push_back(static_cast<unsigned>(i));
+            map->end.push_back(static_cast<unsigned>(i + 1));
         }
         copied = end;
     };
@@ -298,13 +301,15 @@ inline std::optional<std::string> NormalizeNFC(std::string_view in, std::vector<
         if (!out) {
             out.emplace();
             out->reserve(in.size());
-            if (pos_map) {
-                pos_map->clear();
-                pos_map->reserve(in.size() + 1);
+            if (map) {
+                map->start.clear();
+                map->start.reserve(in.size() + 1);
+                map->end.assign(1, 0);
+                map->end.reserve(in.size() + 1);
             }
         }
         copy_until(start);
-        AppendSegment(buf, *out, pos_map);
+        AppendSegment(buf, *out, map);
         copied = end;
     };
 
@@ -339,8 +344,17 @@ inline std::optional<std::string> NormalizeNFC(std::string_view in, std::vector<
     }
     if (out) {
         copy_until(in.size());
-        if (pos_map) {
-            pos_map->push_back(static_cast<unsigned>(in.size()));
+        if (map) {
+            // Per output byte so far: its code point's input [start, end).
+            // start becomes the minimum from each byte on, end (shifted by
+            // one) the maximum before each byte.
+            map->start.push_back(static_cast<unsigned>(in.size()));
+            for (std::size_t k = map->start.size() - 1; k-- > 0;) {
+                map->start[k] = std::min(map->start[k], map->start[k + 1]);
+            }
+            for (std::size_t k = 1; k < map->end.size(); ++k) {
+                map->end[k] = std::max(map->end[k], map->end[k - 1]);
+            }
         }
     }
     return out;
