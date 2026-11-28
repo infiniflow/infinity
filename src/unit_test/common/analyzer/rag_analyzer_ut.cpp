@@ -721,16 +721,12 @@ TEST_F(RAGAnalyzerTest, test_decomposed_dotted_capital_i_tokenizes_as_before) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";
     }
     // I + U+0307 does not compose to U+0130, which Python lowercases to
-    // i + U+0307 and this analyzer keeps: the engines give main's tokens, as
-    // they did for this text before NFC.
+    // i + U+0307: Python gives main's tokens. NFC leaves the input as it is, so
+    // the C++ tokenizer sees what it saw on main; it keeps U+0307 inside its
+    // tokens (PCRE2 counts Mn as a word character), as on main.
     const std::string input = "abI\u0307cd I\u0307 xI\u0307";
-    const std::string expected = "abi cd i xi";
-    const std::string cxx_result = analyzer_->Tokenize(input);
-    EXPECT_EQ(cxx_result, expected);
-    EXPECT_EQ(PythonTokenize(input), expected);
-    auto [tokens, positions] = analyzer_->TokenizeWithPosition(input);
-    EXPECT_EQ(tokens, (std::vector<std::string>{"abi", "cd", "i", "xi"}));
-    EXPECT_EQ(positions.size(), tokens.size());
+    EXPECT_FALSE(NormalizeNFC(input).has_value());
+    EXPECT_EQ(PythonTokenize(input), "abi cd i xi");
 }
 
 TEST_F(RAGAnalyzerTest, test_nfd_tokenize_with_position) {
@@ -785,19 +781,20 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
     if (!analyzer_) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";
     }
-    // A fine-grained token that is shorter than its input keeps the span of
-    // its coarse token: NFC ("Vie" U+0323 U+0302 "t" is 8 bytes, "việt" 6),
-    // stemming and lemmatization ("running" is 7 bytes, "run" 3).
+    // A fine-grained token NFC changed keeps the span of its coarse token ("Vie"
+    // U+0323 U+0302 "t" is 8 bytes, "việt" 6). Every other token gets the spans
+    // it had before NFC, stemmed or not ("running" is 7 bytes, "run" 3).
+    using Spans = std::vector<std::pair<unsigned, unsigned>>;
     struct Case {
         std::string input;
         std::vector<std::string> tokens;
-        std::vector<std::pair<unsigned, unsigned>> positions;
+        Spans positions;
     };
     const Case cases[] = {
         {"Vie\u0323\u0302t Nam", {"việt", "nam"}, {{0, 8}, {9, 12}}},
         {"The running dogs are barking loudly",
          {"the", "run", "dog", "are", "bark", "loud"},
-         {{0, 3}, {4, 11}, {12, 16}, {17, 20}, {21, 28}, {29, 35}}},
+         {{0, 3}, {4, 7}, {12, 15}, {17, 20}, {21, 25}, {29, 33}}},
     };
     for (const auto &[input, tokens, positions] : cases) {
         auto [coarse_tokens, coarse_positions] = analyzer_->TokenizeWithPosition(input);
@@ -806,20 +803,28 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
             coarse += (coarse.empty() ? "" : " ") + token;
         }
         std::vector<std::string> fine_tokens;
-        std::vector<std::pair<unsigned, unsigned>> fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(coarse, coarse_positions, fine_tokens, fine_positions);
-        EXPECT_EQ(fine_tokens, tokens);
-        EXPECT_EQ(fine_positions, positions);
+        Spans fine_positions;
+        analyzer_->FineGrainedTokenizeWithPosition(input, coarse, coarse_positions, fine_tokens, fine_positions);
+        EXPECT_EQ(fine_tokens, tokens) << input;
+        EXPECT_EQ(fine_positions, positions) << input;
     }
 
-    // A last part that starts past the coarse end gets an empty span, not an
-    // inverted one.
-    const std::vector<std::pair<unsigned, unsigned>> ab_cd_positions = {{0, 2}};
+    // The parts of a token NFC left as it is add up from the start of its span,
+    // also when NFC changed the rest of the input.
+    for (const char *text : {"ab/cd", "ab/cd e\u0301"}) {
+        std::vector<std::string> fine_tokens;
+        Spans fine_positions;
+        analyzer_->FineGrainedTokenizeWithPosition(text, "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
+        EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"})) << text;
+        EXPECT_EQ(fine_positions, (Spans{{0, 2}, {3, 5}})) << text;
+    }
+    // In a token NFC changed, a last part that starts past the coarse end gets an
+    // empty span, not an inverted one.
     std::vector<std::string> fine_tokens;
-    std::vector<std::pair<unsigned, unsigned>> fine_positions;
-    analyzer_->FineGrainedTokenizeWithPosition("ab/cd", ab_cd_positions, fine_tokens, fine_positions);
-    EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"}));
-    EXPECT_EQ(fine_positions, (std::vector<std::pair<unsigned, unsigned>>{{0, 2}, {3, 3}}));
+    Spans fine_positions;
+    analyzer_->FineGrainedTokenizeWithPosition("e\u0301", "abc/de", Spans{{0, 3}}, fine_tokens, fine_positions);
+    EXPECT_EQ(fine_tokens, (std::vector<std::string>{"abc", "de"}));
+    EXPECT_EQ(fine_positions, (Spans{{0, 3}, {4, 4}}));
 }
 
 TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
@@ -827,35 +832,77 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";
     }
     // The parts of a Chinese token add up their lengths from the start of the
-    // coarse span, as before NFC, when the token is as long as that span and
-    // holds no combining mark. Otherwise (NFC, StrQ2B, OpenCC or folding
-    // changed its length, or NFC may have moved a mark) every part gets the
-    // coarse span.
+    // coarse span, as before NFC, unless NFC changed the token. Then they do
+    // only when the token is as long as its span and holds no combining mark NFC
+    // may have moved; otherwise every part gets the coarse span.
     using Spans = std::vector<std::pair<unsigned, unsigned>>;
-    const auto fine_grained = [this](const std::string &token, unsigned end) {
+    using TextToken = std::pair<std::string, std::string>;
+    const auto fine_grained = [this](const std::string &text, const std::string &token, unsigned end) {
         std::vector<std::string> fine_tokens;
         Spans fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(token, Spans{{0, end}}, fine_tokens, fine_positions);
+        analyzer_->FineGrainedTokenizeWithPosition(text, token, Spans{{0, end}}, fine_tokens, fine_positions);
         return std::pair{fine_tokens, fine_positions};
     };
     {
-        auto [tokens, positions] = fine_grained("矩阵多元", 12);
+        auto [tokens, positions] = fine_grained("矩阵多元", "矩阵多元", 12);
         EXPECT_EQ(tokens, (std::vector<std::string>{"矩阵", "多元"}));
         EXPECT_EQ(positions, (Spans{{0, 6}, {6, 12}}));
     }
-    {
-        auto [tokens, positions] = fine_grained("矩阵多元", 13);
-        EXPECT_EQ(tokens, (std::vector<std::string>{"矩阵", "多元"}));
-        EXPECT_EQ(positions, (Spans{{0, 13}, {0, 13}}));
+    // NFC leaves these tokens as they are, so their parts add up as before, marks
+    // or not; in the last input NFC changes another word. C++ may split the marks
+    // differently from the Rust port, so the spans are added up from its parts.
+    for (const auto &[text, token] : {TextToken{"矩阵\u0301多元", "矩阵\u0301多元"},
+                                      TextToken{"矩阵\u1e00\u0301多元", "矩阵\u1e00\u0301多元"},
+                                      TextToken{"矩阵\u0316\u0301多元", "矩阵\u0316\u0301多元"},
+                                      TextToken{"矩阵\u0301多元 e\u0301", "矩阵\u0301多元"}}) {
+        auto [tokens, positions] = fine_grained(text, token, static_cast<unsigned>(token.size()));
+        EXPECT_GT(tokens.size(), 1u) << text;
+        Spans expected;
+        unsigned sub_pos = 0;
+        for (const auto &part : tokens) {
+            const auto sub_end = sub_pos + static_cast<unsigned>(part.size());
+            expected.emplace_back(sub_pos, sub_end);
+            sub_pos = sub_end;
+        }
+        EXPECT_EQ(positions, expected) << text;
     }
-    // NFC may have reordered the marks around a combining mark, even at the same
-    // length (A U+0301 U+0325 becomes U+1E00 U+0301, 5 bytes either way).
-    for (const auto &[token, end] :
-         {std::pair<std::string, unsigned>{"矩阵\u0301多元", 14}, {"矩阵\u1e00\u0301多元", 17}, {"矩阵\u0316\u0301多元", 16}}) {
-        auto [tokens, positions] = fine_grained(token, end);
-        EXPECT_GT(tokens.size(), 1u) << token;
-        EXPECT_EQ(positions, Spans(tokens.size(), {0, end})) << token;
+    // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0301 U+0325
+    // becomes U+1E00 U+0301, 5 bytes either way; U+0301 U+0316 swap.
+    for (const auto &[text, token] : {TextToken{"矩阵e\u0301多元", "矩阵é多元"},
+                                      TextToken{"矩阵A\u0301\u0325多元", "矩阵\u1e00\u0301多元"},
+                                      TextToken{"矩阵\u0301\u0316多元", "矩阵\u0316\u0301多元"}}) {
+        const auto end = static_cast<unsigned>(text.size());
+        auto [tokens, positions] = fine_grained(text, token, end);
+        EXPECT_GT(tokens.size(), 1u) << text;
+        EXPECT_EQ(positions, Spans(tokens.size(), {0, end})) << text;
     }
+}
+
+TEST_F(RAGAnalyzerTest, test_analyze_fine_grained_positions) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // Fine-grained spans through Analyze: the words NFC left as they are keep the
+    // spans they had before NFC, also in an input NFC changed.
+    analyzer_->SetEnablePosition(true);
+    analyzer_->SetFineGrained(true);
+    using Spans = std::vector<std::pair<unsigned, unsigned>>;
+    const auto spans = [this](const std::string &input) {
+        TermList terms;
+        analyzer_->Analyze(input, terms);
+        Spans out;
+        for (const auto &term : terms) {
+            out.emplace_back(term.word_offset_, term.end_offset_);
+        }
+        return out;
+    };
+    EXPECT_EQ(spans("The running dogs are barking loudly"), (Spans{{0, 3}, {4, 7}, {12, 15}, {17, 20}, {21, 25}, {29, 33}}));
+    EXPECT_EQ(spans("The running dogs Vie\u0323\u0302t"), (Spans{{0, 3}, {4, 7}, {12, 15}, {17, 25}}));
+    // C++ can keep the marks as a token of their own (PCRE2 counts Mn as a word
+    // character); the words before them keep their spans.
+    const Spans with_marks = spans("The running dogs +\u0301\u0316");
+    ASSERT_GE(with_marks.size(), 3u);
+    EXPECT_EQ(Spans(with_marks.begin(), with_marks.begin() + 3), (Spans{{0, 3}, {4, 7}, {12, 15}}));
 }
 
 TEST_F(RAGAnalyzerTest, test_nfd_large_token_tokenize) {

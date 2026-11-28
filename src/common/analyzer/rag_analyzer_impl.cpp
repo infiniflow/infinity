@@ -2493,7 +2493,8 @@ static bool HasCombiningMarks(std::string_view text) {
     return false;
 }
 
-void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
+void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
+                                                  const std::string &tokens_str,
                                                   const std::vector<std::pair<unsigned, unsigned>> &positions,
                                                   std::vector<std::string> &fine_tokens,
                                                   std::vector<std::pair<unsigned, unsigned>> &fine_positions) {
@@ -2510,6 +2511,17 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             }
         }
     }
+
+    // NFC changed a token only if it changes the input bytes of its span; every
+    // other token gets the spans it had before NFC. A span outside the input
+    // counts as changed, as in the Rust port.
+    const bool text_composed = NormalizeNFC(text).has_value();
+    const auto composed = [&text, text_composed](unsigned start, unsigned end) {
+        if (!text_composed) {
+            return false;
+        }
+        return start > end || end > text.size() || NormalizeNFC(std::string_view(text).substr(start, end - start)).has_value();
+    };
 
     if (zh_num < tks.size() * 0.2) {
         // English text processing - apply normalization
@@ -2531,10 +2543,9 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                     sub_start = sub_end + 1;
                 }
             }
-            // The token can be shorter than its input (NFC, folding, stemming,
-            // lemmatization), so its last part ends where the coarse token
-            // does, and never before it starts.
-            if (fine_positions.size() > first) {
+            // NFC can make the token shorter than its input, so its last part
+            // ends where the coarse token does, and never before it starts.
+            if (fine_positions.size() > first && composed(start_pos, end_pos)) {
                 auto &last = fine_positions.back();
                 last.second = std::max(end_pos, last.first);
             }
@@ -2577,10 +2588,10 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
             std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
             SortTokens(token_list, sorted_tokens);
             const auto &stk = sorted_tokens[1].first;
-            // The offsets of the parts add up only while the token is its input bytes. NFC,
-            // StrQ2B, OpenCC or folding can change its length, and NFC can reorder the
-            // combining marks; then every part gets the span of the whole token.
-            const bool exact = start_pos + token.size() == end_pos && !HasCombiningMarks(token);
+            // The offsets of the parts add up only while the token is its input bytes. In a
+            // token NFC changed, NFC, StrQ2B, OpenCC or folding can change its length, and NFC
+            // can reorder the combining marks; then every part gets the span of the whole token.
+            const bool exact = !composed(start_pos, end_pos) || (start_pos + token.size() == end_pos && !HasCombiningMarks(token));
 
             if (stk.size() == token_len) {
                 fine_tokens.push_back(token);
@@ -2717,7 +2728,7 @@ int RAGAnalyzer::AnalyzeImpl(const Term &input, void *data, HookType func) {
         if (fine_grained_) {
             std::vector<std::string> fine_tokens;
             std::vector<std::pair<unsigned, unsigned>> fine_positions;
-            FineGrainedTokenizeWithPosition(Join(tokens, 0), positions, fine_tokens, fine_positions);
+            FineGrainedTokenizeWithPosition(input.text_, Join(tokens, 0), positions, fine_tokens, fine_positions);
             tokens = std::move(fine_tokens);
             positions = std::move(fine_positions);
         }

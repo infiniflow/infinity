@@ -75,7 +75,9 @@ public:
                                    std::vector<std::pair<unsigned, unsigned>> &positions,
                                    unsigned base_pos,
                                    const std::vector<unsigned> *pos_mapping = nullptr);
-    void FineGrainedTokenizeWithPosition(const std::string &tokens_str,
+    // text is the input that positions index into.
+    void FineGrainedTokenizeWithPosition(const std::string &text,
+                                         const std::string &tokens_str,
                                          const std::vector<std::pair<unsigned, unsigned>> &positions,
                                          std::vector<std::string> &fine_tokens,
                                          std::vector<std::pair<unsigned, unsigned>> &fine_positions);

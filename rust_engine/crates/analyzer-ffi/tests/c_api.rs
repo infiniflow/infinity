@@ -203,6 +203,46 @@ fn fine_grained_positions_split_the_same_way() {
     }
 }
 
+/// The fine-grained spans of the words NFC left as they are stay what they
+/// were before NFC, also in an input NFC changed.
+#[test]
+fn fine_grained_positions_of_unchanged_words_stay() {
+    let Some(handle) = (unsafe { loaded_handle() }) else {
+        return;
+    };
+    let cases: [(&str, &[(u32, u32)]); 3] = [
+        (
+            "The running dogs are barking loudly",
+            &[(0, 3), (4, 7), (12, 15), (17, 20), (21, 25), (29, 33)],
+        ),
+        (
+            "The running dogs Vie\u{323}\u{302}t",
+            &[(0, 3), (4, 7), (12, 15), (17, 25)],
+        ),
+        (
+            "The running dogs +\u{301}\u{316}",
+            &[(0, 3), (4, 7), (12, 15)],
+        ),
+    ];
+    unsafe {
+        RAGAnalyzer_SetFineGrained(handle, true);
+        for (text, positions) in cases {
+            let input = c(text);
+            let list = RAGAnalyzer_TokenizeWithPosition(handle, input.as_ptr());
+            assert!(!list.is_null(), "{}", last_error());
+            let spans: Vec<(u32, u32)> = (0..(*list).count as usize)
+                .map(|index| {
+                    let token = &*(*list).tokens.add(index);
+                    (token.offset, token.end_offset)
+                })
+                .collect();
+            RAGAnalyzer_FreeTokenList(list);
+            assert_eq!(spans, positions, "input '{text}'");
+        }
+        RAGAnalyzer_Destroy(handle);
+    }
+}
+
 #[test]
 fn a_callback_sees_every_token() {
     static SEEN: Mutex<Vec<String>> = Mutex::new(Vec::new());

@@ -3552,9 +3552,9 @@ mod rag_analyzer_tests {
     }
 
     /// C++: `test_fine_grained_tokenize_with_position` — a fine-grained token
-    /// that is shorter than its input keeps the span of its coarse token: NFC
-    /// ("Vie\u{323}\u{302}t" is 8 bytes, "việt" 6), stemming and
-    /// lemmatization ("running" is 7 bytes, "run" 3).
+    /// NFC changed keeps the span of its coarse token ("Vie\u{323}\u{302}t" is
+    /// 8 bytes, "việt" 6). Every other token gets the spans it had before NFC,
+    /// stemmed or not ("running" is 7 bytes, "run" 3).
     #[test]
     fn test_fine_grained_tokenize_with_position() {
         let analyzer = load_analyzer();
@@ -3567,56 +3567,122 @@ mod rag_analyzer_tests {
             (
                 "The running dogs are barking loudly",
                 &["the", "run", "dog", "are", "bark", "loud"],
-                &[(0, 3), (4, 11), (12, 16), (17, 20), (21, 28), (29, 35)],
+                &[(0, 3), (4, 7), (12, 15), (17, 20), (21, 25), (29, 33)],
             ),
         ];
         for (input, tokens, positions) in cases {
             let (coarse_tokens, coarse_positions) = analyzer.tokenize_with_position(input);
-            let (fine_tokens, fine_positions) = analyzer
-                .fine_grained_tokenize_with_position(&coarse_tokens.join(" "), &coarse_positions);
+            let (fine_tokens, fine_positions) = analyzer.fine_grained_tokenize_with_position(
+                input,
+                &coarse_tokens.join(" "),
+                &coarse_positions,
+            );
             assert_eq!(fine_tokens, tokens, "input '{input}'");
             assert_eq!(fine_positions, positions, "input '{input}'");
         }
 
-        // A last part that starts past the coarse end gets an empty span, not
-        // an inverted one.
+        // The parts of a token NFC left as it is add up from the start of its
+        // span, also when NFC changed the rest of the input.
+        for text in ["ab/cd", "ab/cd e\u{301}"] {
+            let (fine_tokens, fine_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, "ab/cd", &[(0, 2)]);
+            assert_eq!(fine_tokens, ["ab", "cd"]);
+            assert_eq!(fine_positions, [(0, 2), (3, 5)], "text '{text}'");
+        }
+        // In a token NFC changed, a last part that starts past the coarse end
+        // gets an empty span, not an inverted one.
         let (fine_tokens, fine_positions) =
-            analyzer.fine_grained_tokenize_with_position("ab/cd", &[(0, 2)]);
-        assert_eq!(fine_tokens, ["ab", "cd"]);
-        assert_eq!(fine_positions, [(0, 2), (3, 3)]);
+            analyzer.fine_grained_tokenize_with_position("e\u{301}", "abc/de", &[(0, 3)]);
+        assert_eq!(fine_tokens, ["abc", "de"]);
+        assert_eq!(fine_positions, [(0, 3), (4, 4)]);
     }
 
     /// C++: `test_fine_grained_chinese_split_span` — the parts of a Chinese
     /// token add up their lengths from the start of the coarse span, as before
-    /// NFC, when the token is as long as that span and NFC cannot have
-    /// reordered its marks. Otherwise (NFC, StrQ2B, OpenCC or folding changed
-    /// its length, or NFC moved a mark) every part gets the coarse span.
+    /// NFC, unless NFC changed the token. Then they do only when the token is
+    /// as long as its span and holds no combining mark NFC may have moved;
+    /// otherwise every part gets the coarse span.
     #[test]
     fn test_fine_grained_chinese_split_span() {
         let analyzer = load_analyzer();
-        let (tokens, positions) =
-            analyzer.fine_grained_tokenize_with_position("矩阵多元", &[(0, 12)]);
-        assert_eq!(tokens, ["矩阵", "多元"]);
-        assert_eq!(positions, [(0, 6), (6, 12)]);
-        let (tokens, positions) =
-            analyzer.fine_grained_tokenize_with_position("矩阵多元", &[(0, 13)]);
-        assert_eq!(tokens, ["矩阵", "多元"]);
-        assert_eq!(positions, [(0, 13), (0, 13)]);
-        // NFC may have reordered the marks around a combining mark, even at the
-        // same length (A U+0301 U+0325 becomes U+1E00 U+0301, 5 bytes either
-        // way): every part gets the coarse span.
-        let (tokens, positions) =
-            analyzer.fine_grained_tokenize_with_position("矩阵\u{301}多元", &[(0, 14)]);
-        assert_eq!(tokens, ["矩阵", "\u{301}", "多元"]);
-        assert_eq!(positions, [(0, 14); 3]);
-        let (tokens, positions) =
-            analyzer.fine_grained_tokenize_with_position("矩阵\u{1e00}\u{301}多元", &[(0, 17)]);
-        assert!(tokens.len() > 1, "{tokens:?}");
-        assert_eq!(positions, vec![(0, 17); tokens.len()]);
-        let (tokens, positions) =
-            analyzer.fine_grained_tokenize_with_position("矩阵\u{316}\u{301}多元", &[(0, 16)]);
-        assert_eq!(tokens, ["矩阵", "\u{316}", "\u{301}", "多元"]);
-        assert_eq!(positions, [(0, 16); 4]);
+        // The token is the first word of the input; NFC leaves it as it is,
+        // marks or not. In the last input NFC changes another word.
+        let cases: [PositionCase; 5] = [
+            ("矩阵多元", &["矩阵", "多元"], &[(0, 6), (6, 12)]),
+            (
+                "矩阵\u{301}多元",
+                &["矩阵", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 14)],
+            ),
+            (
+                "矩阵\u{1e00}\u{301}多元",
+                &["矩阵", "\u{1e00}", "\u{301}", "多元"],
+                &[(0, 6), (6, 9), (9, 11), (11, 17)],
+            ),
+            (
+                "矩阵\u{316}\u{301}多元",
+                &["矩阵", "\u{316}", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 10), (10, 16)],
+            ),
+            (
+                "矩阵\u{301}多元 e\u{301}",
+                &["矩阵", "\u{301}", "多元"],
+                &[(0, 6), (6, 8), (8, 14)],
+            ),
+        ];
+        for (text, tokens, positions) in cases {
+            let token = text.split(' ').next().expect("a word");
+            let span = [(0, token.len() as u32)];
+            let (actual_tokens, actual_positions) =
+                analyzer.fine_grained_tokenize_with_position(text, token, &span);
+            assert_eq!(actual_tokens, tokens, "text '{text}'");
+            assert_eq!(actual_positions, positions, "text '{text}'");
+        }
+
+        // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0301
+        // U+0325 becomes U+1E00 U+0301, 5 bytes either way; U+0301 U+0316 swap.
+        for (text, token) in [
+            ("矩阵e\u{301}多元", "矩阵é多元"),
+            ("矩阵A\u{301}\u{325}多元", "矩阵\u{1e00}\u{301}多元"),
+            ("矩阵\u{301}\u{316}多元", "矩阵\u{316}\u{301}多元"),
+        ] {
+            let end = text.len() as u32;
+            let (tokens, positions) =
+                analyzer.fine_grained_tokenize_with_position(text, token, &[(0, end)]);
+            assert!(tokens.len() > 1, "text '{text}': {tokens:?}");
+            assert_eq!(positions, vec![(0, end); tokens.len()], "text '{text}'");
+        }
+    }
+
+    /// Fine-grained spans through `analyze`: the words NFC left as they are
+    /// keep the spans they had before NFC, also in an input NFC changed.
+    #[test]
+    fn test_analyze_fine_grained_positions() {
+        let mut analyzer = load_analyzer();
+        analyzer.set_enable_position(true);
+        analyzer.set_fine_grained(true);
+        let cases: [(&str, &[(u32, u32)]); 3] = [
+            (
+                "The running dogs are barking loudly",
+                &[(0, 3), (4, 7), (12, 15), (17, 20), (21, 25), (29, 33)],
+            ),
+            (
+                "The running dogs Vie\u{323}\u{302}t",
+                &[(0, 3), (4, 7), (12, 15), (17, 25)],
+            ),
+            (
+                "The running dogs +\u{301}\u{316}",
+                &[(0, 3), (4, 7), (12, 15)],
+            ),
+        ];
+        for (input, positions) in cases {
+            let actual: Vec<(u32, u32)> = analyzer
+                .analyze(input)
+                .iter()
+                .map(|term| (term.word_offset, term.end_offset))
+                .collect();
+            assert_eq!(actual, positions, "input '{input}'");
+        }
     }
 
     /// C++: `test_nfd_large_token_tokenize` — 7 000 NFD "é" (21 000 bytes, 14 000

@@ -258,15 +258,16 @@ def _undo_dotted_i(text: str) -> str:
     if start == -1:
         return text
     out = []
+    done = 0
     while start != -1:
         end = start + 1
         while end < len(text) and unicodedata.combining(text[end]):
             end += 1
         marks = sorted("\u0307" + text[start + 1 : end], key=unicodedata.combining)
-        out.append(text[:start] + "I" + "".join(marks))
-        text = text[end:]
-        start = text.find("\u0130")
-    out.append(text)
+        out.append(text[done:start] + "I" + "".join(marks))
+        done = end
+        start = text.find("\u0130", end)
+    out.append(text[done:])
     return "".join(out)
 
 

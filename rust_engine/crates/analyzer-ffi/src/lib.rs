@@ -204,7 +204,11 @@ impl AnalyzerHandle {
             Backend::Rag(analyzer) => {
                 let (tokens, positions) = analyzer.tokenize_with_position(text);
                 let (tokens, positions) = if self.fine_grained {
-                    analyzer.fine_grained_tokenize_with_position(&tokens.join(" "), &positions)
+                    analyzer.fine_grained_tokenize_with_position(
+                        text,
+                        &tokens.join(" "),
+                        &positions,
+                    )
                 } else {
                     (tokens, positions)
                 };

@@ -252,7 +252,7 @@ impl RAGAnalyzer {
             let (mut tokens, mut positions) = self.tokenize_with_position(text);
             if self.fine_grained {
                 let (fine_tokens, fine_positions) =
-                    self.fine_grained_tokenize_with_position(&tokens.join(" "), &positions);
+                    self.fine_grained_tokenize_with_position(text, &tokens.join(" "), &positions);
                 tokens = fine_tokens;
                 positions = fine_positions;
             }
@@ -482,9 +482,11 @@ impl RAGAnalyzer {
         self.english_normalize(&res)
     }
 
-    /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`.
+    /// C++: `RAGAnalyzer::FineGrainedTokenizeWithPosition`. `text` is the
+    /// input that `positions` index into.
     pub fn fine_grained_tokenize_with_position(
         &self,
+        text: &str,
         tokens_str: &str,
         positions: &[(u32, u32)],
     ) -> (Vec<String>, Vec<(u32, u32)>) {
@@ -499,6 +501,16 @@ impl RAGAnalyzer {
             .count();
         let mut fine_tokens = Vec::new();
         let mut fine_positions = Vec::new();
+        // NFC changed a token only if it changes the input bytes of its span;
+        // every other token gets the spans it had before NFC. A span that is
+        // out of range or cuts a character counts as changed.
+        let text_composed = normalize_nfc(text, None).is_some();
+        let composed = |(start, end): (u32, u32)| {
+            text_composed
+                && text
+                    .get(start as usize..end as usize)
+                    .is_none_or(|span| normalize_nfc(span, None).is_some())
+        };
 
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
             for (i, token) in tks.iter().enumerate() {
@@ -511,10 +523,10 @@ impl RAGAnalyzer {
                     fine_positions.push((sub_start, sub_end));
                     sub_start = sub_end + 1;
                 }
-                // The token can be shorter than its input (NFC, folding,
-                // stemming, lemmatization), so its last part ends where the
-                // coarse token does, and never before it starts.
-                if fine_positions.len() > first {
+                // NFC can make the token shorter than its input, so its last
+                // part ends where the coarse token does, and never before it
+                // starts.
+                if fine_positions.len() > first && composed((start_pos, end_pos)) {
                     let last = fine_positions.last_mut().expect("a part");
                     last.1 = end_pos.max(last.0);
                 }
@@ -552,11 +564,12 @@ impl RAGAnalyzer {
             sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
             let stk = &sorted[1].1;
             // The offsets of the parts add up only while the token is its input
-            // bytes. NFC, StrQ2B, OpenCC or folding can change its length, and
-            // NFC can reorder the combining marks; then every part gets the
-            // span of the whole token.
-            let exact =
-                start_pos as usize + token.len() == end_pos as usize && !has_combining_marks(token);
+            // bytes. In a token NFC changed, NFC, StrQ2B, OpenCC or folding can
+            // change its length, and NFC can reorder the combining marks; then
+            // every part gets the span of the whole token.
+            let exact = !composed((start_pos, end_pos))
+                || (start_pos as usize + token.len() == end_pos as usize
+                    && !has_combining_marks(token));
             let part_span = |sub_pos, sub_end| {
                 if exact {
                     (sub_pos, sub_end)

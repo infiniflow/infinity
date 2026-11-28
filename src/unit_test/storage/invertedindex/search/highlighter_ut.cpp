@@ -146,6 +146,16 @@ TEST_F(HighlighterTest, nfd_document_nfd_query) {
     EXPECT_EQ(output, "tie\u0302\u0301ng <em>vie\u0323\u0302t</em>");
 }
 
+// Two decomposed words with an ASCII-only run between them are both highlighted over
+// their own bytes.
+TEST_F(HighlighterTest, nfd_document_two_words) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng vi\u1ec7t", "tie\u0302\u0301ng and vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "<em>tie\u0302\u0301ng</em> and <em>vie\u0323\u0302t</em>");
+}
+
 // A document that is already NFC highlights exactly as before.
 TEST_F(HighlighterTest, nfc_document_unchanged) {
     if (!analyzer_)

@@ -10514,8 +10514,9 @@ pub fn highlight_with_analyzer(
             }
         }
     }
+    // Only the RAG analyzer composes its query terms to NFC.
     let mut nfc_map = analyzer::NfcPositionMap::default();
-    let nfc_text = if unicode.is_empty() {
+    let nfc_text = if unicode.is_empty() || !matches!(analyzer, analyzer::Analyzer::Rag(_)) {
         None
     } else {
         analyzer::normalize_nfc(raw_text, Some(&mut nfc_map))
