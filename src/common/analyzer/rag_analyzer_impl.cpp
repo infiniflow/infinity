@@ -2035,7 +2035,8 @@ std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> 
     std::vector<unsigned> opencc_pos_mapping;
     BuildPositionMapping(str1, strline, opencc_pos_mapping);
 
-    // Combine all position mappings: strline -> str1 -> processed_line -> (folded_)line
+    // Combine all position mappings: strline -> str1 -> processed_line -> (folded_)line,
+    // then, below, folded line -> NFC line when fold_diacritics_ is on, and NFC line -> line when NFC changed the text
     std::vector<unsigned> final_pos_mapping;
     final_pos_mapping.resize(strline.size() + 1);
 
@@ -2576,8 +2577,12 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                     for (auto &t : stk) {
                         unsigned sub_end = sub_pos + UTF8Length(t);
                         fine_tokens.push_back(t);
-                        fine_positions.emplace_back(sub_pos, sub_end);
+                        fine_positions.emplace_back(std::min(sub_pos, end_pos), std::min(sub_end, end_pos));
                         sub_pos = sub_end;
+                    }
+                    // NFC can change the token's byte length; the last part ends where the coarse token does.
+                    if (!stk.empty()) {
+                        fine_positions.back().second = end_pos;
                     }
                 }
             } else {
@@ -2585,8 +2590,11 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &tokens_str,
                 for (auto &t : stk) {
                     unsigned sub_end = sub_pos + static_cast<unsigned>(t.size());
                     fine_tokens.push_back(t);
-                    fine_positions.emplace_back(sub_pos, sub_end);
+                    fine_positions.emplace_back(std::min(sub_pos, end_pos), std::min(sub_end, end_pos));
                     sub_pos = sub_end;
+                }
+                if (!stk.empty()) {
+                    fine_positions.back().second = end_pos;
                 }
             }
         }

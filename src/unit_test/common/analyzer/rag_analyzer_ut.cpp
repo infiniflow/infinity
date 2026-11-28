@@ -91,7 +91,7 @@ public:
         return python_result;
     }
 
-    RAGAnalyzer *analyzer_;
+    RAGAnalyzer *analyzer_ = nullptr;
     std::string rag_tokenizer_path_ = "python/infinity_sdk/infinity";
     std::string input_file_ = rag_tokenizer_path_ + "/tokenizer_input.txt";
 };
@@ -756,6 +756,42 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
     analyzer_->FineGrainedTokenizeWithPosition("ab/cd", ab_cd_positions, fine_tokens, fine_positions);
     EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"}));
     EXPECT_EQ(fine_positions, (std::vector<std::pair<unsigned, unsigned>>{{0, 2}, {3, 3}}));
+}
+
+TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_with_nfc_shortened_token) {
+    if (!analyzer_) {
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    }
+    // A Chinese token goes through the stk split and holds a CJK Compatibility
+    // Ideograph (U+2F85D, 4 bytes) that NFC turns into a 3-byte one. The parts
+    // stay inside the coarse span [0, 13), never go backwards, and the last one
+    // ends where the coarse token does.
+    struct Case {
+        std::string input;
+        std::vector<std::string> tokens;
+        std::vector<std::pair<unsigned, unsigned>> positions;
+    };
+    const Case cases[] = {
+        {"\u77e9\u9635\U0002f85d\u5143", {"矩阵", "多元"}, {{0, 6}, {6, 13}}},
+    };
+    for (const auto &[input, tokens, positions] : cases) {
+        auto [coarse_tokens, coarse_positions] = analyzer_->TokenizeWithPosition(input);
+        ASSERT_EQ(coarse_positions.size(), 1u);
+        EXPECT_EQ(coarse_positions[0], (std::pair<unsigned, unsigned>{0, 13}));
+        std::vector<std::string> fine_tokens;
+        std::vector<std::pair<unsigned, unsigned>> fine_positions;
+        analyzer_->FineGrainedTokenizeWithPosition(coarse_tokens[0], coarse_positions, fine_tokens, fine_positions);
+        EXPECT_EQ(fine_tokens, tokens);
+        EXPECT_EQ(fine_positions, positions);
+        unsigned prev_end = 0;
+        for (const auto &[a, b] : fine_positions) {
+            EXPECT_LE(prev_end, a);
+            EXPECT_LE(a, b);
+            EXPECT_LE(b, coarse_positions[0].second);
+            prev_end = b;
+        }
+        EXPECT_EQ(prev_end, coarse_positions[0].second);
+    }
 }
 
 TEST_F(RAGAnalyzerTest, test_nfd_large_token_tokenize) {

@@ -3521,6 +3521,40 @@ mod rag_analyzer_tests {
         assert_eq!(fine_positions, [(0, 2), (3, 3)]);
     }
 
+    /// C++: `test_fine_grained_chinese_split_with_nfc_shortened_token` - a
+    /// Chinese token goes through the stk split and holds a CJK Compatibility
+    /// Ideograph (U+2F85D, 4 bytes) that NFC turns into a 3-byte one. The
+    /// parts stay inside the coarse span `[0, 13)`, never go backwards, and
+    /// the last one ends where the coarse token does.
+    #[test]
+    fn test_fine_grained_chinese_split_with_nfc_shortened_token() {
+        let analyzer = load_analyzer();
+        #[allow(clippy::type_complexity)]
+        let cases: [(&str, &[&str], &[(u32, u32)]); 1] = [(
+            "\u{77e9}\u{9635}\u{2f85d}\u{5143}",
+            &["矩阵", "多元"],
+            &[(0, 6), (6, 13)],
+        )];
+        for (input, tokens, positions) in cases {
+            let (coarse_tokens, coarse_positions) = analyzer.tokenize_with_position(input);
+            assert_eq!(coarse_positions, [(0, 13)], "input {input:?}");
+            let (fine_tokens, fine_positions) = analyzer
+                .fine_grained_tokenize_with_position(&coarse_tokens.join(" "), &coarse_positions);
+            assert_eq!(fine_tokens, tokens, "input {input:?}");
+            assert_eq!(fine_positions, positions, "input {input:?}");
+            let (_, coarse_end) = coarse_positions[0];
+            let mut prev_end = 0;
+            for &(a, b) in &fine_positions {
+                assert!(
+                    prev_end <= a && a <= b && b <= coarse_end,
+                    "{fine_positions:?}"
+                );
+                prev_end = b;
+            }
+            assert_eq!(prev_end, coarse_end);
+        }
+    }
+
     /// C++: `test_nfd_large_token_tokenize` — 7 000 NFD "é" (21 000 bytes, 14 000
     /// once composed) stay one token.
     #[test]

@@ -561,8 +561,13 @@ impl RAGAnalyzer {
                     for part in stk {
                         let sub_end = sub_pos + char_len(part) as u32;
                         fine_tokens.push(part.clone());
-                        fine_positions.push((sub_pos, sub_end));
+                        fine_positions.push((sub_pos.min(end_pos), sub_end.min(end_pos)));
                         sub_pos = sub_end;
+                    }
+                    // NFC can change the token's byte length; the last part
+                    // ends where the coarse token does.
+                    if !stk.is_empty() {
+                        fine_positions.last_mut().expect("a part").1 = end_pos;
                     }
                 }
             } else {
@@ -570,8 +575,11 @@ impl RAGAnalyzer {
                 for part in stk {
                     let sub_end = sub_pos + part.len() as u32;
                     fine_tokens.push(part.clone());
-                    fine_positions.push((sub_pos, sub_end));
+                    fine_positions.push((sub_pos.min(end_pos), sub_end.min(end_pos)));
                     sub_pos = sub_end;
+                }
+                if !stk.is_empty() {
+                    fine_positions.last_mut().expect("a part").1 = end_pos;
                 }
             }
         }

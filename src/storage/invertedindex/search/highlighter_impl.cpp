@@ -17,6 +17,9 @@ module;
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 
+// Standard headers go before the module declaration; unicode_nfc.h uses only those.
+#include "common/analyzer/unicode_nfc.h"
+
 module infinity_core:highlighter.impl;
 
 import :highlighter;
@@ -87,6 +90,29 @@ void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_
                 break;
             }
             matches.emplace_back(pos, pos + query_text.length());
+            start = pos + 1;
+        }
+    }
+
+    // The analyzer emits NFC query terms; a document stored decomposed (NFD) only matches
+    // after composing it. Hits are mapped back to raw bytes; MergeMatches folds duplicates.
+    std::vector<unsigned> pos_map;
+    std::optional<std::string> nfc_text = NormalizeNFC(raw_text, &pos_map);
+    if (!nfc_text.has_value()) {
+        return;
+    }
+    for (const auto &query_text : query_texts) {
+        size_t start = 0;
+        while (true) {
+            size_t pos = nfc_text->find(query_text, start);
+            if (pos == std::string::npos) {
+                break;
+            }
+            size_t raw_start = pos_map[pos];
+            size_t raw_end = pos_map[pos + query_text.length()];
+            if (raw_start < raw_end) {
+                matches.emplace_back(raw_start, raw_end);
+            }
             start = pos + 1;
         }
     }

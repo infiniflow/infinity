@@ -46,6 +46,9 @@ pub mod tokenizer;
 pub mod traditional;
 mod unicode_nfc;
 mod unicode_nfc_data;
+/// NFC normalization with an output-to-input byte map, for callers that must
+/// map NFC offsets back to the original text.
+pub use unicode_nfc::normalize_nfc;
 pub mod whitespace;
 
 pub use chinese::*;

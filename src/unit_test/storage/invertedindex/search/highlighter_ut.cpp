@@ -125,3 +125,32 @@ TEST_F(HighlighterTest, test4) {
     Highlighter::instance().GetHighlight(query, raw_text, output, analyzer_);
     std::cout << "Output: " << output << std::endl << std::endl;
 }
+
+// A document stored decomposed (NFD) is highlighted over its own bytes when the query
+// term is NFC, which is what the analyzer emits for any query.
+TEST_F(HighlighterTest, nfd_document_nfc_query) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng", "tie\u0302\u0301ng vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "<em>tie\u0302\u0301ng</em> vie\u0323\u0302t");
+}
+
+// An NFD query goes through the analyzer first, so it reaches the highlighter as NFC and
+// still finds the NFD document.
+TEST_F(HighlighterTest, nfd_document_nfd_query) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("vie\u0323\u0302t", "tie\u0302\u0301ng vie\u0323\u0302t", output, analyzer_);
+    EXPECT_EQ(output, "tie\u0302\u0301ng <em>vie\u0323\u0302t</em>");
+}
+
+// A document that is already NFC highlights exactly as before.
+TEST_F(HighlighterTest, nfc_document_unchanged) {
+    if (!analyzer_)
+        FAIL() << "RAGAnalyzer not loaded, skipping test";
+    std::string output;
+    Highlighter::instance().GetHighlight("ti\u1ebfng", "ti\u1ebfng vi\u1ec7t", output, analyzer_);
+    EXPECT_EQ(output, "<em>ti\u1ebfng</em> vi\u1ec7t");
+}

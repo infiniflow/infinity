@@ -216,7 +216,7 @@ fn append_segment(buf: &[Unit], out: &mut String, mut pos_map: Option<&mut Vec<u
 /// the C++ and Rust tokenizers emit such tokens (PCRE2 counts every Mn as
 /// `\w`, Rust keeps Other_Alphabetic marks such as U+05C1), rag_tokenizer.py
 /// never does.
-pub(crate) fn normalize_nfc(input: &str, mut pos_map: Option<&mut Vec<u32>>) -> Option<String> {
+pub fn normalize_nfc(input: &str, mut pos_map: Option<&mut Vec<u32>>) -> Option<String> {
     let mut out: Option<String> = None;
     let mut copied = 0; // input[..copied] is already in out
     let mut buf = Vec::new();

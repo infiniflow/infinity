@@ -97,3 +97,29 @@ fn test4() {
         "{output}"
     );
 }
+
+/// A document stored decomposed (NFD) is highlighted over its own bytes when
+/// the query term is NFC, which is what the analyzer emits for any query.
+#[test]
+fn nfd_document_highlights_nfc_query() {
+    let raw_text = "tie\u{302}\u{301}ng vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng", raw_text, &analyzer());
+    assert_eq!(output, "<em>tie\u{302}\u{301}ng</em> vie\u{323}\u{302}t");
+}
+
+/// An NFD query goes through the analyzer first, so it reaches the highlighter
+/// as NFC and still finds the NFD document.
+#[test]
+fn nfd_document_highlights_nfd_query() {
+    let raw_text = "tie\u{302}\u{301}ng vie\u{323}\u{302}t";
+    let output = highlight_with_analyzer("vie\u{323}\u{302}t", raw_text, &analyzer());
+    assert_eq!(output, "tie\u{302}\u{301}ng <em>vie\u{323}\u{302}t</em>");
+}
+
+/// A document that is already NFC highlights exactly as before.
+#[test]
+fn nfc_document_highlight_unchanged() {
+    let raw_text = "ti\u{1ebf}ng vi\u{1ec7}t";
+    let output = highlight_with_analyzer("ti\u{1ebf}ng", raw_text, &analyzer());
+    assert_eq!(output, "<em>ti\u{1ebf}ng</em> vi\u{1ec7}t");
+}
