@@ -3597,23 +3597,22 @@ mod rag_analyzer_tests {
             assert_eq!(fine_tokens, ["ab", "cd"]);
             assert_eq!(fine_positions, [(0, 2), (3, 5)], "text '{text}'");
         }
-        // In a token NFC changed, a last part that starts past the coarse end
-        // gets an empty span, not an inverted one.
+        // Every part of a token NFC changed gets the span of the whole token.
         let (fine_tokens, fine_positions) =
             analyzer.fine_grained_tokenize_with_position("e\u{301}", true, "abc/de", &[(0, 3)]);
         assert_eq!(fine_tokens, ["abc", "de"]);
-        assert_eq!(fine_positions, [(0, 3), (4, 4)]);
+        assert_eq!(fine_positions, [(0, 3), (0, 3)]);
     }
 
     /// C++: `test_fine_grained_span_cuts_character` — a span that cuts a
-    /// character counts as changed only when NFC changes the input. The span
-    /// (0, 2) ends inside U+00E9.
+    /// character counts as changed only when NFC changes the input; then every
+    /// part gets that span. The span (0, 2) ends inside U+00E9.
     #[test]
     fn test_fine_grained_span_cuts_character() {
         let analyzer = load_analyzer();
         let cases: [(&str, &[(u32, u32)]); 2] = [
             ("x\u{e9}", &[(0, 2), (3, 5)]),
-            ("x\u{e9} e\u{301}", &[(0, 2), (3, 3)]),
+            ("x\u{e9} e\u{301}", &[(0, 2), (0, 2)]),
         ];
         for (text, positions) in cases {
             let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();

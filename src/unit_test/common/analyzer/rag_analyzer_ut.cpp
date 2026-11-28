@@ -820,13 +820,12 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
         EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"})) << text;
         EXPECT_EQ(fine_positions, (Spans{{0, 2}, {3, 5}})) << text;
     }
-    // In a token NFC changed, a last part that starts past the coarse end gets an
-    // empty span, not an inverted one.
+    // Every part of a token NFC changed gets the span of the whole token.
     std::vector<std::string> fine_tokens;
     Spans fine_positions;
     analyzer_->FineGrainedTokenizeWithPosition("e\u0301", true, "abc/de", Spans{{0, 3}}, fine_tokens, fine_positions);
     EXPECT_EQ(fine_tokens, (std::vector<std::string>{"abc", "de"}));
-    EXPECT_EQ(fine_positions, (Spans{{0, 3}, {4, 4}}));
+    EXPECT_EQ(fine_positions, (Spans{{0, 3}, {0, 3}}));
 }
 
 TEST_F(RAGAnalyzerTest, test_fine_grained_span_cuts_character) {
@@ -834,11 +833,11 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_span_cuts_character) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";
     }
     // A span that cuts a character counts as changed only when NFC changes the
-    // input. The span (0, 2) ends inside U+00E9.
+    // input; then every part gets that span. The span (0, 2) ends inside U+00E9.
     using Spans = std::vector<std::pair<unsigned, unsigned>>;
     const std::pair<std::string, Spans> cases[] = {
         {"x\u00e9", {{0, 2}, {3, 5}}},
-        {"x\u00e9 e\u0301", {{0, 2}, {3, 3}}},
+        {"x\u00e9 e\u0301", {{0, 2}, {0, 2}}},
     };
     for (const auto &[text, positions] : cases) {
         std::vector<std::string> fine_tokens;
@@ -966,30 +965,30 @@ TEST_F(RAGAnalyzerTest, test_nfc_position_map) {
     };
     const Case cases[] = {
         // U+1EC7 (3 bytes) comes from e U+0323 U+0302 (5 bytes).
-        {"Việt", "Việt", {0, 1, 2, 2, 2, 7, 8}, {0, 1, 2, 7, 7, 7, 8}},
+        {"Vie\u0323\u0302t", "Việt", {0, 1, 2, 2, 2, 7, 8}, {0, 1, 2, 7, 7, 7, 8}},
         // Marks typed out of canonical order: U+1EB9 takes in the U+0323 at
         // bytes [3, 5), the U+0301 after it comes from bytes [1, 3).
-        {"ẹ́", "ẹ́", {0, 0, 0, 1, 1, 5}, {0, 5, 5, 5, 5, 5}},
+        {"e\u0301\u0323", "ẹ́", {0, 0, 0, 1, 1, 5}, {0, 5, 5, 5, 5, 5}},
         // No starter to compose with: U+0316 moves before U+0301, and a token
         // of either mark spans both.
-        {"+̖́", "+̖́", {0, 1, 1, 1, 1, 5}, {0, 1, 5, 5, 5, 5}},
+        {"+\u0301\u0316", "+̖́", {0, 1, 1, 1, 1, 5}, {0, 1, 5, 5, 5, 5}},
         // Hangul conjoining jamo (9 bytes) compose to one syllable.
-        {"각", "각", {0, 0, 0, 9}, {0, 9, 9, 9}},
+        {"\u1100\u1161\u11A8", "각", {0, 0, 0, 9}, {0, 9, 9, 9}},
         // A protected code point (U+0958) and its mark are copied as they are;
         // the é after them is composed.
-        {"क़́"
-         "é",
-         "क़́é",
+        {"\u0958\u0301"
+         "e\u0301",
+         "\u0958\u0301\u00E9",
          {0, 1, 2, 3, 4, 5, 5, 8},
          {0, 1, 2, 3, 4, 5, 8, 8}},
         // A byte that is not UTF-8 is copied as it is, between two segments.
-        {"é\xFF"
-         "é",
+        {"e\u0301\xFF"
+         "e\u0301",
          "é\xFFé",
          {0, 0, 3, 4, 4, 7},
          {0, 3, 3, 4, 7, 7}},
         // A truncated sequence at the end.
-        {"é\xCC", "é\xCC", {0, 0, 3, 4}, {0, 3, 3, 4}},
+        {"e\u0301\xCC", "é\xCC", {0, 0, 3, 4}, {0, 3, 3, 4}},
     };
     for (const auto &[input, expected, start, end] : cases) {
         NFCPositionMap map;

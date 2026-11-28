@@ -2543,21 +2543,18 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
             std::istringstream iss(token);
             std::string sub_token;
             unsigned sub_start = start_pos;
-            const std::size_t first = fine_positions.size();
+            // NFC can change the length of a token and of its parts, so every part of a
+            // token NFC changed gets the span of the whole token, which never ends before
+            // it starts.
+            const bool changed = token_composed(start_pos, end_pos);
 
             while (std::getline(iss, sub_token, '/')) {
                 if (!sub_token.empty()) {
                     unsigned sub_end = sub_start + sub_token.size();
                     fine_tokens.push_back(sub_token);
-                    fine_positions.emplace_back(sub_start, sub_end);
+                    fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_start, sub_end});
                     sub_start = sub_end + 1;
                 }
-            }
-            // NFC can make the token shorter than its input, so its last part
-            // ends where the coarse token does, and never before it starts.
-            if (fine_positions.size() > first && token_composed(start_pos, end_pos)) {
-                auto &last = fine_positions.back();
-                last.second = std::max(end_pos, last.first);
             }
         }
 

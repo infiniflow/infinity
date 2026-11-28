@@ -59,7 +59,9 @@ void Highlighter::GetHighlight(const std::string &matching_text, const std::stri
         GetASCIIWordHighlight(ascii_only_queries, raw_text, matches, analyzer);
     }
     if (!unicode_queries.empty()) {
-        GetUnicodeWordHighlight(unicode_queries, raw_text, matches);
+        // Only the RAG analyzer composes its query terms to NFC.
+        const bool compose = dynamic_cast<RAGAnalyzer *>(analyzer) != nullptr;
+        GetUnicodeWordHighlight(unicode_queries, raw_text, matches, compose);
     }
 
     ApplyHighlights(raw_text, matches, output);
@@ -81,7 +83,8 @@ void Highlighter::GetASCIIWordHighlight(const std::vector<std::string> &query_te
 
 void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_texts,
                                           const std::string &raw_text,
-                                          std::vector<std::pair<size_t, size_t>> &matches) {
+                                          std::vector<std::pair<size_t, size_t>> &matches,
+                                          bool compose) {
     for (const auto &query_text : query_texts) {
         size_t start = 0;
         while (true) {
@@ -94,7 +97,10 @@ void Highlighter::GetUnicodeWordHighlight(const std::vector<std::string> &query_
         }
     }
 
-    // The analyzer emits NFC query terms; a document stored decomposed (NFD) only matches
+    if (!compose) {
+        return;
+    }
+    // The RAG analyzer emits NFC query terms; a document stored decomposed (NFD) only matches
     // after composing it. Hits are mapped back to raw bytes; MergeMatches folds duplicates.
     NFCPositionMap nfc_map;
     std::optional<std::string> nfc_text = NormalizeNFC(raw_text, &nfc_map);

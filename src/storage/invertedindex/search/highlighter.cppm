@@ -37,7 +37,10 @@ private:
                                std::vector<std::pair<size_t, size_t>> &matches,
                                Analyzer *analyzer);
 
-    void GetUnicodeWordHighlight(const std::vector<std::string> &query, const std::string &raw_text, std::vector<std::pair<size_t, size_t>> &matches);
+    void GetUnicodeWordHighlight(const std::vector<std::string> &query,
+                                 const std::string &raw_text,
+                                 std::vector<std::pair<size_t, size_t>> &matches,
+                                 bool compose);
 
     void ApplyHighlights(const std::string &text, const std::vector<std::pair<size_t, size_t>> &matches, std::string &output);
 

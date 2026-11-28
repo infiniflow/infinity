@@ -532,20 +532,20 @@ impl RAGAnalyzer {
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
             for (i, token) in tks.iter().enumerate() {
                 let (start_pos, end_pos) = positions[i];
-                let first = fine_positions.len();
+                // NFC can change the length of a token and of its parts, so
+                // every part of a token NFC changed gets the span of the whole
+                // token, which never ends before it starts.
+                let changed = token_composed((start_pos, end_pos));
                 let mut sub_start = start_pos;
                 for sub_token in token.split('/').filter(|part| !part.is_empty()) {
                     let sub_end = sub_start + sub_token.len() as u32;
                     fine_tokens.push(sub_token.to_string());
-                    fine_positions.push((sub_start, sub_end));
+                    fine_positions.push(if changed {
+                        (start_pos, end_pos.max(start_pos))
+                    } else {
+                        (sub_start, sub_end)
+                    });
                     sub_start = sub_end + 1;
-                }
-                // NFC can make the token shorter than its input, so its last
-                // part ends where the coarse token does, and never before it
-                // starts.
-                if fine_positions.len() > first && token_composed((start_pos, end_pos)) {
-                    let last = fine_positions.last_mut().expect("a part");
-                    last.1 = end_pos.max(last.0);
                 }
             }
             return (fine_tokens, fine_positions);
