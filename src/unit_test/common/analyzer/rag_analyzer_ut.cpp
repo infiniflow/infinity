@@ -797,14 +797,16 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
          {{0, 3}, {4, 7}, {12, 15}, {17, 20}, {21, 25}, {29, 33}}},
     };
     for (const auto &[input, tokens, positions] : cases) {
-        auto [coarse_tokens, coarse_positions] = analyzer_->TokenizeWithPosition(input);
+        bool composed = false;
+        auto [coarse_tokens, coarse_positions] = analyzer_->TokenizeWithPosition(input, &composed);
+        EXPECT_EQ(composed, NormalizeNFC(input).has_value()) << input;
         std::string coarse;
         for (const auto &token : coarse_tokens) {
             coarse += (coarse.empty() ? "" : " ") + token;
         }
         std::vector<std::string> fine_tokens;
         Spans fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(input, coarse, coarse_positions, fine_tokens, fine_positions);
+        analyzer_->FineGrainedTokenizeWithPosition(input, composed, coarse, coarse_positions, fine_tokens, fine_positions);
         EXPECT_EQ(fine_tokens, tokens) << input;
         EXPECT_EQ(fine_positions, positions) << input;
     }
@@ -814,7 +816,7 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
     for (const char *text : {"ab/cd", "ab/cd e\u0301"}) {
         std::vector<std::string> fine_tokens;
         Spans fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(text, "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
+        analyzer_->FineGrainedTokenizeWithPosition(text, NormalizeNFC(text).has_value(), "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
         EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"})) << text;
         EXPECT_EQ(fine_positions, (Spans{{0, 2}, {3, 5}})) << text;
     }
@@ -822,7 +824,7 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_tokenize_with_position) {
     // empty span, not an inverted one.
     std::vector<std::string> fine_tokens;
     Spans fine_positions;
-    analyzer_->FineGrainedTokenizeWithPosition("e\u0301", "abc/de", Spans{{0, 3}}, fine_tokens, fine_positions);
+    analyzer_->FineGrainedTokenizeWithPosition("e\u0301", true, "abc/de", Spans{{0, 3}}, fine_tokens, fine_positions);
     EXPECT_EQ(fine_tokens, (std::vector<std::string>{"abc", "de"}));
     EXPECT_EQ(fine_positions, (Spans{{0, 3}, {4, 4}}));
 }
@@ -841,7 +843,7 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_span_cuts_character) {
     for (const auto &[text, positions] : cases) {
         std::vector<std::string> fine_tokens;
         Spans fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(text, "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
+        analyzer_->FineGrainedTokenizeWithPosition(text, NormalizeNFC(text).has_value(), "ab/cd", Spans{{0, 2}}, fine_tokens, fine_positions);
         EXPECT_EQ(fine_tokens, (std::vector<std::string>{"ab", "cd"})) << text;
         EXPECT_EQ(fine_positions, positions) << text;
     }
@@ -860,7 +862,7 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
     const auto fine_grained = [this](const std::string &text, const std::string &token, unsigned end) {
         std::vector<std::string> fine_tokens;
         Spans fine_positions;
-        analyzer_->FineGrainedTokenizeWithPosition(text, token, Spans{{0, end}}, fine_tokens, fine_positions);
+        analyzer_->FineGrainedTokenizeWithPosition(text, NormalizeNFC(text).has_value(), token, Spans{{0, end}}, fine_tokens, fine_positions);
         return std::pair{fine_tokens, fine_positions};
     };
     {

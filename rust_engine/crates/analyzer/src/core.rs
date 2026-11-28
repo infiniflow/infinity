@@ -3571,9 +3571,16 @@ mod rag_analyzer_tests {
             ),
         ];
         for (input, tokens, positions) in cases {
-            let (coarse_tokens, coarse_positions) = analyzer.tokenize_with_position(input);
+            let (coarse_tokens, coarse_positions, composed) =
+                analyzer.tokenize_with_position_composed(input);
+            assert_eq!(
+                composed,
+                crate::unicode_nfc::normalize_nfc(input, None).is_some(),
+                "input '{input}'"
+            );
             let (fine_tokens, fine_positions) = analyzer.fine_grained_tokenize_with_position(
                 input,
+                composed,
                 &coarse_tokens.join(" "),
                 &coarse_positions,
             );
@@ -3584,15 +3591,16 @@ mod rag_analyzer_tests {
         // The parts of a token NFC left as it is add up from the start of its
         // span, also when NFC changed the rest of the input.
         for text in ["ab/cd", "ab/cd e\u{301}"] {
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
             let (fine_tokens, fine_positions) =
-                analyzer.fine_grained_tokenize_with_position(text, "ab/cd", &[(0, 2)]);
+                analyzer.fine_grained_tokenize_with_position(text, composed, "ab/cd", &[(0, 2)]);
             assert_eq!(fine_tokens, ["ab", "cd"]);
             assert_eq!(fine_positions, [(0, 2), (3, 5)], "text '{text}'");
         }
         // In a token NFC changed, a last part that starts past the coarse end
         // gets an empty span, not an inverted one.
         let (fine_tokens, fine_positions) =
-            analyzer.fine_grained_tokenize_with_position("e\u{301}", "abc/de", &[(0, 3)]);
+            analyzer.fine_grained_tokenize_with_position("e\u{301}", true, "abc/de", &[(0, 3)]);
         assert_eq!(fine_tokens, ["abc", "de"]);
         assert_eq!(fine_positions, [(0, 3), (4, 4)]);
     }
@@ -3608,8 +3616,9 @@ mod rag_analyzer_tests {
             ("x\u{e9} e\u{301}", &[(0, 2), (3, 3)]),
         ];
         for (text, positions) in cases {
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
             let (fine_tokens, fine_positions) =
-                analyzer.fine_grained_tokenize_with_position(text, "ab/cd", &[(0, 2)]);
+                analyzer.fine_grained_tokenize_with_position(text, composed, "ab/cd", &[(0, 2)]);
             assert_eq!(fine_tokens, ["ab", "cd"], "text '{text}'");
             assert_eq!(fine_positions, positions, "text '{text}'");
         }
@@ -3651,8 +3660,9 @@ mod rag_analyzer_tests {
         for (text, tokens, positions) in cases {
             let token = text.split(' ').next().expect("a word");
             let span = [(0, token.len() as u32)];
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
             let (actual_tokens, actual_positions) =
-                analyzer.fine_grained_tokenize_with_position(text, token, &span);
+                analyzer.fine_grained_tokenize_with_position(text, composed, token, &span);
             assert_eq!(actual_tokens, tokens, "text '{text}'");
             assert_eq!(actual_positions, positions, "text '{text}'");
         }
@@ -3665,8 +3675,9 @@ mod rag_analyzer_tests {
             ("矩阵\u{301}\u{316}多元", "矩阵\u{316}\u{301}多元"),
         ] {
             let end = text.len() as u32;
+            let composed = crate::unicode_nfc::normalize_nfc(text, None).is_some();
             let (tokens, positions) =
-                analyzer.fine_grained_tokenize_with_position(text, token, &[(0, end)]);
+                analyzer.fine_grained_tokenize_with_position(text, composed, token, &[(0, end)]);
             assert!(tokens.len() > 1, "text '{text}': {tokens:?}");
             assert_eq!(positions, vec![(0, end); tokens.len()], "text '{text}'");
         }

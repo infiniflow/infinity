@@ -65,7 +65,9 @@ public:
     // diacritics-folding language (Slovak, Czech).
     static std::string FoldDiacritics(const std::string &input);
 
-    std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> TokenizeWithPosition(const std::string &line);
+    // When composed is not null, it is set to whether NFC changed line.
+    std::pair<std::vector<std::string>, std::vector<std::pair<unsigned, unsigned>>> TokenizeWithPosition(const std::string &line,
+                                                                                                         bool *composed = nullptr);
     std::string Tokenize(const std::string &line);
 
     void FineGrainedTokenize(const std::string &tokens, std::vector<std::string> &result);
@@ -75,8 +77,10 @@ public:
                                    std::vector<std::pair<unsigned, unsigned>> &positions,
                                    unsigned base_pos,
                                    const std::vector<unsigned> *pos_mapping = nullptr);
-    // text is the input that positions index into.
+    // text is the input that positions index into; composed is whether NFC
+    // changed it.
     void FineGrainedTokenizeWithPosition(const std::string &text,
+                                         bool composed,
                                          const std::string &tokens_str,
                                          const std::vector<std::pair<unsigned, unsigned>> &positions,
                                          std::vector<std::string> &fine_tokens,

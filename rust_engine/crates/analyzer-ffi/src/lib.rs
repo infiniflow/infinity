@@ -202,10 +202,11 @@ impl AnalyzerHandle {
     fn tokens_with_position(&self, text: &str) -> Result<Vec<(String, u32, u32)>, String> {
         match &self.backend {
             Backend::Rag(analyzer) => {
-                let (tokens, positions) = analyzer.tokenize_with_position(text);
+                let (tokens, positions, composed) = analyzer.tokenize_with_position_composed(text);
                 let (tokens, positions) = if self.fine_grained {
                     analyzer.fine_grained_tokenize_with_position(
                         text,
+                        composed,
                         &tokens.join(" "),
                         &positions,
                     )
