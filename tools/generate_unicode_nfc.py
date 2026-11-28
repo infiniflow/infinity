@@ -447,36 +447,36 @@ def print_cases():
     for cp in range(0x110000):
         if canonical_decomposition(chr(cp)):
             cases += [chr(cp), unicodedata.normalize("NFD", chr(cp))]
-    marks = "̛̣̀́̂̃̆̉"
+    marks = "\u0300\u0301\u0302\u0303\u0306\u0309\u0323\u031b"
     for base in "aeiouyAEIOUY":
         for m1, m2 in itertools.permutations(marks, 2):
             cases.append(base + m1 + m2)
     vowels = "âêôăơưÂÊÔĂƠƯ"
     for base in vowels:
-        for tone in "̣̀́̃̉":
+        for tone in "\u0300\u0301\u0303\u0309\u0323":
             cases.append(base + tone)
     for s in "가각힣":
         cases += [s, unicodedata.normalize("NFD", s)]
     cases += [
-        "각",
+        "\uac00\u11a8",
         "각ᆨ",
         "ᄀᆨ",
         # Full_Composition_Exclusion: non-starter decompositions, a
         # script-specific exclusion and singletons.
-        "̈́",
-        "ཱི",
-        "क़",
-        "क़़",
-        "שׁלום",
-        "Km",
-        "濾",
+        "\u0344",
+        "\u0f73",
+        "\u0958",
+        "\u0958\u093c",
+        "\ufb2a\u05dc\u05d5\u05dd",
+        "\u212am",
+        "\uf984",
         # Marks before, after and around protected code points.
-        "éक़́",
-        "à̖́",
-        "̖̀",
-        "ẹ̈́",
-        "ᄀक़ᅡ",
-        "क़̈́",
+        "e\u0301\u0958\u0301",
+        "a\u0316\u0340\u0301",
+        "\u0340\u0316",
+        "e\u0344\u0323",
+        "\u1100\u0958\u1161",
+        "\u0915\u0344\u093c",
         # I + U+0307 does not compose (NOT_COMPOSED), with marks of lower and
         # higher classes around it; U+0130 typed as such stays.
         "abI\u0307cd",
@@ -492,9 +492,9 @@ def print_cases():
         "\u0130\u0323",
         "\u0130\u0307\u0316",
         # Marks typed out of canonical order, of the same length once ordered.
-        "x॒́",
-        "+̖́",
-        "بَّ",
+        "x\u0301\u0952",
+        "+\u0301\u0316",
+        "\u0628\u0651\u064e",
         # Assigned after Unicode 13.0: a mark of 14.0 (U+0897), the pairs that
         # compose in 16.0 (U+105D2 U+0307, U+11382 U+113C9, U+1611E U+1611E),
         # and a 13.0 letter with marks around a 15.0 mark (U+1E4EC).
@@ -502,8 +502,8 @@ def print_cases():
         "\U000105d2̇",
         "\U00011382\U000113c9",
         "\U0001611e\U0001611e",
-        "é\U0001e4ec̣",
-        "\U0001e4eć̖",
+        "e\u0301\U0001e4ec\u0323",
+        "\U0001e4ec\u0301\u0316",
     ]
     compose = load_compose()
     for s in cases:
