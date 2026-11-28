@@ -94,8 +94,8 @@ typedef struct {
  * input as given. Where NFC changed the input, a token's span covers every
  * input byte its characters come from, and can overlap the next token's span,
  * or contain it, when NFC reordered combining marks across them. In
- * fine-grained mode, the parts of a token NFC changed can all carry that
- * token's span. */
+ * fine-grained mode, the parts of a token NFC changed all carry that token's
+ * span. */
 RAGTokenList *RAGAnalyzer_TokenizeWithPosition(RAGAnalyzerHandle handle, const char *text);
 
 void RAGAnalyzer_FreeTokenList(RAGTokenList *token_list);

@@ -273,14 +273,16 @@ inline void AppendSegment(const std::vector<NFCUnit> &buf, std::string &out, NFC
 // are not well-formed UTF-8 are copied as they are and split segments.
 //
 // When a string is returned and map is set, map->start and map->end get
-// out.size() + 1 entries each, which never decrease and are the identity on
-// bytes NFC did not change. A token at output bytes [a, b) comes from input
-// bytes [map->start[a], map->end[b]): start[a] is the lowest input offset of
-// the code points from output byte a on, end[b] the highest input end of the
-// code points before output byte b (a composite comes from everything it took
-// in). The span is never empty for a non-empty token and covers the input of
-// every code point in it; when canonical reordering moved a mark, it also
-// covers the marks it moved past, so it can overlap the next token.
+// out.size() + 1 entries each, which never decrease. Outside the segments NFC
+// changed, each byte maps to its own input byte; inside such a segment, to the
+// span of the input characters it comes from, which reordering can widen. A
+// token at output bytes [a, b) comes from input bytes
+// [map->start[a], map->end[b]): start[a] is the lowest input offset of the
+// code points from output byte a on, end[b] the highest input end of the code
+// points before output byte b (a composite comes from everything it took in).
+// The span is never empty for a non-empty token and covers the input of every
+// code point in it; when canonical reordering moved a mark, it also covers the
+// marks it moved past, so it can overlap the next token.
 inline std::optional<std::string> NormalizeNFC(std::string_view in, NFCPositionMap *map = nullptr) {
     using namespace nfc_detail;
     std::optional<std::string> out;

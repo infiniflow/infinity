@@ -63,7 +63,7 @@ fn non_boundary(c: char) -> Option<(u8, bool)> {
 }
 
 /// C++: `nfc_detail::CanonicalCombiningClass` — 0 for a protected code point.
-pub(crate) fn canonical_combining_class(c: char) -> u8 {
+fn canonical_combining_class(c: char) -> u8 {
     non_boundary(c).map_or(0, |(ccc, _)| ccc)
 }
 
@@ -211,15 +211,16 @@ pub struct NfcPositionMap {
 /// already NFC.
 ///
 /// When a string is returned and `map` is set, `map.start` and `map.end` get
-/// `out.len() + 1` entries each, which never decrease and are the identity on
-/// bytes NFC did not change. A token at output bytes `[a, b)` comes from input
-/// bytes `[map.start[a], map.end[b])`: `start[a]` is the lowest input offset
-/// of the code points from output byte `a` on, `end[b]` the highest input end
-/// of the code points before output byte `b` (a composite comes from
-/// everything it took in). The span is never empty for a non-empty token and
-/// covers the input of every code point in it; when canonical reordering
-/// moved a mark, it also covers the marks it moved past, so it can overlap
-/// the next token.
+/// `out.len() + 1` entries each, which never decrease. Outside the segments
+/// NFC changed, each byte maps to its own input byte; inside such a segment,
+/// to the span of the input characters it comes from, which reordering can
+/// widen. A token at output bytes `[a, b)` comes from input bytes
+/// `[map.start[a], map.end[b])`: `start[a]` is the lowest input offset of the
+/// code points from output byte `a` on, `end[b]` the highest input end of the
+/// code points before output byte `b` (a composite comes from everything it
+/// took in). The span is never empty for a non-empty token and covers the
+/// input of every code point in it; when canonical reordering moved a mark,
+/// it also covers the marks it moved past, so it can overlap the next token.
 pub fn normalize_nfc(input: &str, mut map: Option<&mut NfcPositionMap>) -> Option<String> {
     let mut out: Option<String> = None;
     let mut copied = 0; // input[..copied] is already in out
@@ -227,7 +228,7 @@ pub fn normalize_nfc(input: &str, mut map: Option<&mut NfcPositionMap>) -> Optio
     let copy = |map: &mut Option<&mut NfcPositionMap>, from: usize, to: usize| {
         if let Some(map) = map.as_deref_mut() {
             map.start.extend(from as u32..to as u32);
-            map.end.extend(from as u32 + 1..to as u32 + 1);
+            map.end.extend((from + 1..=to).map(|end| end as u32));
         }
     };
     let mut flush_segment = |start: usize, end: usize, map: &mut Option<&mut NfcPositionMap>| {

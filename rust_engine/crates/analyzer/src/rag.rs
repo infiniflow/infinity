@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use super::*;
-use crate::unicode_nfc::{canonical_combining_class, normalize_nfc, NfcPositionMap};
+use crate::unicode_nfc::{normalize_nfc, NfcPositionMap};
 
 /// C++: `DartsTrie` (`darts_trie_impl.cpp`) over a Darts-clone unit array.
 ///
@@ -532,9 +532,10 @@ impl RAGAnalyzer {
         if (zh_num as f64) < (tks.len() as f64) * 0.2 {
             for (i, token) in tks.iter().enumerate() {
                 let (start_pos, end_pos) = positions[i];
-                // NFC can change the length of a token and of its parts, so
-                // every part of a token NFC changed gets the span of the whole
-                // token, which never ends before it starts.
+                // In every branch, each part of a token NFC changed gets the span
+                // of the whole token, which never ends before it starts. NFC can
+                // change lengths and move combining marks, so offsets inside such
+                // a token do not map to input bytes.
                 let changed = token_composed((start_pos, end_pos));
                 let mut sub_start = start_pos;
                 for sub_token in token.split('/').filter(|part| !part.is_empty()) {
@@ -580,18 +581,16 @@ impl RAGAnalyzer {
                 .collect();
             sorted.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
             let stk = &sorted[1].1;
-            // The offsets of the parts add up only while the token is its input
-            // bytes. In a token NFC changed, NFC, StrQ2B, OpenCC or folding can
-            // change its length, and NFC can reorder the combining marks; then
-            // every part gets the span of the whole token.
-            let exact = !token_composed((start_pos, end_pos))
-                || (start_pos as usize + token.len() == end_pos as usize
-                    && !has_combining_marks(token));
+            // In every branch, each part of a token NFC changed gets the span of
+            // the whole token, which never ends before it starts. NFC can change
+            // lengths and move combining marks, so offsets inside such a token do
+            // not map to input bytes.
+            let changed = token_composed((start_pos, end_pos));
             let part_span = |sub_pos, sub_end| {
-                if exact {
-                    (sub_pos, sub_end)
+                if changed {
+                    (start_pos, end_pos.max(start_pos))
                 } else {
-                    (start_pos, end_pos)
+                    (sub_pos, sub_end)
                 }
             };
             if stk.len() == token_len {
@@ -1515,14 +1514,6 @@ pub(crate) fn merge_with_position(
         start = end;
     }
     (merged_tokens, merged_positions)
-}
-
-/// C++: `HasCombiningMarks` — whether `text` holds a combining mark
-/// (ccc != 0). NFC may have reordered the marks around it, even when the
-/// length stayed the same: A U+0301 U+0325 becomes U+1E00 U+0301, 5 bytes
-/// either way.
-fn has_combining_marks(text: &str) -> bool {
-    text.chars().any(|c| canonical_combining_class(c) != 0)
 }
 
 /// C++: `IsChinese` — a 3-byte sequence with a 0xE4..=0xE9 lead byte, i.e.

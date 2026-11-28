@@ -3625,9 +3625,7 @@ mod rag_analyzer_tests {
 
     /// C++: `test_fine_grained_chinese_split_span` — the parts of a Chinese
     /// token add up their lengths from the start of the coarse span, as before
-    /// NFC, unless NFC changed the token. Then they do only when the token is
-    /// as long as its span and holds no combining mark NFC may have moved;
-    /// otherwise every part gets the coarse span.
+    /// NFC, unless NFC changed the token; then every part gets the coarse span.
     #[test]
     fn test_fine_grained_chinese_split_span() {
         let analyzer = load_analyzer();
@@ -3666,10 +3664,12 @@ mod rag_analyzer_tests {
             assert_eq!(actual_positions, positions, "text '{text}'");
         }
 
-        // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0301
-        // U+0325 becomes U+1E00 U+0301, 5 bytes either way; U+0301 U+0316 swap.
+        // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0325
+        // becomes U+1E00 with no mark left, and A U+0301 U+0325 becomes U+1E00
+        // U+0301, the same length either way; U+0301 U+0316 swap.
         for (text, token) in [
             ("矩阵e\u{301}多元", "矩阵é多元"),
+            ("矩阵A\u{325}多元", "矩阵\u{1e00}多元"),
             ("矩阵A\u{301}\u{325}多元", "矩阵\u{1e00}\u{301}多元"),
             ("矩阵\u{301}\u{316}多元", "矩阵\u{316}\u{301}多元"),
         ] {

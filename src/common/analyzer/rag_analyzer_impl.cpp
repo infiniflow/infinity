@@ -2482,21 +2482,6 @@ void RAGAnalyzer::EnglishNormalizeWithPosition(const std::vector<std::string> &t
     }
 }
 
-// Whether text holds a combining mark (ccc != 0). NFC may have reordered the
-// marks around it, even when the length stayed the same: A U+0301 U+0325
-// becomes U+1E00 U+0301, 5 bytes either way.
-static bool HasCombiningMarks(std::string_view text) {
-    char32_t cp = 0;
-    for (std::size_t i = 0; i < text.size();) {
-        const std::size_t len = nfc_detail::DecodeUTF8(text, i, cp);
-        if (len != 0 && nfc_detail::CanonicalCombiningClass(cp) != 0) {
-            return true;
-        }
-        i += len == 0 ? 1 : len;
-    }
-    return false;
-}
-
 void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
                                                   bool composed,
                                                   const std::string &tokens_str,
@@ -2543,9 +2528,9 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
             std::istringstream iss(token);
             std::string sub_token;
             unsigned sub_start = start_pos;
-            // NFC can change the length of a token and of its parts, so every part of a
-            // token NFC changed gets the span of the whole token, which never ends before
-            // it starts.
+            // In every branch, each part of a token NFC changed gets the span of the whole
+            // token, which never ends before it starts. NFC can change lengths and move
+            // combining marks, so offsets inside such a token do not map to input bytes.
             const bool changed = token_composed(start_pos, end_pos);
 
             while (std::getline(iss, sub_token, '/')) {
@@ -2595,10 +2580,10 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
             std::vector<std::pair<std::vector<std::string>, double>> sorted_tokens;
             SortTokens(token_list, sorted_tokens);
             const auto &stk = sorted_tokens[1].first;
-            // The offsets of the parts add up only while the token is its input bytes. In a
-            // token NFC changed, NFC, StrQ2B, OpenCC or folding can change its length, and NFC
-            // can reorder the combining marks; then every part gets the span of the whole token.
-            const bool exact = !token_composed(start_pos, end_pos) || (start_pos + token.size() == end_pos && !HasCombiningMarks(token));
+            // In every branch, each part of a token NFC changed gets the span of the whole
+            // token, which never ends before it starts. NFC can change lengths and move
+            // combining marks, so offsets inside such a token do not map to input bytes.
+            const bool changed = token_composed(start_pos, end_pos);
 
             if (stk.size() == token_len) {
                 fine_tokens.push_back(token);
@@ -2618,7 +2603,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
                     for (auto &t : stk) {
                         unsigned sub_end = sub_pos + UTF8Length(t);
                         fine_tokens.push_back(t);
-                        fine_positions.push_back(exact ? std::pair{sub_pos, sub_end} : std::pair{start_pos, end_pos});
+                        fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_pos, sub_end});
                         sub_pos = sub_end;
                     }
                 }
@@ -2627,7 +2612,7 @@ void RAGAnalyzer::FineGrainedTokenizeWithPosition(const std::string &text,
                 for (auto &t : stk) {
                     unsigned sub_end = sub_pos + static_cast<unsigned>(t.size());
                     fine_tokens.push_back(t);
-                    fine_positions.push_back(exact ? std::pair{sub_pos, sub_end} : std::pair{start_pos, end_pos});
+                    fine_positions.push_back(changed ? std::pair{start_pos, std::max(end_pos, start_pos)} : std::pair{sub_pos, sub_end});
                     sub_pos = sub_end;
                 }
             }

@@ -853,9 +853,8 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
         FAIL() << "RAGAnalyzer not loaded, skipping test";
     }
     // The parts of a Chinese token add up their lengths from the start of the
-    // coarse span, as before NFC, unless NFC changed the token. Then they do
-    // only when the token is as long as its span and holds no combining mark NFC
-    // may have moved; otherwise every part gets the coarse span.
+    // coarse span, as before NFC, unless NFC changed the token; then every part
+    // gets the coarse span.
     using Spans = std::vector<std::pair<unsigned, unsigned>>;
     using TextToken = std::pair<std::string, std::string>;
     const auto fine_grained = [this](const std::string &text, const std::string &token, unsigned end) {
@@ -887,9 +886,11 @@ TEST_F(RAGAnalyzerTest, test_fine_grained_chinese_split_span) {
         }
         EXPECT_EQ(positions, expected) << text;
     }
-    // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0301 U+0325
-    // becomes U+1E00 U+0301, 5 bytes either way; U+0301 U+0316 swap.
+    // Inputs NFC changes: e U+0301 becomes é, one byte shorter; A U+0325 becomes
+    // U+1E00 with no mark left, and A U+0301 U+0325 becomes U+1E00 U+0301, the
+    // same length either way; U+0301 U+0316 swap.
     for (const auto &[text, token] : {TextToken{"矩阵e\u0301多元", "矩阵é多元"},
+                                      TextToken{"矩阵A\u0325多元", "矩阵\u1e00多元"},
                                       TextToken{"矩阵A\u0301\u0325多元", "矩阵\u1e00\u0301多元"},
                                       TextToken{"矩阵\u0301\u0316多元", "矩阵\u0316\u0301多元"}}) {
         const auto end = static_cast<unsigned>(text.size());
@@ -1039,7 +1040,7 @@ TEST_F(RAGAnalyzerTest, test_nfc_matches_python) {
         EXPECT_EQ(actual.has_value(), input != expected) << line;
         if (actual) {
             for (const auto *entries : {&map.start, &map.end}) {
-                EXPECT_EQ(entries->size(), actual->size() + 1) << line;
+                ASSERT_EQ(entries->size(), actual->size() + 1) << line;
                 EXPECT_EQ(entries->back(), static_cast<unsigned>(input.size())) << line;
                 EXPECT_TRUE(std::is_sorted(entries->begin(), entries->end())) << line;
             }
